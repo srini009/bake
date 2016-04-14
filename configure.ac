@@ -1,0 +1,54 @@
+#                                               -*- Autoconf -*-
+# Process this file with autoconf to produce a configure script.
+
+AC_PREREQ([2.67])
+AC_INIT([bake-bulk], [0.1], [],[],[]) 
+
+AC_CANONICAL_TARGET
+AC_CANONICAL_SYSTEM
+AC_CANONICAL_HOST
+
+AM_INIT_AUTOMAKE([foreign subdir-objects -Wall])
+
+# we should remove this soon, only needed for automake 1.10 and older
+m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
+
+AC_CONFIG_SRCDIR([README.md])
+AC_CONFIG_HEADERS([bake-bulk-config.h])
+
+# Checks for programs.
+AC_PROG_CC
+AM_PROG_CC_C_O
+AC_PROG_CXX
+AC_PROG_CXXCPP
+AC_PROG_RANLIB
+
+AC_PROG_MKDIR_P
+
+AC_REQUIRE_CPP
+
+AC_CHECK_SIZEOF([long int])
+
+dnl
+dnl Verify pkg-config
+dnl
+PKG_PROG_PKG_CONFIG
+PKG_CONFIG="pkg-config --static"
+
+PKG_CHECK_MODULES_STATIC([MARGO],[margo],[],
+   [AC_MSG_ERROR([Could not find working margo installation!])])
+LIBS="$MARGO_LIBS $LIBS"
+CPPFLAGS="$MARGO_CFLAGS $CPPFLAGS"
+CFLAGS="$MARGO_CFLAGS $CFLAGS"
+
+# NOTE: See README.md if the following does not work for you; some versions of
+# nvml/pmem install broken .pc files
+PKG_CHECK_MODULES_STATIC([LIBPMEMOBJ],[libpmemobj],[],
+   [AC_MSG_ERROR([Could not find working libpmemobj installation!])])
+LIBS="$LIBPMEMOBJ_LIBS $LIBS"
+CPPFLAGS="$LIBPMEMOBJ_CFLAGS $CPPFLAGS"
+CFLAGS="$LIBPMEMOBJ_CFLAGS $CFLAGS"
+
+AC_CONFIG_FILES([Makefile maint/bake-bulk.pc])
+AC_OUTPUT
+ 

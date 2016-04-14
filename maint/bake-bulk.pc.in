@@ -1,0 +1,12 @@
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+libdir=@libdir@
+includedir=@includedir@
+
+Name: bake-bulk
+Description: bulk data access service
+Version: 0.1
+URL: https://xgitlab.cels.anl.gov/sds/bake-bulk
+Requires: margo
+Libs: -L${libdir} -lbake-bulk
+Cflags: -I${includedir}
