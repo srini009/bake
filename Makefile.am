@@ -15,7 +15,7 @@ CLEANFILES = $(bin_SCRIPTS)
 MAINTAINERCLEANFILES =
 EXTRA_DIST =
 BUILT_SOURCES =
-# include_HEADERS = include/margo.h include/margo-timer.h
+include_HEADERS = include/bake-bulk.h
 
 EXTRA_DIST += \
  prepare.sh 
@@ -28,16 +28,16 @@ AM_LIBS =
 
 AM_CXXFLAGS = $(AM_CFLAGS)
 
-# lib_LIBRARIES += src/libmargo.a
-# src_libmargo_a_SOURCES =
+lib_LIBRARIES += src/libbake-bulk.a
+src_libbake_bulk_a_SOURCES =
 
-# LDADD = src/libmargo.a
+LDADD = src/libbake-bulk.a
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = maint/bake-bulk.pc
 
 include Make.rules
 
-# include $(top_srcdir)/src/Makefile.subdir
+include $(top_srcdir)/src/Makefile.subdir
 # include $(top_srcdir)/examples/Makefile.subdir
 
