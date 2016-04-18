@@ -27,11 +27,21 @@ int main(int argc, char **argv)
     hg_class_t *hg_class;
     hg_addr_t svr_addr = HG_ADDR_NULL;
     hg_handle_t handle;
-        
+ 
+    if(argc != 2)
+    {
+        fprintf(stderr, "Usage: bb-shutdown <server addr to stop>\n");
+        fprintf(stderr, "  Example: ./bb-shutdown tcp://localhost:1234\n");
+        return(-1);
+    }       
+
     /* boilerplate HG initialization steps */
     /***************************************/
-    /* TODO: fix addr */
-    hg_class = HG_Init("tcp://localhost:1234", HG_FALSE);
+    /* NOTE: the listening address is not actually used in this case (the
+     * na_listen flag is false); but we pass in the *target* server address
+     * here to make sure that Mercury starts up the correct transport
+     */
+    hg_class = HG_Init(argv[1], HG_FALSE);
     if(!hg_class)
     {
         fprintf(stderr, "Error: HG_Init()\n");
@@ -91,8 +101,7 @@ int main(int argc, char **argv)
 
     /* send one rpc to server to shut it down */
     /* find addr for server */
-    /* TODO: fix addr */
-    ret = margo_addr_lookup(mid, hg_context, "tcp://localhost:1234", &svr_addr);
+    ret = margo_addr_lookup(mid, hg_context, argv[1], &svr_addr);
     assert(ret == 0);
 
     /* create handle */
