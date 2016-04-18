@@ -10,6 +10,7 @@
 #include <abt.h>
 #include <abt-snoozer.h>
 #include <margo.h>
+#include <libpmemobj.h>
 
 #include "bake-bulk-rpc.h"
 
@@ -21,14 +22,23 @@ int main(int argc, char **argv)
     ABT_pool handler_pool;
     hg_context_t *hg_context;
     hg_class_t *hg_class;
+    PMEMobjpool *pmem_pool;
 
-    if(argc != 2)
+    if(argc != 3)
     {
-        fprintf(stderr, "Usage: bake-bulk-server <HG listening addr>\n");
-        fprintf(stderr, "  Example: ./bake-bulk-server tcp://localhost:1234\n");
+        fprintf(stderr, "Usage: bake-bulk-server <HG listening addr> <pmem pool>\n");
+        fprintf(stderr, "  Example: ./bake-bulk-server tcp://localhost:1234 /dev/shm/foo.dat\n");
         return(-1);
     }
 
+    /* open pmem pool */
+    pmem_pool = pmemobj_open(argv[2], NULL);
+    if(!pmem_pool)
+    {
+        fprintf(stderr, "pmemobj_open: %s\n", pmemobj_errormsg());
+        return(-1);
+    }
+    
     /* boilerplate HG initialization steps */
     /***************************************/
     hg_class = HG_Init(argv[1], HG_TRUE);
@@ -109,6 +119,8 @@ int main(int argc, char **argv)
 
     HG_Context_destroy(hg_context);
     HG_Finalize(hg_class);
+
+    pmemobj_close(pmem_pool);
 
     return(0);
 }
