@@ -1,2 +1,4 @@
 src_libbake_bulk_a_SOURCES += \
  src/bake-bulk.c 
+
+bin_PROGRAMS += src/bake-bulk-server
