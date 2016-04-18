@@ -13,25 +13,25 @@
 
 #include "bake-bulk-rpc.h"
 
+/* client program that will shut down a BAKE bulk server. */
+
+static hg_id_t bake_bulk_shutdown_id;
+
 int main(int argc, char **argv) 
 {
     int ret;
+    ABT_xstream xstream;
+    ABT_pool pool;
     margo_instance_id mid;
-    ABT_xstream handler_xstream;
-    ABT_pool handler_pool;
     hg_context_t *hg_context;
     hg_class_t *hg_class;
-
-    if(argc != 2)
-    {
-        fprintf(stderr, "Usage: bake-bulk-server <HG listening addr>\n");
-        fprintf(stderr, "  Example: ./bake-bulk-server tcp://localhost:1234\n");
-        return(-1);
-    }
-
+    hg_addr_t svr_addr = HG_ADDR_NULL;
+    hg_handle_t handle;
+        
     /* boilerplate HG initialization steps */
     /***************************************/
-    hg_class = HG_Init(argv[1], HG_TRUE);
+    /* TODO: fix addr */
+    hg_class = HG_Init("tcp://localhost:1234", HG_FALSE);
     if(!hg_class)
     {
         fprintf(stderr, "Error: HG_Init()\n");
@@ -62,14 +62,14 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    /* Find primary pool to use for running rpc handlers */
-    ret = ABT_xstream_self(&handler_xstream);
+    /* retrieve current pool to use for ULT creation */
+    ret = ABT_xstream_self(&xstream);
     if(ret != 0)
     {
         fprintf(stderr, "Error: ABT_xstream_self()\n");
         return(-1);
     }
-    ret = ABT_xstream_get_main_pools(handler_xstream, 1, &handler_pool);
+    ret = ABT_xstream_get_main_pools(xstream, 1, &pool);
     if(ret != 0)
     {
         fprintf(stderr, "Error: ABT_xstream_get_main_pools()\n");
@@ -79,32 +79,31 @@ int main(int argc, char **argv)
     /* actually start margo */
     /* provide argobots pools for driving communication progress and
      * executing rpc handlers as well as class and context for Mercury
-     * communication.
+     * communication.  The rpc handler pool is null in this example program
+     * because this is a pure client that will not be servicing rpc requests.
      */
     /***************************************/
-    mid = margo_init(handler_pool, handler_pool, hg_context, hg_class);
-    assert(mid);
+    mid = margo_init(pool, ABT_POOL_NULL, hg_context, hg_class);
 
     /* register RPC */
-    MERCURY_REGISTER(hg_class, "bake_bulk_shutdown_rpc", void, void, 
-        bake_bulk_shutdown_ult_handler);
+    bake_bulk_shutdown_id = MERCURY_REGISTER(hg_class, "bake_bulk_shutdown_rpc", void, void, 
+        NULL);
 
-    /* NOTE: at this point this server ULT has two options.  It can wait on
-     * whatever mechanism it wants to (however long the daemon should run and
-     * then call margo_finalize().  Otherwise, it can call
-     * margo_wait_for_finalize() on the assumption that it should block until
-     * some other entity calls margo_finalize().
-     *
-     * This example does the latter.  Margo will be finalized by a special
-     * RPC from the client.
-     *
-     * This approach will allow the server to idle gracefully even when
-     * executed in "single" mode, in which the main thread of the server
-     * daemon and the progress thread for Mercury are executing in the same
-     * ABT pool.
-     */
-    margo_wait_for_finalize(mid);
+    /* send one rpc to server to shut it down */
+    /* find addr for server */
+    /* TODO: fix addr */
+    ret = margo_addr_lookup(mid, hg_context, "tcp://localhost:1234", &svr_addr);
+    assert(ret == 0);
 
+    /* create handle */
+    ret = HG_Create(hg_context, svr_addr, bake_bulk_shutdown_id, &handle);
+    assert(ret == 0);
+
+    margo_forward(mid, handle, NULL);
+
+    /* shut down everything */
+    margo_finalize(mid);
+    
     ABT_finalize();
 
     HG_Context_destroy(hg_context);
