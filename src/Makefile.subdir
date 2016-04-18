@@ -2,3 +2,7 @@ src_libbake_bulk_a_SOURCES += \
  src/bake-bulk.c 
 
 bin_PROGRAMS += src/bake-bulk-server
+
+src_bake_bulk_server_SOURCES = \
+ src/bake-bulk-server.c \
+ src/bake-bulk-rpc.c
