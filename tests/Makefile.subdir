@@ -1,0 +1,6 @@
+TESTS += \
+ tests/basic.sh
+
+EXTRA_DIST += \
+ tests/basic.sh 
+

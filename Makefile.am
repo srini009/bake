@@ -39,5 +39,5 @@ pkgconfig_DATA = maint/bake-bulk.pc
 include Make.rules
 
 include $(top_srcdir)/src/Makefile.subdir
-# include $(top_srcdir)/examples/Makefile.subdir
+include $(top_srcdir)/tests/Makefile.subdir
 
