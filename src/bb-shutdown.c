@@ -93,7 +93,7 @@ int main(int argc, char **argv)
      * because this is a pure client that will not be servicing rpc requests.
      */
     /***************************************/
-    mid = margo_init(pool, ABT_POOL_NULL, hg_context, hg_class);
+    mid = margo_init_pool(pool, ABT_POOL_NULL, hg_context);
 
     /* register RPC */
     bake_bulk_shutdown_id = MERCURY_REGISTER(hg_class, "bake_bulk_shutdown_rpc", void, void, 
@@ -101,7 +101,7 @@ int main(int argc, char **argv)
 
     /* send one rpc to server to shut it down */
     /* find addr for server */
-    ret = margo_addr_lookup(mid, hg_context, argv[1], &svr_addr);
+    ret = margo_addr_lookup(mid, argv[1], &svr_addr);
     assert(ret == 0);
 
     /* create handle */
