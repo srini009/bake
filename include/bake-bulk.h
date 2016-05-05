@@ -4,6 +4,11 @@
  * See COPYRIGHT in top-level directory.
  */
 
+/* NOTE: code below is a copy of the bulk portion of the proposed BAKE API.
+ * Commented out for now but leaving it in place for reference
+ */
+
+#if 0
 
 /// ==== Some high-level goals ====
 // - abstract particular keyval service being used
@@ -209,4 +214,4 @@ bake_return_t bake_bulk_region_deprecate(
 bake_return_t bake_bulk_gc(
         bake_instance_t *target,
         bake_request_t *req);
-
+#endif
