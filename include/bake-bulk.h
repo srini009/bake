@@ -4,6 +4,44 @@
  * See COPYRIGHT in top-level directory.
  */
 
+#include <stdint.h>
+ 
+/**
+ * Persistent, universal, opaque identifier for a BAKE target.
+ * Remains constant if instance is opened, closed, or migrated.
+ *
+ * Think of this like you would a UUID for a storage volume.
+ */
+typedef uint64_t bake_target_id_t;
+
+/**
+ * Obtain identifying information for a bake target through the provided
+ * remote mercury address.
+ *
+ * @param [in] mecury_dest Mercury address in string form
+ * @param [out] bti BAKE target identifier
+ * @returns 0 on success, -1 on failure
+ */
+int bake_probe_instance(
+    const char *mercury_dest,
+    bake_target_id_t *bti);
+ 
+/**
+ * Release resources associated with access to a target
+ *
+ * @param [in] bti BAKE target_identifier
+ */
+void bake_release_instance(
+    bake_target_id_t bti);
+
+/**
+ * Utility function to shut down a remote service
+ *
+ * @param [in] bti Bake target identifier
+ * @returns 0 on success, -1 on fialure 
+ */
+int bake_shutdown_service(bake_target_id_t bti);
+
 /* NOTE: code below is a copy of the bulk portion of the proposed BAKE API.
  * Commented out for now but leaving it in place for reference
  */
