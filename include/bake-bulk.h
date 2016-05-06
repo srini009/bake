@@ -15,6 +15,14 @@
 typedef uint64_t bake_target_id_t;
 
 /**
+ * Persistent, opaque identifier for a bulk region within a BAKE target.
+ */
+#define BAKE_BULK_REGION_ID_SIZE 16
+typedef struct {
+    char data[BAKE_BULK_REGION_ID_SIZE];
+} bake_bulk_region_id_t;
+
+/**
  * Obtain identifying information for a bake target through the provided
  * remote mercury address.
  *
@@ -25,9 +33,26 @@ typedef uint64_t bake_target_id_t;
 int bake_probe_instance(
     const char *mercury_dest,
     bake_target_id_t *bti);
- 
+  
 /**
- * Release resources associated with access to a target
+ * Create a bounded-size bulk data region.  The resulting region can be
+ * written using bulk write operations, and can be persisted (once writes are
+ * complete) with a a bulk persist operation.  The region is not valid for
+ * read access until persisted.
+ *
+ * @param [in] bti BAKE target identifier
+ * @param [in] region_size size of region to be created
+ * @param [out] rid identifier for new region
+ * @returns 0 on success, -1 on failure
+ */
+int bake_bulk_create(
+    bake_target_id_t bti,
+    uint64_t region_size,
+    bake_bulk_region_id_t *rid);
+
+/**
+ * Release local resources associated with access to a target; does not
+ * modify the target in any way.
  *
  * @param [in] bti BAKE target_identifier
  */

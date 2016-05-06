@@ -115,3 +115,13 @@ int bake_shutdown_service(bake_target_id_t bti)
     return(0);
 }
 
+int bake_bulk_create(
+    bake_target_id_t bti,
+    uint64_t region_size,
+    bake_bulk_region_id_t *rid)
+{
+
+    return(-1);
+}
+
+
