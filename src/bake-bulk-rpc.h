@@ -36,6 +36,16 @@ MERCURY_GEN_PROC(bake_bulk_write_out_t,
     ((int32_t)(ret)))
 DECLARE_MARGO_RPC_HANDLER(bake_bulk_write_ult)
 
+/* bulk persist */
+MERCURY_GEN_PROC(bake_bulk_persist_in_t,
+    ((bake_target_id_t)(bti))\
+    ((bake_bulk_region_id_t)(rid)))
+MERCURY_GEN_PROC(bake_bulk_persist_out_t,
+    ((int32_t)(ret)))
+DECLARE_MARGO_RPC_HANDLER(bake_bulk_persist_ult)
+
+
+
 /* TODO: where should the encoder defs live?  Not in bake-bulk-rpc.c because 
  * we don't really need the rpc handlers to be linked into clients...
  */

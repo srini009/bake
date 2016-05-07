@@ -157,3 +157,58 @@ static void bake_bulk_write_ult(hg_handle_t handle)
 }
 DEFINE_MARGO_RPC_HANDLER(bake_bulk_write_ult)
 
+/* service a remote RPC that persists to a bulk region */
+static void bake_bulk_persist_ult(hg_handle_t handle)
+{
+    bake_bulk_persist_out_t out;
+    bake_bulk_persist_in_t in;
+    hg_return_t hret;
+    PMEMoid oid;
+    char* buffer;
+    hg_size_t size;
+
+    printf("Got RPC request to persist bulk region.\n");
+    
+    memset(&out, 0, sizeof(out));
+
+    hret = HG_Get_input(handle, &in);
+    if(hret != HG_SUCCESS)
+    {
+        out.ret = -1;
+        HG_Respond(handle, NULL, NULL, &out);
+        HG_Destroy(handle);
+        return;
+    }
+
+    /* TODO: real translation functions for opaque type */
+    memcpy(&oid, &in.rid, sizeof(oid));
+
+    /* find memory address for target object */
+    buffer = pmemobj_direct(oid);
+    if(!buffer)
+    {
+        out.ret = -1;
+        HG_Free_input(handle, &in);
+        HG_Respond(handle, NULL, NULL, &out);
+        HG_Destroy(handle);
+        return;
+    }
+
+    /* TODO: how to get the size of the object? */
+    /* TODO: options:
+     * - do typed objects in the pmemobj api help?
+     * - can we store a header on each region?
+     */
+    size = 1;
+
+    pmemobj_persist(pmem_pool, buffer, size);
+
+    out.ret = 0;
+
+    HG_Free_input(handle, &in);
+    HG_Respond(handle, NULL, NULL, &out);
+    HG_Destroy(handle);
+    return;
+}
+DEFINE_MARGO_RPC_HANDLER(bake_bulk_persist_ult)
+

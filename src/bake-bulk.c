@@ -22,12 +22,11 @@ struct bake_instance
 /* TODO: replace later, hard coded global instance */
 struct bake_instance g_binst; 
 
-/* TODO: probably not global in the long run either */
+/* TODO: these IDs are probably not global in the long run either */
 static hg_id_t g_bake_bulk_shutdown_id; 
-/* TODO: probably not global in the long run either */
 static hg_id_t g_bake_bulk_create_id;
-/* TODO: probably not global in the long run either */
 static hg_id_t g_bake_bulk_write_id;
+static hg_id_t g_bake_bulk_persist_id;
 
 int bake_probe_instance(
     const char *mercury_dest,
@@ -79,6 +78,13 @@ int bake_probe_instance(
         bake_bulk_write_in_t,
         bake_bulk_write_out_t,
         NULL);
+    g_bake_bulk_persist_id = 
+        MERCURY_REGISTER(g_binst.hg_class, 
+        "bake_bulk_persist_rpc", 
+        bake_bulk_persist_in_t,
+        bake_bulk_persist_out_t,
+        NULL);
+
 
     g_binst.mid = margo_init(0, 0, g_binst.hg_context);
     if(!g_binst.mid)
@@ -241,6 +247,40 @@ int bake_bulk_persist(
     bake_target_id_t bti,
     bake_bulk_region_id_t rid)
 {
-    /* TODO: implement */
-    return(-1);
+    hg_return_t hret;
+    hg_handle_t handle;
+    bake_bulk_persist_in_t in;
+    bake_bulk_persist_out_t out;
+    int ret;
+
+    in.bti = bti;
+    in.rid = rid;
+
+    /* create handle */
+    hret = HG_Create(g_binst.hg_context, g_binst.dest, 
+        g_bake_bulk_persist_id, &handle);
+    if(hret != HG_SUCCESS)
+    {
+        return(-1);
+    }
+
+    hret = margo_forward(g_binst.mid, handle, &in);
+    if(hret != HG_SUCCESS)
+    {
+        HG_Destroy(handle);
+        return(-1);
+    }
+
+    hret = HG_Get_output(handle, &out);
+    if(hret != HG_SUCCESS)
+    {
+        HG_Destroy(handle);
+        return(-1);
+    }
+
+    ret = out.ret;
+
+    HG_Free_output(handle, &out);
+    HG_Destroy(handle);
+    return(ret);
 }
