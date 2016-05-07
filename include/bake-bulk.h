@@ -60,6 +60,13 @@ int bake_bulk_create(
  *
  * Results are undefined if multiple writers (from same process or different
  * processes) perform overlapping writes.
+ *
+ * @param [in] bti BAKE target identifier
+ * @param [in] rid identifier for new region
+ * @param [in] region_offset offset into the target region to write
+ * @param [in] buf local memory buffer to write
+ * @param [in] buf_size size of local memory buffer to write
+ * @returns 0 on success, -1 on failure
  */
 int bake_bulk_write(
     bake_target_id_t bti,
@@ -67,6 +74,18 @@ int bake_bulk_write(
     uint64_t region_offset,
     void const *buf,
     uint64_t buf_size);
+ 
+/**
+ * Persist a bulk region. The region is considered immutable at this point 
+ * and reads may be performed on the region.
+ *
+ * @param [in] bti BAKE target identifier
+ * @param [in] rid identifier for new region
+ * @returns 0 on success, -1 on failure
+ */
+int bake_bulk_persist(
+    bake_target_id_t bti,
+    bake_bulk_region_id_t rid);
 
 /**
  * Release local resources associated with access to a target; does not

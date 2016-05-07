@@ -116,10 +116,18 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    /* TODO: persist */
-   
     munmap(local_region, statbuf.st_size);
     close(fd);
+
+    ret = bake_bulk_persist(bti, rid);
+    if(ret != 0)
+    {
+        bake_release_instance(bti);
+        ABT_finalize();
+        fprintf(stderr, "Error: bake_bulk_persist()\n");
+        return(-1);
+    }
+   
     bake_release_instance(bti);
     ABT_finalize();
 

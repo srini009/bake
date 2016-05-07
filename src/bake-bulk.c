@@ -237,3 +237,10 @@ int bake_bulk_create(
 }
 
 
+int bake_bulk_persist(
+    bake_target_id_t bti,
+    bake_bulk_region_id_t rid)
+{
+    /* TODO: implement */
+    return(-1);
+}
