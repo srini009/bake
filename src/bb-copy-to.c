@@ -115,6 +115,8 @@ int main(int argc, char **argv)
         fprintf(stderr, "Error: bake_bulk_write()\n");
         return(-1);
     }
+
+    /* TODO: persist */
    
     munmap(local_region, statbuf.st_size);
     close(fd);
