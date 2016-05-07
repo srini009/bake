@@ -12,12 +12,14 @@ test_start_servers 1 2 20
 # actual test case
 #####################
 
-run_to 10 src/bb-copy-to $svr1
+echo "Hello world." > $TMPBASE/foo.dat
+run_to 10 src/bb-copy-to $TMPBASE/foo.dat $svr1
 if [ $? -ne 0 ]; then
     run_to 10 src/bb-shutdown $svr1 &> /dev/null 
     wait
     exit 1
 fi
+
 sleep 1
 
 #####################
