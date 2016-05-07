@@ -14,6 +14,11 @@
 
 #include "bake-bulk-rpc.h"
 
+/* TODO: this should not be global in the long run; server may provide access
+ * to multiple targets
+ */
+PMEMobjpool *pmem_pool;
+
 int main(int argc, char **argv) 
 {
     int ret;
@@ -22,7 +27,6 @@ int main(int argc, char **argv)
     ABT_pool handler_pool;
     hg_context_t *hg_context;
     hg_class_t *hg_class;
-    PMEMobjpool *pmem_pool;
 
     if(argc != 3)
     {

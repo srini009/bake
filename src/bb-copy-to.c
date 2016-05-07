@@ -52,6 +52,7 @@ int main(int argc, char **argv)
 
     /* TODO: create appropriate size region */
     ret = bake_bulk_create(bti, 1024, &rid);
+    if(ret != 0)
     {
         fprintf(stderr, "Error: bake_bulk_create()\n");
         return(-1);

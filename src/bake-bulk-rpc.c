@@ -5,7 +5,14 @@
  */
 
 #include <assert.h>
+#include <libpmemobj.h>
+
 #include "bake-bulk-rpc.h"
+
+/* TODO: this should not be global in the long run; server may provide access
+ * to multiple targets
+ */
+extern PMEMobjpool *pmem_pool;
 
 /* service a remote RPC that instructs the server daemon to shut down */
 static void bake_bulk_shutdown_ult(hg_handle_t handle)
@@ -39,16 +46,32 @@ DEFINE_MARGO_RPC_HANDLER(bake_bulk_shutdown_ult)
 static void bake_bulk_create_ult(hg_handle_t handle)
 {
     bake_bulk_create_out_t out;
+    bake_bulk_create_in_t in;
+    PMEMoid oid;
+    hg_return_t hret;
 
     printf("Got RPC request to create bulk region.\n");
-
+    
     memset(&out, 0, sizeof(out));
-    out.ret = -1;
+
+    hret = HG_Get_input(handle, &in);
+    if(hret != HG_SUCCESS)
+    {
+        out.ret = -1;
+        HG_Respond(handle, NULL, NULL, &out);
+        HG_Destroy(handle);
+        return;
+    }
+
+    out.ret = pmemobj_alloc(pmem_pool, &oid, in.region_size, 0, NULL, NULL);
+    if(out.ret == 0)
+    {
+        /* TODO: real translation functions for opaque type */
+        memcpy(&out.rid, &oid, sizeof(oid));
+    }
 
     HG_Respond(handle, NULL, NULL, &out);
-
     HG_Destroy(handle);
-
     return;
 }
 DEFINE_MARGO_RPC_HANDLER(bake_bulk_create_ult)
