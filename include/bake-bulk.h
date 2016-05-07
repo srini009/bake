@@ -52,6 +52,21 @@ int bake_bulk_create(
     bake_target_id_t bti,
     uint64_t region_size,
     bake_bulk_region_id_t *rid);
+ 
+/**
+ * Writes into a region that was previously created with bake_bulk_create().
+ * Result is not guaranteed to be persistent until explicit
+ * bake_bulk_persist() call.
+ *
+ * Results are undefined if multiple writers (from same process or different
+ * processes) perform overlapping writes.
+ */
+int bake_bulk_write(
+    bake_target_id_t bti,
+    bake_bulk_region_id_t rid,
+    uint64_t region_offset,
+    void const *buf,
+    uint64_t buf_size);
 
 /**
  * Release local resources associated with access to a target; does not
