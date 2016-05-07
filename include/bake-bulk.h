@@ -4,6 +4,9 @@
  * See COPYRIGHT in top-level directory.
  */
 
+#ifndef __BAKE_BULK_H
+#define __BAKE_BULK_H
+
 #include <stdint.h>
  
 /**
@@ -278,3 +281,5 @@ bake_return_t bake_bulk_gc(
         bake_instance_t *target,
         bake_request_t *req);
 #endif
+
+#endif /* __BAKE_BULK_H */

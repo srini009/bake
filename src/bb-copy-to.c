@@ -18,11 +18,12 @@ int main(int argc, char **argv)
 {
     int ret;
     bake_target_id_t bti;
+    bake_bulk_region_id_t rid;
  
     if(argc != 2)
     {
-        fprintf(stderr, "Usage: bb-shutdown <server addr to stop>\n");
-        fprintf(stderr, "  Example: ./bb-shutdown tcp://localhost:1234\n");
+        fprintf(stderr, "Usage: bb-copy-to <server addr>\n");
+        fprintf(stderr, "  Example: ./bb-copy-to tcp://localhost:1234\n");
         return(-1);
     }       
 
@@ -47,11 +48,21 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    /* shutdown server */
-    bake_shutdown_service(bti);
+    /* TODO: find local file, check it's size */
+
+    /* TODO: create appropriate size region */
+    ret = bake_bulk_create(bti, 1024, &rid);
+    {
+        fprintf(stderr, "Error: bake_bulk_create()\n");
+        return(-1);
+    }
+
+    /* TODO: a way to print region id */
+
+    /* TODO: data transfer */
 
     bake_release_instance(bti);
-
+    
     ABT_finalize();
 
     return(0);

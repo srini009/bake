@@ -6,6 +6,7 @@
 
 #include <bake-bulk.h>
 #include <margo.h>
+#include "bake-bulk-rpc.h"
 
 struct bake_instance
 {
@@ -20,6 +21,7 @@ struct bake_instance
 
 struct bake_instance g_binst; /* TODO: replace later, hard coded global instance */
 static hg_id_t g_bake_bulk_shutdown_id; /* TODO: probably not global in the long run either */
+static hg_id_t g_bake_bulk_create_id; /* TODO: probably not global in the long run either */
 
 int bake_probe_instance(
     const char *mercury_dest,
@@ -58,6 +60,12 @@ int bake_probe_instance(
     g_bake_bulk_shutdown_id = 
         MERCURY_REGISTER(g_binst.hg_class, 
         "bake_bulk_shutdown_rpc", void, void, 
+        NULL);
+    g_bake_bulk_create_id = 
+        MERCURY_REGISTER(g_binst.hg_class, 
+        "bake_bulk_create_rpc", 
+        bake_bulk_create_in_t,
+        bake_bulk_create_out_t,
         NULL);
 
     g_binst.mid = margo_init(0, 0, g_binst.hg_context);
@@ -120,8 +128,43 @@ int bake_bulk_create(
     uint64_t region_size,
     bake_bulk_region_id_t *rid)
 {
+    hg_return_t hret;
+    hg_handle_t handle;
+    bake_bulk_create_in_t in;
+    bake_bulk_create_out_t out;
+    int ret;
 
-    return(-1);
+    /* create handle */
+    hret = HG_Create(g_binst.hg_context, g_binst.dest, 
+        g_bake_bulk_create_id, &handle);
+    if(hret != HG_SUCCESS)
+    {
+        return(-1);
+    }
+
+    in.bti = bti;
+    in.region_size = region_size;
+
+    hret = margo_forward(g_binst.mid, handle, &in);
+    if(hret != HG_SUCCESS)
+    {
+        HG_Destroy(handle);
+        return(-1);
+    }
+
+    hret = HG_Get_output(handle, &out);
+    if(hret != HG_SUCCESS)
+    {
+        HG_Destroy(handle);
+        return(-1);
+    }
+
+    ret = out.ret;
+    *rid = out.rid;
+
+    HG_Free_output(handle, &out);
+    HG_Destroy(handle);
+    return(ret);
 }
 
 

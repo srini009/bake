@@ -14,7 +14,7 @@ static void bake_bulk_shutdown_ult(hg_handle_t handle)
     struct hg_info *hgi;
     margo_instance_id mid;
 
-    printf("Got RPC request to shutdown\n");
+    printf("Got RPC request to shutdown.\n");
 
     hgi = HG_Get_info(handle);
     assert(hgi);
@@ -34,3 +34,22 @@ static void bake_bulk_shutdown_ult(hg_handle_t handle)
     return;
 }
 DEFINE_MARGO_RPC_HANDLER(bake_bulk_shutdown_ult)
+
+/* service a remote RPC that creates a bulk region */
+static void bake_bulk_create_ult(hg_handle_t handle)
+{
+    bake_bulk_create_out_t out;
+
+    printf("Got RPC request to create bulk region.\n");
+
+    memset(&out, 0, sizeof(out));
+    out.ret = -1;
+
+    HG_Respond(handle, NULL, NULL, &out);
+
+    HG_Destroy(handle);
+
+    return;
+}
+DEFINE_MARGO_RPC_HANDLER(bake_bulk_create_ult)
+

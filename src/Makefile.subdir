@@ -1,7 +1,10 @@
 src_libbake_bulk_a_SOURCES += \
  src/bake-bulk.c 
 
-bin_PROGRAMS += src/bake-bulk-server src/bb-shutdown
+bin_PROGRAMS += \
+ src/bake-bulk-server \
+ src/bb-shutdown \
+ src/bb-copy-to
 
 src_bake_bulk_server_SOURCES = \
  src/bake-bulk-server.c \
