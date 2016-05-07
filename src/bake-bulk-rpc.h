@@ -26,10 +26,18 @@ MERCURY_GEN_PROC(bake_bulk_create_out_t,
     ((bake_bulk_region_id_t)(rid)))
 DECLARE_MARGO_RPC_HANDLER(bake_bulk_create_ult)
 
-/* TODO: where should these live?  Not in bake-bulk-rpc.c because we don't
- * really need the rpc handlers to be linked into clients...
- */
+/* bulk write */
+MERCURY_GEN_PROC(bake_bulk_write_in_t,
+    ((bake_target_id_t)(bti))\
+    ((bake_bulk_region_id_t)(rid))\
+    ((uint64_t)(region_offset))\
+    ((hg_bulk_t)(bulk_handle)))
+MERCURY_GEN_PROC(bake_bulk_write_out_t,
+    ((int32_t)(ret)))
 
+/* TODO: where should the encoder defs live?  Not in bake-bulk-rpc.c because 
+ * we don't really need the rpc handlers to be linked into clients...
+ */
 static inline hg_return_t hg_proc_bake_bulk_region_id_t(hg_proc_t proc, bake_bulk_region_id_t *rid)
 {
     /* TODO: update later depending on final region_id_t type */
