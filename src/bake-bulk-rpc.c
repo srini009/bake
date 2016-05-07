@@ -76,3 +76,32 @@ static void bake_bulk_create_ult(hg_handle_t handle)
 }
 DEFINE_MARGO_RPC_HANDLER(bake_bulk_create_ult)
 
+/* service a remote RPC that writes to a bulk region */
+static void bake_bulk_write_ult(hg_handle_t handle)
+{
+    bake_bulk_write_out_t out;
+    bake_bulk_write_in_t in;
+    hg_return_t hret;
+
+    printf("Got RPC request to write bulk region.\n");
+    
+    memset(&out, 0, sizeof(out));
+
+    hret = HG_Get_input(handle, &in);
+    if(hret != HG_SUCCESS)
+    {
+        out.ret = -1;
+        HG_Respond(handle, NULL, NULL, &out);
+        HG_Destroy(handle);
+        return;
+    }
+
+    /* TODO: implement */
+    out.ret = -1;
+
+    HG_Respond(handle, NULL, NULL, &out);
+    HG_Destroy(handle);
+    return;
+}
+DEFINE_MARGO_RPC_HANDLER(bake_bulk_write_ult)
+

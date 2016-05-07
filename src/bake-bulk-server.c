@@ -105,6 +105,9 @@ int main(int argc, char **argv)
     MERCURY_REGISTER(hg_class, "bake_bulk_create_rpc", bake_bulk_create_in_t, 
         bake_bulk_create_out_t,
         bake_bulk_create_ult_handler);
+    MERCURY_REGISTER(hg_class, "bake_bulk_write_rpc", bake_bulk_write_in_t, 
+        bake_bulk_write_out_t,
+        bake_bulk_write_ult_handler);
 
     /* NOTE: at this point this server ULT has two options.  It can wait on
      * whatever mechanism it wants to (however long the daemon should run and

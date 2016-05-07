@@ -22,6 +22,7 @@ struct bake_instance
 struct bake_instance g_binst; /* TODO: replace later, hard coded global instance */
 static hg_id_t g_bake_bulk_shutdown_id; /* TODO: probably not global in the long run either */
 static hg_id_t g_bake_bulk_create_id; /* TODO: probably not global in the long run either */
+static hg_id_t g_bake_bulk_write_id; /* TODO: probably not global in the long run either */
 
 int bake_probe_instance(
     const char *mercury_dest,
@@ -66,6 +67,12 @@ int bake_probe_instance(
         "bake_bulk_create_rpc", 
         bake_bulk_create_in_t,
         bake_bulk_create_out_t,
+        NULL);
+    g_bake_bulk_write_id = 
+        MERCURY_REGISTER(g_binst.hg_class, 
+        "bake_bulk_write_rpc", 
+        bake_bulk_write_in_t,
+        bake_bulk_write_out_t,
         NULL);
 
     g_binst.mid = margo_init(0, 0, g_binst.hg_context);
