@@ -195,9 +195,7 @@ static void bake_bulk_persist_ult(hg_handle_t handle)
     }
 
     /* TODO: how to get the size of the object? */
-    /* TODO: options:
-     * - do typed objects in the pmemobj api help?
-     * - can we store a header on each region?
+    /* TODO: let's put a header on each object with a magic number and a size
      */
     size = 1;
 
