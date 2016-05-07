@@ -19,10 +19,15 @@ struct bake_instance
     hg_context_t *hg_context;
 };
 
-struct bake_instance g_binst; /* TODO: replace later, hard coded global instance */
-static hg_id_t g_bake_bulk_shutdown_id; /* TODO: probably not global in the long run either */
-static hg_id_t g_bake_bulk_create_id; /* TODO: probably not global in the long run either */
-static hg_id_t g_bake_bulk_write_id; /* TODO: probably not global in the long run either */
+/* TODO: replace later, hard coded global instance */
+struct bake_instance g_binst; 
+
+/* TODO: probably not global in the long run either */
+static hg_id_t g_bake_bulk_shutdown_id; 
+/* TODO: probably not global in the long run either */
+static hg_id_t g_bake_bulk_create_id;
+/* TODO: probably not global in the long run either */
+static hg_id_t g_bake_bulk_write_id;
 
 int bake_probe_instance(
     const char *mercury_dest,
@@ -137,8 +142,54 @@ int bake_bulk_write(
     void const *buf,
     uint64_t buf_size)
 {
+    hg_return_t hret;
+    hg_handle_t handle;
+    bake_bulk_write_in_t in;
+    bake_bulk_write_out_t out;
+    int ret;
 
-    return(-1);
+    in.bti = bti;
+    in.rid = rid;
+    in.region_offset = region_offset;
+
+    hret = HG_Bulk_create(g_binst.hg_class, 1, (void**)(&buf), &buf_size, 
+        HG_BULK_READ_ONLY, &in.bulk_handle);
+    if(hret != HG_SUCCESS)
+    {
+        return(-1);
+    }
+   
+    /* create handle */
+    hret = HG_Create(g_binst.hg_context, g_binst.dest, 
+        g_bake_bulk_write_id, &handle);
+    if(hret != HG_SUCCESS)
+    {
+        HG_Bulk_free(in.bulk_handle);
+        return(-1);
+    }
+
+    hret = margo_forward(g_binst.mid, handle, &in);
+    if(hret != HG_SUCCESS)
+    {
+        HG_Destroy(handle);
+        HG_Bulk_free(in.bulk_handle);
+        return(-1);
+    }
+
+    hret = HG_Get_output(handle, &out);
+    if(hret != HG_SUCCESS)
+    {
+        HG_Destroy(handle);
+        HG_Bulk_free(in.bulk_handle);
+        return(-1);
+    }
+    
+    ret = out.ret;
+
+    HG_Free_output(handle, &out);
+    HG_Destroy(handle);
+    HG_Bulk_free(in.bulk_handle);
+    return(ret);
 }
 
 int bake_bulk_create(
@@ -152,6 +203,9 @@ int bake_bulk_create(
     bake_bulk_create_out_t out;
     int ret;
 
+    in.bti = bti;
+    in.region_size = region_size;
+
     /* create handle */
     hret = HG_Create(g_binst.hg_context, g_binst.dest, 
         g_bake_bulk_create_id, &handle);
@@ -159,9 +213,6 @@ int bake_bulk_create(
     {
         return(-1);
     }
-
-    in.bti = bti;
-    in.region_size = region_size;
 
     hret = margo_forward(g_binst.mid, handle, &in);
     if(hret != HG_SUCCESS)
