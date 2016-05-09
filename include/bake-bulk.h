@@ -20,9 +20,10 @@ typedef uint64_t bake_target_id_t;
 /**
  * Persistent, opaque identifier for a bulk region within a BAKE target.
  */
-#define BAKE_BULK_REGION_ID_SIZE 16
+#define BAKE_BULK_REGION_ID_DATA_SIZE 24
 typedef struct {
-    char data[BAKE_BULK_REGION_ID_SIZE];
+    uint32_t type;
+    char data[BAKE_BULK_REGION_ID_DATA_SIZE];
 } bake_bulk_region_id_t;
 
 /**

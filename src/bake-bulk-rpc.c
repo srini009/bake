@@ -14,6 +14,12 @@
  */
 extern PMEMobjpool *pmem_pool;
 
+/* definition of internal region_id_t identifier for libpmemobj back end */
+typedef struct {
+    PMEMoid oid;
+    uint64_t size;
+} pmemobj_region_id_t;
+
 /* service a remote RPC that instructs the server daemon to shut down */
 static void bake_bulk_shutdown_ult(hg_handle_t handle)
 {
@@ -47,9 +53,11 @@ static void bake_bulk_create_ult(hg_handle_t handle)
 {
     bake_bulk_create_out_t out;
     bake_bulk_create_in_t in;
-    PMEMoid oid;
     hg_return_t hret;
+    pmemobj_region_id_t* prid;
 
+    /* TODO: this check needs to be somewhere else */
+    assert(sizeof(pmemobj_region_id_t) <= BAKE_BULK_REGION_ID_DATA_SIZE);
     printf("Got RPC request to create bulk region.\n");
     
     memset(&out, 0, sizeof(out));
@@ -63,12 +71,9 @@ static void bake_bulk_create_ult(hg_handle_t handle)
         return;
     }
 
-    out.ret = pmemobj_alloc(pmem_pool, &oid, in.region_size, 0, NULL, NULL);
-    if(out.ret == 0)
-    {
-        /* TODO: real translation functions for opaque type */
-        memcpy(&out.rid, &oid, sizeof(oid));
-    }
+    prid = (pmemobj_region_id_t*)out.rid.data;
+    prid->size = in.region_size;
+    out.ret = pmemobj_alloc(pmem_pool, &prid->oid, in.region_size, 0, NULL, NULL);
 
     HG_Free_input(handle, &in);
     HG_Respond(handle, NULL, NULL, &out);
@@ -83,12 +88,12 @@ static void bake_bulk_write_ult(hg_handle_t handle)
     bake_bulk_write_out_t out;
     bake_bulk_write_in_t in;
     hg_return_t hret;
-    PMEMoid oid;
     char* buffer;
     hg_size_t size;
     hg_bulk_t bulk_handle;
     struct hg_info *hgi;
     margo_instance_id mid;
+    pmemobj_region_id_t* prid;
 
     printf("Got RPC request to write bulk region.\n");
     
@@ -107,11 +112,10 @@ static void bake_bulk_write_ult(hg_handle_t handle)
         return;
     }
 
-    /* TODO: real translation functions for opaque type */
-    memcpy(&oid, &in.rid, sizeof(oid));
+    prid = (pmemobj_region_id_t*)in.rid.data;
 
     /* find memory address for target object */
-    buffer = pmemobj_direct(oid);
+    buffer = pmemobj_direct(prid->oid);
     if(!buffer)
     {
         out.ret = -1;
@@ -163,9 +167,8 @@ static void bake_bulk_persist_ult(hg_handle_t handle)
     bake_bulk_persist_out_t out;
     bake_bulk_persist_in_t in;
     hg_return_t hret;
-    PMEMoid oid;
     char* buffer;
-    hg_size_t size;
+    pmemobj_region_id_t* prid;
 
     printf("Got RPC request to persist bulk region.\n");
     
@@ -180,11 +183,10 @@ static void bake_bulk_persist_ult(hg_handle_t handle)
         return;
     }
 
-    /* TODO: real translation functions for opaque type */
-    memcpy(&oid, &in.rid, sizeof(oid));
+    prid = (pmemobj_region_id_t*)in.rid.data;
 
     /* find memory address for target object */
-    buffer = pmemobj_direct(oid);
+    buffer = pmemobj_direct(prid->oid);
     if(!buffer)
     {
         out.ret = -1;
@@ -194,12 +196,7 @@ static void bake_bulk_persist_ult(hg_handle_t handle)
         return;
     }
 
-    /* TODO: how to get the size of the object? */
-    /* TODO: let's put a header on each object with a magic number and a size
-     */
-    size = 1;
-
-    pmemobj_persist(pmem_pool, buffer, size);
+    pmemobj_persist(pmem_pool, buffer, prid->size);
 
     out.ret = 0;
 

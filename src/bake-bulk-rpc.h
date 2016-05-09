@@ -52,10 +52,12 @@ DECLARE_MARGO_RPC_HANDLER(bake_bulk_persist_ult)
 static inline hg_return_t hg_proc_bake_bulk_region_id_t(hg_proc_t proc, bake_bulk_region_id_t *rid)
 {
     /* TODO: update later depending on final region_id_t type */
+    /* TODO: need separate encoders for different backend types */
     int i;
     hg_return_t ret;
 
-    for(i=0; i<BAKE_BULK_REGION_ID_SIZE; i++)
+    hg_proc_hg_uint32_t(proc, &rid->type);
+    for(i=0; i<BAKE_BULK_REGION_ID_DATA_SIZE; i++)
     {
         ret = hg_proc_hg_uint8_t(proc, (uint8_t*)&rid->data[i]);
         if(ret != HG_SUCCESS)
