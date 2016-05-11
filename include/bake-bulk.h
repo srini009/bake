@@ -63,7 +63,7 @@ int bake_bulk_create(
  * processes) perform overlapping writes.
  *
  * @param [in] bti BAKE target identifier
- * @param [in] rid identifier for new region
+ * @param [in] rid identifier for region
  * @param [in] region_offset offset into the target region to write
  * @param [in] buf local memory buffer to write
  * @param [in] buf_size size of local memory buffer to write
@@ -81,13 +81,26 @@ int bake_bulk_write(
  * and reads may be performed on the region.
  *
  * @param [in] bti BAKE target identifier
- * @param [in] rid identifier for new region
+ * @param [in] rid identifier for region
  * @returns 0 on success, -1 on failure
  */
 int bake_bulk_persist(
     bake_target_id_t bti,
     bake_bulk_region_id_t rid);
- 
+  
+/**
+ * Check the size of an existing region. 
+ *
+ * @param [in] bti BAKE target identifier
+ * @param [in] rid identifier for region
+ * @param [out] size sizes of region
+ * @returns 0 on success, -1 on failure
+ */
+int bake_bulk_get_size(
+    bake_target_id_t bti,
+    bake_bulk_region_id_t rid,
+    uint64_t *region_size);
+
 /**
  * Reads from a region that was previously persisted with bake_bulk_persist().
  *

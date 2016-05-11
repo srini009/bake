@@ -27,6 +27,7 @@ static hg_id_t g_bake_bulk_shutdown_id;
 static hg_id_t g_bake_bulk_create_id;
 static hg_id_t g_bake_bulk_write_id;
 static hg_id_t g_bake_bulk_persist_id;
+static hg_id_t g_bake_bulk_get_size_id;
 
 int bake_probe_instance(
     const char *mercury_dest,
@@ -84,7 +85,12 @@ int bake_probe_instance(
         bake_bulk_persist_in_t,
         bake_bulk_persist_out_t,
         NULL);
-
+    g_bake_bulk_get_size_id = 
+        MERCURY_REGISTER(g_binst.hg_class, 
+        "bake_bulk_get_size_rpc", 
+        bake_bulk_get_size_in_t,
+        bake_bulk_get_size_out_t,
+        NULL);
 
     g_binst.mid = margo_init(0, 0, g_binst.hg_context);
     if(!g_binst.mid)
@@ -279,6 +285,50 @@ int bake_bulk_persist(
     }
 
     ret = out.ret;
+
+    HG_Free_output(handle, &out);
+    HG_Destroy(handle);
+    return(ret);
+}
+
+int bake_bulk_get_size(
+    bake_target_id_t bti,
+    bake_bulk_region_id_t rid,
+    uint64_t *region_size)
+{
+    hg_return_t hret;
+    hg_handle_t handle;
+    bake_bulk_get_size_in_t in;
+    bake_bulk_get_size_out_t out;
+    int ret;
+
+    in.bti = bti;
+    in.rid = rid;
+
+    /* create handle */
+    hret = HG_Create(g_binst.hg_context, g_binst.dest, 
+        g_bake_bulk_get_size_id, &handle);
+    if(hret != HG_SUCCESS)
+    {
+        return(-1);
+    }
+
+    hret = margo_forward(g_binst.mid, handle, &in);
+    if(hret != HG_SUCCESS)
+    {
+        HG_Destroy(handle);
+        return(-1);
+    }
+
+    hret = HG_Get_output(handle, &out);
+    if(hret != HG_SUCCESS)
+    {
+        HG_Destroy(handle);
+        return(-1);
+    }
+
+    ret = out.ret;
+    *region_size = out.size;
 
     HG_Free_output(handle, &out);
     HG_Destroy(handle);

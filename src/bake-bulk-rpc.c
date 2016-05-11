@@ -207,3 +207,37 @@ static void bake_bulk_persist_ult(hg_handle_t handle)
 }
 DEFINE_MARGO_RPC_HANDLER(bake_bulk_persist_ult)
 
+/* service a remote RPC that retrieves the size of a bulk region */
+static void bake_bulk_get_size_ult(hg_handle_t handle)
+{
+    bake_bulk_get_size_out_t out;
+    bake_bulk_get_size_in_t in;
+    hg_return_t hret;
+    pmemobj_region_id_t* prid;
+
+    printf("Got RPC request to get_size bulk region.\n");
+    
+    memset(&out, 0, sizeof(out));
+
+    hret = HG_Get_input(handle, &in);
+    if(hret != HG_SUCCESS)
+    {
+        out.ret = -1;
+        HG_Respond(handle, NULL, NULL, &out);
+        HG_Destroy(handle);
+        return;
+    }
+
+    prid = (pmemobj_region_id_t*)in.rid.data;
+
+    /* kind of cheating here; the size is encoded in the RID */
+    out.size = prid->size;
+    out.ret = 0;
+
+    HG_Free_input(handle, &in);
+    HG_Respond(handle, NULL, NULL, &out);
+    HG_Destroy(handle);
+    return;
+}
+DEFINE_MARGO_RPC_HANDLER(bake_bulk_get_size_ult)
+

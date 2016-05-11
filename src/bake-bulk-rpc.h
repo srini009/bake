@@ -44,6 +44,15 @@ MERCURY_GEN_PROC(bake_bulk_persist_out_t,
     ((int32_t)(ret)))
 DECLARE_MARGO_RPC_HANDLER(bake_bulk_persist_ult)
 
+/* bulk get size */
+MERCURY_GEN_PROC(bake_bulk_get_size_in_t,
+    ((bake_target_id_t)(bti))\
+    ((bake_bulk_region_id_t)(rid)))
+MERCURY_GEN_PROC(bake_bulk_get_size_out_t,
+    ((int32_t)(ret))\
+    ((uint64_t)(size)))
+DECLARE_MARGO_RPC_HANDLER(bake_bulk_get_size_ult)
+
 
 
 /* TODO: where should the encoder defs live?  Not in bake-bulk-rpc.c because 

@@ -29,6 +29,7 @@ int main(int argc, char **argv)
     char* local_region;
     int region_fd;
     char region_file[128];
+    uint64_t  check_size;
  
     if(argc != 3)
     {
@@ -131,6 +132,25 @@ int main(int argc, char **argv)
         return(-1);
     }
 
+    /* safety check size */
+    ret = bake_bulk_get_size(bti, rid, &check_size);
+    if(ret != 0)
+    {
+        bake_release_instance(bti);
+        ABT_finalize();
+        fprintf(stderr, "Error: bake_bulk_get_size()\n");
+        return(-1);
+    }
+    
+    bake_release_instance(bti);
+
+    if(check_size != statbuf.st_size)
+    {
+        ABT_finalize();
+        fprintf(stderr, "Error: size mismatch!\n");
+        return(-1);
+    }
+
     sprintf(region_file, "/tmp/bb-copy-rid.XXXXXX");
     region_fd = mkstemp(region_file);
     if(region_fd < 0)
@@ -150,7 +170,6 @@ int main(int argc, char **argv)
         }
     }
    
-    bake_release_instance(bti);
     ABT_finalize();
 
     return(0);
