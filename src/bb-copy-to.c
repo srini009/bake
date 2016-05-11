@@ -5,6 +5,7 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <assert.h>
 #include <unistd.h>
 #include <sys/types.h>
@@ -26,6 +27,8 @@ int main(int argc, char **argv)
     int fd;
     struct stat statbuf;
     char* local_region;
+    int region_fd;
+    char region_file[128];
  
     if(argc != 3)
     {
@@ -126,6 +129,25 @@ int main(int argc, char **argv)
         ABT_finalize();
         fprintf(stderr, "Error: bake_bulk_persist()\n");
         return(-1);
+    }
+
+    sprintf(region_file, "/tmp/bb-copy-rid.XXXXXX");
+    region_fd = mkstemp(region_file);
+    if(region_fd < 0)
+    {
+        perror("mkstemp");
+    }
+    else
+    {
+        ret = write(region_fd, &rid, sizeof(rid));
+        if(ret < 0)
+        {
+            perror("write");
+        }
+        else
+        {
+            printf("RID written to %s\n", region_file);
+        }
     }
    
     bake_release_instance(bti);
