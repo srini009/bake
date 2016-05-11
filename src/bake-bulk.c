@@ -284,3 +284,15 @@ int bake_bulk_persist(
     HG_Destroy(handle);
     return(ret);
 }
+
+int bake_bulk_read(
+    bake_target_id_t bti,
+    bake_bulk_region_id_t rid,
+    uint64_t region_offset,
+    void *buf,
+    uint64_t buf_size)
+{
+    return(-1);
+}
+
+

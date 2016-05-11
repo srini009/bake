@@ -87,6 +87,26 @@ int bake_bulk_write(
 int bake_bulk_persist(
     bake_target_id_t bti,
     bake_bulk_region_id_t rid);
+ 
+/**
+ * Reads from a region that was previously persisted with bake_bulk_persist().
+ *
+ * NOTE: for now at least, this call does not support "short" reads.  It
+ * either succeeds in reading the requested size or not.
+ *
+ * @param [in] bti BAKE target identifier
+ * @param [in] rid region identifier
+ * @param [in] region_offset offset into the target region to read from
+ * @param [in] buf local memory buffer read into
+ * @param [in] buf_size size of local memory buffer to read into
+ * @returns 0 on success, -1 on failure
+ */
+int bake_bulk_read(
+    bake_target_id_t bti,
+    bake_bulk_region_id_t rid,
+    uint64_t region_offset,
+    void *buf,
+    uint64_t buf_size);
 
 /**
  * Release local resources associated with access to a target; does not
