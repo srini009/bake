@@ -17,7 +17,7 @@
 #include "abt-snoozer.h"
 #include "bake-bulk.h"
 
-/* client program that will shut down a BAKE bulk server. */
+/* client program that will copy a POSIX file into a bake bulk region */
 
 int main(int argc, char **argv) 
 {
