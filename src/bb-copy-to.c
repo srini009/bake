@@ -101,8 +101,6 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    /* TODO: a way to print region id */
-
     /* transfer data */
     ret = bake_bulk_write(
         bti,
@@ -167,6 +165,7 @@ int main(int argc, char **argv)
         else
         {
             printf("RID written to %s\n", region_file);
+            close(region_fd);
         }
     }
    
