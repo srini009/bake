@@ -53,6 +53,16 @@ MERCURY_GEN_PROC(bake_bulk_get_size_out_t,
     ((uint64_t)(size)))
 DECLARE_MARGO_RPC_HANDLER(bake_bulk_get_size_ult)
 
+/* bulk read */
+MERCURY_GEN_PROC(bake_bulk_read_in_t,
+    ((bake_target_id_t)(bti))\
+    ((bake_bulk_region_id_t)(rid))\
+    ((uint64_t)(region_offset))\
+    ((hg_bulk_t)(bulk_handle)))
+MERCURY_GEN_PROC(bake_bulk_read_out_t,
+    ((int32_t)(ret)))
+DECLARE_MARGO_RPC_HANDLER(bake_bulk_read_ult)
+
 
 
 /* TODO: where should the encoder defs live?  Not in bake-bulk-rpc.c because 
