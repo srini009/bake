@@ -1,8 +1,8 @@
 TESTS += \
  tests/basic.sh \
- tests/copy-to.sh
+ tests/copy-to-and-from.sh
 
 EXTRA_DIST += \
  tests/basic.sh \
- tests/copy-to.sh
+ tests/copy-to-and-from.sh
 

@@ -51,7 +51,7 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    ret = bake_probe_instance(argv[2], &bti);
+    ret = bake_probe_instance(argv[1], &bti);
     if(ret < 0)
     {
         ABT_finalize();
@@ -59,10 +59,10 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    region_fd = open(argv[1], O_RDONLY);
+    region_fd = open(argv[2], O_RDONLY);
     if(region_fd < 0)
     {
-        perror("open");
+        perror("open rid");
         bake_release_instance(bti);
         ABT_finalize();
         return(-1);
@@ -80,7 +80,7 @@ int main(int argc, char **argv)
     close(region_fd);
 
     ret = bake_bulk_get_size(bti, rid, &check_size);
-    if(ret != sizeof(rid))
+    if(ret != 0)
     {
         fprintf(stderr, "Error: bake_bulk_get_size()\n");
         bake_release_instance(bti);
@@ -88,10 +88,10 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    fd = open(argv[3], O_WRONLY|O_TRUNC);
+    fd = open(argv[3], O_WRONLY|O_TRUNC|O_CREAT, S_IRUSR|S_IWUSR);
     if(fd < 0)
     {
-        perror("open");
+        perror("open output");
         bake_release_instance(bti);
         ABT_finalize();
         return(-1);

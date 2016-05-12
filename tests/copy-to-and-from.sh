@@ -13,13 +13,22 @@ test_start_servers 1 2 20
 #####################
 
 echo "Hello world." > $TMPBASE/foo.dat
-run_to 10 src/bb-copy-to $TMPBASE/foo.dat $svr1
+CPOUT=`run_to 10 src/bb-copy-to $TMPBASE/foo.dat $svr1`
 if [ $? -ne 0 ]; then
     run_to 10 src/bb-shutdown $svr1 &> /dev/null 
     wait
     exit 1
 fi
 
+RID=`echo "$CPOUT" | grep -o -P '/tmp.*$'`
+run_to 10 src/bb-copy-from $svr1 $RID $TMPBASE/foo-out.dat 
+if [ $? -ne 0 ]; then
+    run_to 10 src/bb-shutdown $svr1 &> /dev/null 
+    wait
+    exit 1
+fi
+
+cat $TMPBASE/foo-out.dat
 sleep 1
 
 #####################
