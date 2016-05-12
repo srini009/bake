@@ -196,6 +196,7 @@ static void bake_bulk_persist_ult(hg_handle_t handle)
         return;
     }
 
+    /* TODO: should this have an abt shim in case it blocks? */
     pmemobj_persist(pmem_pool, buffer, prid->size);
 
     out.ret = 0;
