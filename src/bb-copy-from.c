@@ -88,7 +88,7 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    fd = open(argv[3], O_WRONLY|O_TRUNC|O_CREAT, S_IRUSR|S_IWUSR);
+    fd = open(argv[3], O_RDWR|O_TRUNC|O_CREAT, S_IRUSR|S_IWUSR);
     if(fd < 0)
     {
         perror("open output");
@@ -97,8 +97,18 @@ int main(int argc, char **argv)
         return(-1);
     }
 
+    ret = ftruncate(fd, check_size);
+    if(ret < 0)
+    {
+        perror("ftruncate");
+        close(fd);
+        bake_release_instance(bti);
+        ABT_finalize();
+        return(-1);
+    }
+
     local_region = mmap(NULL, check_size, PROT_WRITE, MAP_SHARED, fd, 0);
-    if(!local_region)
+    if(local_region == MAP_FAILED)
     {
         perror("mmap");
         close(fd);

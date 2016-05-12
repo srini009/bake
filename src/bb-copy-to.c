@@ -53,7 +53,7 @@ int main(int argc, char **argv)
     }
 
     local_region = mmap(NULL, statbuf.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
-    if(!local_region)
+    if(local_region == MAP_FAILED)
     {
         perror("mmap");
         close(fd);
