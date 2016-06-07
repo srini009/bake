@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <unistd.h>
+#include <uuid.h>
 #include <abt.h>
 #include <abt-snoozer.h>
 #include <margo.h>
@@ -14,10 +15,20 @@
 
 #include "bake-bulk-rpc.h"
 
+struct bake_bulk_root
+{
+    /* TODO: sync up types with bake-bulk.h; for now using uuid directly */
+    uuid_t target_id;
+};
+
 /* TODO: this should not be global in the long run; server may provide access
  * to multiple targets
  */
-PMEMobjpool *pmem_pool;
+/* note that these are deliberately not static for now so we can get to them from
+ * rpc.c
+ */
+PMEMobjpool *g_pmem_pool = NULL;
+struct bake_bulk_root *g_bake_bulk_root = NULL;
 
 int main(int argc, char **argv) 
 {
@@ -27,6 +38,8 @@ int main(int argc, char **argv)
     ABT_pool handler_pool;
     hg_context_t *hg_context;
     hg_class_t *hg_class;
+    char target_string[64];
+    PMEMoid root_oid;
 
     if(argc != 3)
     {
@@ -36,13 +49,21 @@ int main(int argc, char **argv)
     }
 
     /* open pmem pool */
-    pmem_pool = pmemobj_open(argv[2], NULL);
-    if(!pmem_pool)
+    g_pmem_pool = pmemobj_open(argv[2], NULL);
+    if(!g_pmem_pool)
     {
         fprintf(stderr, "pmemobj_open: %s\n", pmemobj_errormsg());
         return(-1);
     }
     
+    /* find root */
+    root_oid = pmemobj_root(g_pmem_pool, sizeof(*g_bake_bulk_root));
+    g_bake_bulk_root = pmemobj_direct(root_oid);
+    if(uuid_is_null(g_bake_bulk_root->target_id))
+        uuid_generate(g_bake_bulk_root->target_id);
+    uuid_unparse(g_bake_bulk_root->target_id, target_string);
+    fprintf(stderr, "BAKE target ID: %s\n", target_string);
+
     /* boilerplate HG initialization steps */
     /***************************************/
     hg_class = HG_Init(argv[1], HG_TRUE);
@@ -139,7 +160,7 @@ int main(int argc, char **argv)
     HG_Context_destroy(hg_context);
     HG_Finalize(hg_class);
 
-    pmemobj_close(pmem_pool);
+    pmemobj_close(g_pmem_pool);
 
     return(0);
 }

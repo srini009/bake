@@ -12,7 +12,7 @@
 /* TODO: this should not be global in the long run; server may provide access
  * to multiple targets
  */
-extern PMEMobjpool *pmem_pool;
+extern PMEMobjpool *g_pmem_pool;
 
 /* definition of internal region_id_t identifier for libpmemobj back end */
 typedef struct {
@@ -73,7 +73,7 @@ static void bake_bulk_create_ult(hg_handle_t handle)
 
     prid = (pmemobj_region_id_t*)out.rid.data;
     prid->size = in.region_size;
-    out.ret = pmemobj_alloc(pmem_pool, &prid->oid, in.region_size, 0, NULL, NULL);
+    out.ret = pmemobj_alloc(g_pmem_pool, &prid->oid, in.region_size, 0, NULL, NULL);
 
     HG_Free_input(handle, &in);
     HG_Respond(handle, NULL, NULL, &out);
@@ -197,7 +197,7 @@ static void bake_bulk_persist_ult(hg_handle_t handle)
     }
 
     /* TODO: should this have an abt shim in case it blocks? */
-    pmemobj_persist(pmem_pool, buffer, prid->size);
+    pmemobj_persist(g_pmem_pool, buffer, prid->size);
 
     out.ret = 0;
 
