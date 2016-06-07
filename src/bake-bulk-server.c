@@ -60,7 +60,10 @@ int main(int argc, char **argv)
     root_oid = pmemobj_root(g_pmem_pool, sizeof(*g_bake_bulk_root));
     g_bake_bulk_root = pmemobj_direct(root_oid);
     if(uuid_is_null(g_bake_bulk_root->target_id))
+    {
         uuid_generate(g_bake_bulk_root->target_id);
+        pmemobj_persist(g_pmem_pool, g_bake_bulk_root, sizeof(*g_bake_bulk_root));
+    }
     uuid_unparse(g_bake_bulk_root->target_id, target_string);
     fprintf(stderr, "BAKE target ID: %s\n", target_string);
 
