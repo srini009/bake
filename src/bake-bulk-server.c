@@ -15,11 +15,6 @@
 
 #include "bake-bulk-rpc.h"
 
-struct bake_bulk_root
-{
-    /* TODO: sync up types with bake-bulk.h; for now using uuid directly */
-    uuid_t target_id;
-};
 
 /* TODO: this should not be global in the long run; server may provide access
  * to multiple targets
@@ -59,12 +54,12 @@ int main(int argc, char **argv)
     /* find root */
     root_oid = pmemobj_root(g_pmem_pool, sizeof(*g_bake_bulk_root));
     g_bake_bulk_root = pmemobj_direct(root_oid);
-    if(uuid_is_null(g_bake_bulk_root->target_id))
+    if(uuid_is_null(g_bake_bulk_root->target_id.id))
     {
-        uuid_generate(g_bake_bulk_root->target_id);
+        uuid_generate(g_bake_bulk_root->target_id.id);
         pmemobj_persist(g_pmem_pool, g_bake_bulk_root, sizeof(*g_bake_bulk_root));
     }
-    uuid_unparse(g_bake_bulk_root->target_id, target_string);
+    uuid_unparse(g_bake_bulk_root->target_id.id, target_string);
     fprintf(stderr, "BAKE target ID: %s\n", target_string);
 
     /* boilerplate HG initialization steps */
@@ -141,6 +136,9 @@ int main(int argc, char **argv)
     MERCURY_REGISTER(hg_class, "bake_bulk_read_rpc", bake_bulk_read_in_t, 
         bake_bulk_read_out_t,
         bake_bulk_read_ult_handler);
+    MERCURY_REGISTER(hg_class, "bake_bulk_probe_rpc", void, 
+        bake_bulk_probe_out_t,
+        bake_bulk_probe_ult_handler);
 
     /* NOTE: at this point this server ULT has two options.  It can wait on
      * whatever mechanism it wants to (however long the daemon should run and

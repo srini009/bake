@@ -13,6 +13,7 @@
  * to multiple targets
  */
 extern PMEMobjpool *g_pmem_pool;
+extern struct bake_bulk_root *g_bake_bulk_root;
 
 /* definition of internal region_id_t identifier for libpmemobj back end */
 typedef struct {
@@ -321,5 +322,23 @@ static void bake_bulk_read_ult(hg_handle_t handle)
     return;
 }
 DEFINE_MARGO_RPC_HANDLER(bake_bulk_read_ult)
+
+/* service a remote RPC that probes for a target id */
+static void bake_bulk_probe_ult(hg_handle_t handle)
+{
+    bake_bulk_probe_out_t out;
+
+    printf("Got RPC request to probe bulk region.\n");
+    
+    memset(&out, 0, sizeof(out));
+
+    out.ret = 0;
+    out.bti = g_bake_bulk_root->target_id;
+
+    HG_Respond(handle, NULL, NULL, &out);
+    HG_Destroy(handle);
+    return;
+}
+DEFINE_MARGO_RPC_HANDLER(bake_bulk_probe_ult)
 
 

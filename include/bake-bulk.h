@@ -7,15 +7,16 @@
 #ifndef __BAKE_BULK_H
 #define __BAKE_BULK_H
 
+#include <uuid.h>
 #include <stdint.h>
  
 /**
  * Persistent, universal, opaque identifier for a BAKE target.
  * Remains constant if instance is opened, closed, or migrated.
- *
- * Think of this like you would a UUID for a storage volume.
  */
-typedef uint64_t bake_target_id_t;
+typedef struct {
+    uuid_t id;
+} bake_target_id_t;
 
 /**
  * Persistent, opaque identifier for a bulk region within a BAKE target.

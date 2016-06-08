@@ -63,6 +63,20 @@ MERCURY_GEN_PROC(bake_bulk_read_out_t,
     ((int32_t)(ret)))
 DECLARE_MARGO_RPC_HANDLER(bake_bulk_read_ult)
 
+/* bulk probe */
+MERCURY_GEN_PROC(bake_bulk_probe_out_t,
+    ((int32_t)(ret))\
+    ((bake_target_id_t)(bti)))
+DECLARE_MARGO_RPC_HANDLER(bake_bulk_probe_ult)
+
+/* TODO: this should be somewhere else, just putting in this header for
+ * convenience right now.  The type should only be visible to the server
+ * daemon and the rpc handlers.
+ */
+struct bake_bulk_root
+{
+    bake_target_id_t target_id;
+};
 
 
 /* TODO: where should the encoder defs live?  Not in bake-bulk-rpc.c because 
@@ -87,10 +101,8 @@ static inline hg_return_t hg_proc_bake_bulk_region_id_t(hg_proc_t proc, bake_bul
 
 static inline hg_return_t hg_proc_bake_target_id_t(hg_proc_t proc, bake_target_id_t *bti)
 {
-    /* TODO: will probably have to update this later when we have a better
-     * idea of what the target identifier will look like.
-     */
-    return(hg_proc_uint64_t(proc, bti));
+    /* TODO: make this portable; just raw encoding for now */
+    return(hg_proc_raw(proc, bti->id, sizeof(bti->id)));
 }
 
 #endif /* __BAKE_BULK_RPC */

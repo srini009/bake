@@ -20,6 +20,7 @@ struct hg_instance
     hg_context_t *hg_context;
     int refct;
     
+    hg_id_t bake_bulk_probe_id;
     hg_id_t bake_bulk_shutdown_id; 
     hg_id_t bake_bulk_create_id;
     hg_id_t bake_bulk_write_id;
@@ -37,7 +38,6 @@ struct bake_instance
 
 /* TODO: replace later, hard coded global instance */
 struct bake_instance g_binst = {
-    .bti = 0,
     .dest = HG_ADDR_NULL,
 };
 
@@ -73,6 +73,10 @@ static int hg_instance_init(const char *mercury_dest)
     }
 
     /* register RPCs */
+    g_hginst.bake_bulk_probe_id = 
+        MERCURY_REGISTER(g_hginst.hg_class, 
+        "bake_bulk_probe_rpc", void, bake_bulk_probe_out_t, 
+        NULL);
     g_hginst.bake_bulk_shutdown_id = 
         MERCURY_REGISTER(g_hginst.hg_class, 
         "bake_bulk_shutdown_rpc", void, void, 
@@ -139,8 +143,9 @@ int bake_probe_instance(
     bake_target_id_t *bti)
 {
     hg_return_t hret;
-    *bti = 0; /* TODO: use a real id eventually, just a placeholder for now */
     int ret;
+    bake_bulk_probe_out_t out;
+    hg_handle_t handle;
 
     ret = hg_instance_init(mercury_dest);
     if(ret < 0)
@@ -153,7 +158,35 @@ int bake_probe_instance(
         return(-1);
     }
 
-    return(0);
+    /* create handle */
+    hret = HG_Create(g_hginst.hg_context, g_binst.dest, 
+        g_hginst.bake_bulk_probe_id, &handle);
+    if(hret != HG_SUCCESS)
+    {
+        return(-1);
+    }
+
+    hret = margo_forward(g_hginst.mid, handle, NULL);
+    if(hret != HG_SUCCESS)
+    {
+        HG_Destroy(handle);
+        return(-1);
+    }
+
+    hret = HG_Get_output(handle, &out);
+    if(hret != HG_SUCCESS)
+    {
+        HG_Destroy(handle);
+        return(-1);
+    }
+
+    ret = out.ret;
+    *bti = out.bti;
+
+    HG_Free_output(handle, &out);
+    HG_Destroy(handle);
+
+    return(ret);
 }
   
 void bake_release_instance(
