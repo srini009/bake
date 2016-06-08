@@ -7,6 +7,7 @@
 #include <assert.h>
 #include <bake-bulk.h>
 #include <margo.h>
+#include "uthash.h"
 #include "bake-bulk-rpc.h"
 
 /* Refers to a single Mercury/Margo initialization, for now this is shared by
