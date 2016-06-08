@@ -33,14 +33,12 @@ struct hg_instance
 /* Refers to an instance connected to a specific target */
 struct bake_instance
 {
-    bake_target_id_t bti; /* persistent identifier for this target */
-    hg_addr_t dest;         /* remote Mercury address */
+    bake_target_id_t bti;   /* persistent identifier for this target */
+    hg_addr_t dest;         /* resolved Mercury address */
+    UT_hash_handle hh;
 };
 
-/* TODO: replace later, hard coded global instance */
-struct bake_instance g_binst = {
-    .dest = HG_ADDR_NULL,
-};
+struct bake_instance *instance_hash;
 
 struct hg_instance g_hginst = {
     .mid = MARGO_INSTANCE_NULL,
@@ -147,45 +145,72 @@ int bake_probe_instance(
     int ret;
     bake_bulk_probe_out_t out;
     hg_handle_t handle;
+    struct bake_instance *new_instance;
 
     ret = hg_instance_init(mercury_dest);
     if(ret < 0)
         return(ret);
 
-    hret = margo_addr_lookup(g_hginst.mid, mercury_dest, &g_binst.dest);
-    if(hret != HG_SUCCESS)
+    new_instance = calloc(1, sizeof(*new_instance));
+    if(!new_instance)
     {
         hg_instance_finalize();
         return(-1);
     }
 
+    hret = margo_addr_lookup(g_hginst.mid, mercury_dest, &new_instance->dest);
+    if(hret != HG_SUCCESS)
+    {
+        free(new_instance);
+        hg_instance_finalize();
+        return(-1);
+    }
+
     /* create handle */
-    hret = HG_Create(g_hginst.hg_context, g_binst.dest, 
+    hret = HG_Create(g_hginst.hg_context, new_instance->dest, 
         g_hginst.bake_bulk_probe_id, &handle);
     if(hret != HG_SUCCESS)
     {
+        free(new_instance);
+        hg_instance_finalize();
         return(-1);
     }
 
     hret = margo_forward(g_hginst.mid, handle, NULL);
     if(hret != HG_SUCCESS)
     {
+        free(new_instance);
         HG_Destroy(handle);
+        hg_instance_finalize();
         return(-1);
     }
 
     hret = HG_Get_output(handle, &out);
     if(hret != HG_SUCCESS)
     {
+        free(new_instance);
         HG_Destroy(handle);
+        hg_instance_finalize();
         return(-1);
     }
 
     ret = out.ret;
     *bti = out.bti;
+    new_instance->bti = out.bti;
 
     HG_Free_output(handle, &out);
     HG_Destroy(handle);
+
+    if(ret != 0)
+    {
+        free(new_instance);
+        hg_instance_finalize();
+    }
+    else
+    {
+        /* TODO: safety check that it isn't already there.  Here or earlier? */
+        HASH_ADD(hh, instance_hash, bti, sizeof(new_instance->bti), new_instance);
+    }
 
     return(ret);
 }
@@ -193,9 +218,17 @@ int bake_probe_instance(
 void bake_release_instance(
     bake_target_id_t bti)
 {
-    HG_Addr_free(g_hginst.hg_class, g_binst.dest);
+    struct bake_instance *instance = NULL;
+
+    HASH_FIND(hh, instance_hash, &bti, sizeof(bti), instance);
+    if(!instance)
+        return;
+    
+    HASH_DELETE(hh, instance_hash, instance);
+    HG_Addr_free(g_hginst.hg_class, instance->dest);
+    free(instance);
     hg_instance_finalize();
-    memset(&g_binst, 0, sizeof(g_binst));
+
     return;
 }
 
@@ -203,9 +236,14 @@ int bake_shutdown_service(bake_target_id_t bti)
 {
     hg_return_t hret;
     hg_handle_t handle;
+    struct bake_instance *instance = NULL;
+
+    HASH_FIND(hh, instance_hash, &bti, sizeof(bti), instance);
+    if(!instance)
+        return(-1);
 
     /* create handle */
-    hret = HG_Create(g_hginst.hg_context, g_binst.dest, 
+    hret = HG_Create(g_hginst.hg_context, instance->dest, 
         g_hginst.bake_bulk_shutdown_id, &handle);
     if(hret != HG_SUCCESS)
     {
@@ -235,6 +273,11 @@ int bake_bulk_write(
     bake_bulk_write_in_t in;
     bake_bulk_write_out_t out;
     int ret;
+    struct bake_instance *instance = NULL;
+
+    HASH_FIND(hh, instance_hash, &bti, sizeof(bti), instance);
+    if(!instance)
+        return(-1);
 
     in.bti = bti;
     in.rid = rid;
@@ -248,7 +291,7 @@ int bake_bulk_write(
     }
    
     /* create handle */
-    hret = HG_Create(g_hginst.hg_context, g_binst.dest, 
+    hret = HG_Create(g_hginst.hg_context, instance->dest, 
         g_hginst.bake_bulk_write_id, &handle);
     if(hret != HG_SUCCESS)
     {
@@ -290,12 +333,17 @@ int bake_bulk_create(
     bake_bulk_create_in_t in;
     bake_bulk_create_out_t out;
     int ret;
+    struct bake_instance *instance = NULL;
+
+    HASH_FIND(hh, instance_hash, &bti, sizeof(bti), instance);
+    if(!instance)
+        return(-1);
 
     in.bti = bti;
     in.region_size = region_size;
 
     /* create handle */
-    hret = HG_Create(g_hginst.hg_context, g_binst.dest, 
+    hret = HG_Create(g_hginst.hg_context, instance->dest, 
         g_hginst.bake_bulk_create_id, &handle);
     if(hret != HG_SUCCESS)
     {
@@ -334,12 +382,17 @@ int bake_bulk_persist(
     bake_bulk_persist_in_t in;
     bake_bulk_persist_out_t out;
     int ret;
+    struct bake_instance *instance = NULL;
+
+    HASH_FIND(hh, instance_hash, &bti, sizeof(bti), instance);
+    if(!instance)
+        return(-1);
 
     in.bti = bti;
     in.rid = rid;
 
     /* create handle */
-    hret = HG_Create(g_hginst.hg_context, g_binst.dest, 
+    hret = HG_Create(g_hginst.hg_context, instance->dest, 
         g_hginst.bake_bulk_persist_id, &handle);
     if(hret != HG_SUCCESS)
     {
@@ -377,12 +430,17 @@ int bake_bulk_get_size(
     bake_bulk_get_size_in_t in;
     bake_bulk_get_size_out_t out;
     int ret;
+    struct bake_instance *instance = NULL;
+
+    HASH_FIND(hh, instance_hash, &bti, sizeof(bti), instance);
+    if(!instance)
+        return(-1);
 
     in.bti = bti;
     in.rid = rid;
 
     /* create handle */
-    hret = HG_Create(g_hginst.hg_context, g_binst.dest, 
+    hret = HG_Create(g_hginst.hg_context, instance->dest, 
         g_hginst.bake_bulk_get_size_id, &handle);
     if(hret != HG_SUCCESS)
     {
@@ -423,6 +481,11 @@ int bake_bulk_read(
     bake_bulk_read_in_t in;
     bake_bulk_read_out_t out;
     int ret;
+    struct bake_instance *instance = NULL;
+
+    HASH_FIND(hh, instance_hash, &bti, sizeof(bti), instance);
+    if(!instance)
+        return(-1);
 
     in.bti = bti;
     in.rid = rid;
@@ -436,7 +499,7 @@ int bake_bulk_read(
     }
    
     /* create handle */
-    hret = HG_Create(g_hginst.hg_context, g_binst.dest, 
+    hret = HG_Create(g_hginst.hg_context, instance->dest, 
         g_hginst.bake_bulk_read_id, &handle);
     if(hret != HG_SUCCESS)
     {
