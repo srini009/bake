@@ -51,7 +51,10 @@ static int hg_instance_init(const char *mercury_dest)
 {
     /* have we already started a Mercury instance? */
     if(g_hginst.refct > 0)
+    {
+        g_hginst.refct++;
         return(0);
+    }
 
     /* boilerplate HG initialization steps */
     /***************************************/
