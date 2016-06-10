@@ -28,7 +28,7 @@ static void bake_bulk_shutdown_ult(hg_handle_t handle)
     struct hg_info *hgi;
     margo_instance_id mid;
 
-    printf("Got RPC request to shutdown.\n");
+    // printf("Got RPC request to shutdown.\n");
 
     hgi = HG_Get_info(handle);
     assert(hgi);
@@ -59,7 +59,7 @@ static void bake_bulk_create_ult(hg_handle_t handle)
 
     /* TODO: this check needs to be somewhere else */
     assert(sizeof(pmemobj_region_id_t) <= BAKE_BULK_REGION_ID_DATA_SIZE);
-    printf("Got RPC request to create bulk region.\n");
+    // printf("Got RPC request to create bulk region.\n");
     
     memset(&out, 0, sizeof(out));
 
@@ -96,7 +96,7 @@ static void bake_bulk_write_ult(hg_handle_t handle)
     margo_instance_id mid;
     pmemobj_region_id_t* prid;
 
-    printf("Got RPC request to write bulk region.\n");
+    // printf("Got RPC request to write bulk region.\n");
     
     memset(&out, 0, sizeof(out));
 
@@ -171,7 +171,7 @@ static void bake_bulk_persist_ult(hg_handle_t handle)
     char* buffer;
     pmemobj_region_id_t* prid;
 
-    printf("Got RPC request to persist bulk region.\n");
+    // printf("Got RPC request to persist bulk region.\n");
     
     memset(&out, 0, sizeof(out));
 
@@ -217,7 +217,7 @@ static void bake_bulk_get_size_ult(hg_handle_t handle)
     hg_return_t hret;
     pmemobj_region_id_t* prid;
 
-    printf("Got RPC request to get_size bulk region.\n");
+    // printf("Got RPC request to get_size bulk region.\n");
     
     memset(&out, 0, sizeof(out));
 
@@ -257,7 +257,7 @@ static void bake_bulk_read_ult(hg_handle_t handle)
     margo_instance_id mid;
     pmemobj_region_id_t* prid;
 
-    printf("Got RPC request to read bulk region.\n");
+    // printf("Got RPC request to read bulk region.\n");
     
     memset(&out, 0, sizeof(out));
 
@@ -328,7 +328,7 @@ static void bake_bulk_probe_ult(hg_handle_t handle)
 {
     bake_bulk_probe_out_t out;
 
-    printf("Got RPC request to probe bulk region.\n");
+    // printf("Got RPC request to probe bulk region.\n");
     
     memset(&out, 0, sizeof(out));
 
