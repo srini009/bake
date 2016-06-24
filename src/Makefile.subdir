@@ -5,7 +5,8 @@ bin_PROGRAMS += \
  src/bake-bulk-server \
  src/bb-shutdown \
  src/bb-copy-to \
- src/bb-copy-from
+ src/bb-copy-from \
+ src/bb-latency-bench
 
 src_bake_bulk_server_SOURCES = \
  src/bake-bulk-server.c \
