@@ -28,6 +28,7 @@ struct hg_instance
     hg_id_t bake_bulk_persist_id;
     hg_id_t bake_bulk_get_size_id;
     hg_id_t bake_bulk_read_id;
+    hg_id_t bake_bulk_noop_id;
 };
 
 /* Refers to an instance connected to a specific target */
@@ -112,6 +113,12 @@ static int hg_instance_init(const char *mercury_dest)
         "bake_bulk_read_rpc", 
         bake_bulk_read_in_t,
         bake_bulk_read_out_t,
+        NULL);
+    g_hginst.bake_bulk_noop_id = 
+        MERCURY_REGISTER(g_hginst.hg_class, 
+        "bake_bulk_noop_rpc", 
+        void,
+        void,
         NULL);
 
     g_hginst.mid = margo_init(0, 0, g_hginst.hg_context);
@@ -470,6 +477,36 @@ int bake_bulk_get_size(
     HG_Free_output(handle, &out);
     HG_Destroy(handle);
     return(ret);
+}
+
+int bake_bulk_noop(
+    bake_target_id_t bti)
+{
+    hg_return_t hret;
+    hg_handle_t handle;
+    struct bake_instance *instance = NULL;
+
+    HASH_FIND(hh, instance_hash, &bti, sizeof(bti), instance);
+    if(!instance)
+        return(-1);
+
+    /* create handle */
+    hret = HG_Create(g_hginst.hg_context, instance->dest, 
+        g_hginst.bake_bulk_noop_id, &handle);
+    if(hret != HG_SUCCESS)
+    {
+        return(-1);
+    }
+
+    hret = margo_forward(g_hginst.mid, handle, NULL);
+    if(hret != HG_SUCCESS)
+    {
+        HG_Destroy(handle);
+        return(-1);
+    }
+
+    HG_Destroy(handle);
+    return(0);
 }
 
 int bake_bulk_read(

@@ -243,6 +243,17 @@ static void bake_bulk_get_size_ult(hg_handle_t handle)
 }
 DEFINE_MARGO_RPC_HANDLER(bake_bulk_get_size_ult)
 
+/* service a remote RPC for a no-op */
+static void bake_bulk_noop_ult(hg_handle_t handle)
+{
+    // printf("Got RPC request to noop bulk region.\n");
+
+    HG_Respond(handle, NULL, NULL, NULL);
+    HG_Destroy(handle);
+    return;
+}
+DEFINE_MARGO_RPC_HANDLER(bake_bulk_noop_ult)
+
 /* TODO consolidate with write handler; read and write are nearly identical */
 /* service a remote RPC that reads to a bulk region */
 static void bake_bulk_read_ult(hg_handle_t handle)

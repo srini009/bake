@@ -69,6 +69,9 @@ MERCURY_GEN_PROC(bake_bulk_probe_out_t,
     ((bake_target_id_t)(bti)))
 DECLARE_MARGO_RPC_HANDLER(bake_bulk_probe_ult)
 
+/* noop */
+DECLARE_MARGO_RPC_HANDLER(bake_bulk_noop_ult)
+
 /* TODO: this should be somewhere else, just putting in this header for
  * convenience right now.  The type should only be visible to the server
  * daemon and the rpc handlers.

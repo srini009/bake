@@ -143,6 +143,15 @@ int bake_shutdown_service(bake_target_id_t bti);
  * Commented out for now but leaving it in place for reference
  */
 
+/**
+ * Issue a no-op 
+ *
+ * @param [in] bti BAKE target identifier
+ * @returns 0 on success, -1 on failure
+ */
+int bake_bulk_noop(
+    bake_target_id_t bti);
+
 #if 0
 
 /// ==== Some high-level goals ====
