@@ -18,6 +18,7 @@
 #include "bake-bulk.h"
 
 static void bench_routine(bake_target_id_t bti, int iterations, int size);
+static void bench_routine_noop(bake_target_id_t bti, int iterations);
 
 int main(int argc, char **argv) 
 {
@@ -65,10 +66,9 @@ int main(int argc, char **argv)
     }
 
     printf("# <op> <iterations> <size> <avg> <min> <max>\n");
+    bench_routine_noop(bti, iterations);
     for(cur_size=min_size; cur_size <= max_size; cur_size *= 2)
-    {
         bench_routine(bti, iterations, cur_size);
-    }
     
     bake_release_instance(bti);
 
@@ -156,6 +156,54 @@ static void bench_routine(bake_target_id_t bti, int iterations, int size)
     assert(ret == 0);
 
     free(buffer);
+
+    return;
+}
+
+static void bench_routine_noop(bake_target_id_t bti, int iterations)
+{
+    int ret;
+    double tm1, tm2, min = 0, max = 0, sum = 0;
+    int i;
+
+    sleep(1);
+
+    tm1 = Wtime();
+    for(i=0; i<iterations; i++)
+    {
+        /* noop */
+        ret = bake_bulk_noop(bti);
+        assert(ret == 0);
+    }
+    tm2 = Wtime();
+    sum = tm2-tm1;
+    min = -1;
+    max = -1;
+
+    printf("noop(continuous))\t%d\t%d\t%.9f\t%.9f\t%.9f\n", iterations, -1, sum/((double)iterations), min, max);
+
+
+    min = 0;
+    max = 0;
+    sum = 0;
+    sleep(1);
+
+    for(i=0; i<iterations; i++)
+    {
+        tm1 = Wtime();
+        /* noop */
+        ret = bake_bulk_noop(bti);
+        tm2 = Wtime();
+        assert(ret == 0);
+
+        sum += tm2-tm1;
+        if(min == 0 || min > (tm2-tm1))
+            min = tm2-tm1;
+        if(max == 0 || max < (tm2-tm1))
+            max = tm2-tm1;
+    }
+
+    printf("noop\t%d\t%d\t%.9f\t%.9f\t%.9f\n", iterations, -1, sum/((double)iterations), min, max);
 
     return;
 }
