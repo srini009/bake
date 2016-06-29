@@ -79,9 +79,9 @@ int main(int argc, char **argv)
 
 static double Wtime(void)
 {
-    struct timeval t;
-    gettimeofday(&t, NULL);
-    return((double)t.tv_sec + (double)(t.tv_usec) / 1000000);
+    struct timespec tp;
+    clock_gettime(CLOCK_MONOTONIC, &tp);
+    return((double)tp.tv_sec + (double)(tp.tv_nsec) / (double)1000000000.0);
 }
 
 static void bench_routine(bake_target_id_t bti, int iterations, int size)
