@@ -50,6 +50,9 @@ struct hg_instance g_hginst = {
 
 static int hg_instance_init(const char *mercury_dest)
 {
+    char hg_na[64] = {0};
+    int i;
+
     /* have we already started a Mercury instance? */
     if(g_hginst.refct > 0)
     {
@@ -59,11 +62,14 @@ static int hg_instance_init(const char *mercury_dest)
 
     /* boilerplate HG initialization steps */
     /***************************************/
-    /* NOTE: the listening address is not actually used in this case (the
-     * na_listen flag is false); but we pass in the *target* server address
-     * here to make sure that Mercury starts up the correct transport
+
+    /* initialize Mercury using the transport portion of the destination
+     * address (i.e., the part before the first : character if present)
      */
-    g_hginst.hg_class = HG_Init(mercury_dest, HG_FALSE);
+    for(i=0; (i<63 && mercury_dest[i] != '\0' && mercury_dest[i] != ':'); i++)
+        hg_na[i] = mercury_dest[i];
+
+    g_hginst.hg_class = HG_Init(hg_na, HG_FALSE);
     if(!g_hginst.hg_class)
     {
         return(-1);
