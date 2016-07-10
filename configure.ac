@@ -3,6 +3,7 @@
 
 AC_PREREQ([2.67])
 AC_INIT([bake-bulk], [0.1], [],[],[]) 
+AC_CONFIG_MACRO_DIRS([m4])
 LT_INIT
 
 AC_CANONICAL_TARGET
