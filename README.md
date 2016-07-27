@@ -44,11 +44,19 @@ libpmemobj.
 
 The bake-bulk-server command starts the server daemon.  
 
-The first argument to bake-bulk-server is
-the address for Mercury to listen on.  In this case we are using the CCI/SM
-transport, and the "1/1" portion of the URL specifies the last two components
-of the /tmp path to use for SM connection information. For other transports
-this would more likely just be a port number.
+The first argument to bake-bulk-server is the address for Mercury to
+listen on.  In this case we are using the CCI/SM transport.  For other
+transports this would more likely just be an address and port number
+(e.g. "tcp://localhost:1234").  CCI/SM endpoints are identified by two
+integers.  By default ("sm://"), the first integer is the server's process
+id and the second is 0.  The defaults can be overriden on the command
+line (e.g. "sm://1/1" fixes the listening address to 1/1).  CCI/SM uses
+the integers in the address in conjunction with the server's hostname
+to create subdirectories in /tmp/cci/sm for IPC connection information.
+CCI/SM will create all necessary subdirectories in /tmp/cci.  For example,
+if the command is run on host "carns-x1" with "sm://1/1" then CCI/SM
+will create a /tmp/cci/sm/carns-x1/1/1 directory containing connection
+information for the bake-bulk-server process.
 
 The second argument to bake-bulk-server is the path to the libpmem-formatted
 storage device.
