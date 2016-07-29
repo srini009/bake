@@ -124,7 +124,14 @@ static inline hg_return_t hg_proc_bake_target_id_t(hg_proc_t proc, bake_target_i
 
 static inline hg_return_t hg_proc_bake_bulk_eager_write_in_t(hg_proc_t proc, bake_bulk_eager_write_in_t *in)
 {
-    /* TODO: implement */
+    /* TODO: error checking */
+
+    hg_proc_bake_target_id_t(proc, &in->bti);
+    hg_proc_bake_bulk_region_id_t(proc, &in->rid);
+    hg_proc_uint64_t(proc, &in->region_offset);
+    hg_proc_uint32_t(proc, &in->size);
+    hg_proc_memcpy(proc, in->buffer, in->size);
+
     return(HG_SUCCESS);
 }
 
