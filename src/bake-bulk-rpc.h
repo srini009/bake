@@ -13,7 +13,6 @@
 /* encoders for bake-specific types */
 static inline hg_return_t hg_proc_bake_target_id_t(hg_proc_t proc, bake_target_id_t *bti);
 static inline hg_return_t hg_proc_bake_bulk_region_id_t(hg_proc_t proc, bake_bulk_region_id_t *rid);
-
 /* shutdown */
 DECLARE_MARGO_RPC_HANDLER(bake_bulk_shutdown_ult)
 
@@ -35,6 +34,21 @@ MERCURY_GEN_PROC(bake_bulk_write_in_t,
 MERCURY_GEN_PROC(bake_bulk_write_out_t,
     ((int32_t)(ret)))
 DECLARE_MARGO_RPC_HANDLER(bake_bulk_write_ult)
+
+/* bulk eager write */
+typedef struct 
+{
+    bake_target_id_t bti;
+    bake_bulk_region_id_t rid;
+    uint64_t region_offset;
+    uint32_t size;
+    char * buffer;
+} bake_bulk_eager_write_in_t;
+static inline hg_return_t hg_proc_bake_bulk_eager_write_in_t(hg_proc_t proc, bake_bulk_eager_write_in_t *in);
+MERCURY_GEN_PROC(bake_bulk_eager_write_out_t,
+    ((int32_t)(ret)))
+DECLARE_MARGO_RPC_HANDLER(bake_bulk_eager_write_ult)
+
 
 /* bulk persist */
 MERCURY_GEN_PROC(bake_bulk_persist_in_t,
@@ -106,6 +120,12 @@ static inline hg_return_t hg_proc_bake_target_id_t(hg_proc_t proc, bake_target_i
 {
     /* TODO: make this portable; just raw encoding for now */
     return(hg_proc_raw(proc, bti->id, sizeof(bti->id)));
+}
+
+static inline hg_return_t hg_proc_bake_bulk_eager_write_in_t(hg_proc_t proc, bake_bulk_eager_write_in_t *in)
+{
+    /* TODO: implement */
+    return(HG_SUCCESS);
 }
 
 #endif /* __BAKE_BULK_RPC */
