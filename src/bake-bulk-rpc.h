@@ -44,7 +44,7 @@ typedef struct
     uint32_t size;
     char * buffer;
 } bake_bulk_eager_write_in_t;
-static inline hg_return_t hg_proc_bake_bulk_eager_write_in_t(hg_proc_t proc, bake_bulk_eager_write_in_t *in);
+static inline hg_return_t hg_proc_bake_bulk_eager_write_in_t(hg_proc_t proc, void *v_out_p);
 MERCURY_GEN_PROC(bake_bulk_eager_write_out_t,
     ((int32_t)(ret)))
 DECLARE_MARGO_RPC_HANDLER(bake_bulk_eager_write_ult)
@@ -122,9 +122,10 @@ static inline hg_return_t hg_proc_bake_target_id_t(hg_proc_t proc, bake_target_i
     return(hg_proc_raw(proc, bti->id, sizeof(bti->id)));
 }
 
-static inline hg_return_t hg_proc_bake_bulk_eager_write_in_t(hg_proc_t proc, bake_bulk_eager_write_in_t *in)
+static inline hg_return_t hg_proc_bake_bulk_eager_write_in_t(hg_proc_t proc, void *v_out_p)
 {
     /* TODO: error checking */
+    bake_bulk_eager_write_in_t *in = v_out_p;
 
     hg_proc_bake_target_id_t(proc, &in->bti);
     hg_proc_bake_bulk_region_id_t(proc, &in->rid);
