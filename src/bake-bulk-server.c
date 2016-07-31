@@ -130,6 +130,9 @@ int main(int argc, char **argv)
     MERCURY_REGISTER(hg_class, "bake_bulk_eager_write_rpc", bake_bulk_eager_write_in_t, 
         bake_bulk_eager_write_out_t,
         bake_bulk_eager_write_ult_handler);
+    MERCURY_REGISTER(hg_class, "bake_bulk_eager_read_rpc", bake_bulk_eager_read_in_t, 
+        bake_bulk_eager_read_out_t,
+        bake_bulk_eager_read_ult_handler);
     MERCURY_REGISTER(hg_class, "bake_bulk_persist_rpc", bake_bulk_persist_in_t, 
         bake_bulk_persist_out_t,
         bake_bulk_persist_ult_handler);

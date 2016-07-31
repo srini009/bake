@@ -25,6 +25,7 @@ struct hg_instance
     hg_id_t bake_bulk_shutdown_id; 
     hg_id_t bake_bulk_create_id;
     hg_id_t bake_bulk_eager_write_id;
+    hg_id_t bake_bulk_eager_read_id;
     hg_id_t bake_bulk_write_id;
     hg_id_t bake_bulk_persist_id;
     hg_id_t bake_bulk_get_size_id;
@@ -48,6 +49,13 @@ struct hg_instance g_hginst = {
     .hg_context = NULL,
     .refct = 0,
 };
+
+static int bake_bulk_eager_read(
+    bake_target_id_t bti,
+    bake_bulk_region_id_t rid,
+    uint64_t region_offset,
+    void *buf,
+    uint64_t buf_size);
 
 static int hg_instance_init(const char *mercury_dest)
 {
@@ -108,6 +116,12 @@ static int hg_instance_init(const char *mercury_dest)
         "bake_bulk_eager_write_rpc", 
         bake_bulk_eager_write_in_t,
         bake_bulk_eager_write_out_t,
+        NULL);
+    g_hginst.bake_bulk_eager_read_id = 
+        MERCURY_REGISTER(g_hginst.hg_class, 
+        "bake_bulk_eager_read_rpc", 
+        bake_bulk_eager_read_in_t,
+        bake_bulk_eager_read_out_t,
         NULL);
     g_hginst.bake_bulk_persist_id = 
         MERCURY_REGISTER(g_hginst.hg_class, 
@@ -284,7 +298,7 @@ int bake_shutdown_service(bake_target_id_t bti)
     return(0);
 }
 
-int bake_bulk_eager_write(
+static int bake_bulk_eager_write(
     bake_target_id_t bti,
     bake_bulk_region_id_t rid,
     uint64_t region_offset,
@@ -596,6 +610,11 @@ int bake_bulk_read(
     int ret;
     struct bake_instance *instance = NULL;
 
+    if(buf_size <= BAKE_BULK_EAGER_LIMIT)
+    {
+        return(bake_bulk_eager_read(bti, rid, region_offset, buf, buf_size));
+    }
+
     HASH_FIND(hh, instance_hash, &bti, sizeof(bti), instance);
     if(!instance)
         return(-1);
@@ -641,6 +660,61 @@ int bake_bulk_read(
     HG_Free_output(handle, &out);
     HG_Destroy(handle);
     HG_Bulk_free(in.bulk_handle);
+    return(ret);
+}
+
+
+static int bake_bulk_eager_read(
+    bake_target_id_t bti,
+    bake_bulk_region_id_t rid,
+    uint64_t region_offset,
+    void *buf,
+    uint64_t buf_size)
+{
+    hg_return_t hret;
+    hg_handle_t handle;
+    bake_bulk_eager_read_in_t in;
+    bake_bulk_eager_read_out_t out;
+    int ret;
+    struct bake_instance *instance = NULL;
+
+    HASH_FIND(hh, instance_hash, &bti, sizeof(bti), instance);
+    if(!instance)
+        return(-1);
+
+    in.bti = bti;
+    in.rid = rid;
+    in.region_offset = region_offset;
+    in.size = buf_size;
+   
+    /* create handle */
+    hret = HG_Create(g_hginst.hg_context, instance->dest, 
+        g_hginst.bake_bulk_eager_read_id, &handle);
+    if(hret != HG_SUCCESS)
+    {
+        return(-1);
+    }
+
+    hret = margo_forward(g_hginst.mid, handle, &in);
+    if(hret != HG_SUCCESS)
+    {
+        HG_Destroy(handle);
+        return(-1);
+    }
+
+    hret = HG_Get_output(handle, &out);
+    if(hret != HG_SUCCESS)
+    {
+        HG_Destroy(handle);
+        return(-1);
+    }
+    
+    ret = out.ret;
+    if(ret == 0)
+        memcpy(buf, out.buffer, out.size);
+
+    HG_Free_output(handle, &out);
+    HG_Destroy(handle);
     return(ret);
 }
 

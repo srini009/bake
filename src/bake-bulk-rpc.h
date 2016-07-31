@@ -77,6 +77,21 @@ MERCURY_GEN_PROC(bake_bulk_read_out_t,
     ((int32_t)(ret)))
 DECLARE_MARGO_RPC_HANDLER(bake_bulk_read_ult)
 
+/* bulk eager read */
+MERCURY_GEN_PROC(bake_bulk_eager_read_in_t,
+    ((bake_target_id_t)(bti))\
+    ((bake_bulk_region_id_t)(rid))\
+    ((uint64_t)(region_offset))\
+    ((uint32_t)(size)))
+typedef struct 
+{
+    int32_t ret;
+    uint32_t size;
+    char * buffer;
+} bake_bulk_eager_read_out_t;
+static inline hg_return_t hg_proc_bake_bulk_eager_read_out_t(hg_proc_t proc, void *v_out_p);
+DECLARE_MARGO_RPC_HANDLER(bake_bulk_eager_read_ult)
+
 /* bulk probe */
 MERCURY_GEN_PROC(bake_bulk_probe_out_t,
     ((int32_t)(ret))\
@@ -132,9 +147,25 @@ static inline hg_return_t hg_proc_bake_bulk_eager_write_in_t(hg_proc_t proc, voi
     hg_proc_uint64_t(proc, &in->region_offset);
     hg_proc_uint32_t(proc, &in->size);
     if(hg_proc_get_op(proc) == HG_DECODE)
-        hg_proc_memcpy_decode_in_place(proc, &in->buffer, in->size);
+        hg_proc_memcpy_decode_in_place(proc, (void**)(&in->buffer), in->size);
     else
         hg_proc_memcpy(proc, in->buffer, in->size);
+
+    return(HG_SUCCESS);
+}
+
+
+static inline hg_return_t hg_proc_bake_bulk_eager_read_out_t(hg_proc_t proc, void *v_out_p)
+{
+    /* TODO: error checking */
+    bake_bulk_eager_read_out_t *out = v_out_p;
+
+    hg_proc_int32_t(proc, &out->ret);
+    hg_proc_uint32_t(proc, &out->size);
+    if(hg_proc_get_op(proc) == HG_DECODE)
+        hg_proc_memcpy_decode_in_place(proc, (void**)(&out->buffer), out->size);
+    else
+        hg_proc_memcpy(proc, out->buffer, out->size);
 
     return(HG_SUCCESS);
 }

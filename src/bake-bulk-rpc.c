@@ -388,6 +388,61 @@ static void bake_bulk_read_ult(hg_handle_t handle)
 }
 DEFINE_MARGO_RPC_HANDLER(bake_bulk_read_ult)
 
+
+/* service a remote RPC that reads to a bulk region and eagerly sends
+ * response */
+static void bake_bulk_eager_read_ult(hg_handle_t handle)
+{
+    bake_bulk_eager_read_out_t out;
+    bake_bulk_eager_read_in_t in;
+    hg_return_t hret;
+    char* buffer;
+    hg_size_t size;
+    struct hg_info *hgi;
+    margo_instance_id mid;
+    pmemobj_region_id_t* prid;
+
+    // printf("Got RPC request to read bulk region.\n");
+    
+    memset(&out, 0, sizeof(out));
+
+    hgi = HG_Get_info(handle);
+    assert(hgi);
+    mid = margo_hg_class_to_instance(hgi->hg_class);
+
+    hret = HG_Get_input(handle, &in);
+    if(hret != HG_SUCCESS)
+    {
+        out.ret = -1;
+        HG_Respond(handle, NULL, NULL, &out);
+        HG_Destroy(handle);
+        return;
+    }
+
+    prid = (pmemobj_region_id_t*)in.rid.data;
+
+    /* find memory address for target object */
+    buffer = pmemobj_direct(prid->oid);
+    if(!buffer)
+    {
+        out.ret = -1;
+        HG_Free_input(handle, &in);
+        HG_Respond(handle, NULL, NULL, &out);
+        HG_Destroy(handle);
+        return;
+    }
+
+    out.ret = 0;
+    out.buffer = buffer;
+    out.size = in.size;
+
+    HG_Free_input(handle, &in);
+    HG_Respond(handle, NULL, NULL, &out);
+    HG_Destroy(handle);
+    return;
+}
+DEFINE_MARGO_RPC_HANDLER(bake_bulk_eager_read_ult)
+
 /* service a remote RPC that probes for a target id */
 static void bake_bulk_probe_ult(hg_handle_t handle)
 {
