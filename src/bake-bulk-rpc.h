@@ -132,15 +132,9 @@ static inline hg_return_t hg_proc_bake_bulk_eager_write_in_t(hg_proc_t proc, voi
     hg_proc_uint64_t(proc, &in->region_offset);
     hg_proc_uint32_t(proc, &in->size);
     if(hg_proc_get_op(proc) == HG_DECODE)
-    {
-        in->buffer = malloc(in->size);
-    }
-    hg_proc_memcpy(proc, in->buffer, in->size);
-    if(hg_proc_get_op(proc) == HG_FREE)
-    {
-        if(in->buffer)
-            free(in->buffer);
-    }
+        hg_proc_memcpy_decode_in_place(proc, &in->buffer, in->size);
+    else
+        hg_proc_memcpy(proc, in->buffer, in->size);
 
     return(HG_SUCCESS);
 }
