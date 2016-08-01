@@ -104,8 +104,8 @@ static inline hg_return_t hg_proc_bake_bulk_region_id_t(hg_proc_t proc, bake_bul
 
 static inline hg_return_t hg_proc_bake_target_id_t(hg_proc_t proc, bake_target_id_t *bti)
 {
-    /* TODO: make this portable; just raw encoding for now */
-    return(hg_proc_raw(proc, bti->id, sizeof(bti->id)));
+    /* TODO: make this portable */
+    return(hg_proc_memcpy(proc, bti->id, sizeof(bti->id)));
 }
 
 #endif /* __BAKE_BULK_RPC */
