@@ -126,6 +126,7 @@ static void bench_routine(bake_target_id_t bti, int iterations, int size)
     printf("write\t%d\t%d\t%.9f\t%.9f\t%.9f\n", iterations, size, sum/((double)iterations), min, max);
 
     region_offset = 0;
+    sum = 0;
     sleep(1);
 
     for(i=0; i<iterations; i++)
