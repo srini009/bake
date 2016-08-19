@@ -141,15 +141,21 @@ static inline hg_return_t hg_proc_bake_bulk_eager_write_in_t(hg_proc_t proc, voi
 {
     /* TODO: error checking */
     bake_bulk_eager_write_in_t *in = v_out_p;
+    void *buf = NULL;
 
     hg_proc_bake_target_id_t(proc, &in->bti);
     hg_proc_bake_bulk_region_id_t(proc, &in->rid);
     hg_proc_uint64_t(proc, &in->region_offset);
     hg_proc_uint32_t(proc, &in->size);
-    if(hg_proc_get_op(proc) == HG_DECODE)
-        hg_proc_memcpy_decode_in_place(proc, (void**)(&in->buffer), in->size);
-    else
-        hg_proc_memcpy(proc, in->buffer, in->size);
+    if(in->size)
+    {
+        buf = hg_proc_save_ptr(proc, in->size);
+        if(hg_proc_get_op(proc) == HG_ENCODE)
+            memcpy(buf, in->buffer, in->size);
+        if(hg_proc_get_op(proc) == HG_DECODE)
+            in->buffer = buf;
+        hg_proc_restore_ptr(proc, buf, in->size);
+    }
 
     return(HG_SUCCESS);
 }
@@ -159,13 +165,19 @@ static inline hg_return_t hg_proc_bake_bulk_eager_read_out_t(hg_proc_t proc, voi
 {
     /* TODO: error checking */
     bake_bulk_eager_read_out_t *out = v_out_p;
+    void *buf = NULL;
 
     hg_proc_int32_t(proc, &out->ret);
     hg_proc_uint32_t(proc, &out->size);
-    if(hg_proc_get_op(proc) == HG_DECODE)
-        hg_proc_memcpy_decode_in_place(proc, (void**)(&out->buffer), out->size);
-    else
-        hg_proc_memcpy(proc, out->buffer, out->size);
+    if(out->size)
+    {
+        buf = hg_proc_save_ptr(proc, out->size);
+        if(hg_proc_get_op(proc) == HG_ENCODE)
+            memcpy(buf, out->buffer, out->size);
+        if(hg_proc_get_op(proc) == HG_DECODE)
+            out->buffer = buf;
+        hg_proc_restore_ptr(proc, buf, out->size);
+    }
 
     return(HG_SUCCESS);
 }
