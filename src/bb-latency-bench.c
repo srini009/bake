@@ -167,23 +167,6 @@ static void bench_routine_noop(bake_target_id_t bti, int iterations)
     double tm1, tm2, min = 0, max = 0, sum = 0;
     int i;
 
-    sleep(1);
-
-    tm1 = Wtime();
-    for(i=0; i<iterations; i++)
-    {
-        /* noop */
-        ret = bake_bulk_noop(bti);
-        assert(ret == 0);
-    }
-    tm2 = Wtime();
-    sum = tm2-tm1;
-    min = -1;
-    max = -1;
-
-    printf("noop(continuous))\t%d\t%d\t%.9f\t%.9f\t%.9f\n", iterations, -1, sum/((double)iterations), min, max);
-
-
     min = 0;
     max = 0;
     sum = 0;
