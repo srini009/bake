@@ -17,8 +17,14 @@
 #include "abt-snoozer.h"
 #include "bake-bulk.h"
 
-static void bench_routine(bake_target_id_t bti, int iterations, int size);
-static void bench_routine_noop(bake_target_id_t bti, int iterations);
+static void bench_routine_write(bake_target_id_t bti, int iterations, double* measurement_array, int size);
+static void bench_routine_read(bake_target_id_t bti, int iterations, double* measurement_array, int size);
+static void bench_routine_noop(bake_target_id_t bti, int iterations, double* measurement_array);
+static void bench_routine_print(const char* op, int size, int iterations, double* measurement_array);
+static int measurement_cmp(const void* a, const void *b);
+
+static double *measurement_array = NULL;
+static bake_bulk_region_id_t rid;
 
 int main(int argc, char **argv) 
 {
@@ -41,6 +47,9 @@ int main(int argc, char **argv)
 
     ret = sscanf(argv[4], "%d", &max_size);
     assert(ret == 1);
+
+    measurement_array = malloc(sizeof(*measurement_array)*iterations);
+    assert(measurement_array);
 
     /* set up Argobots */
     ret = ABT_init(argc, argv);
@@ -65,14 +74,23 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    printf("# <op> <iterations> <size> <avg> <min> <max>\n");
-    bench_routine_noop(bti, iterations);
+    printf("# <op> <iterations> <size> <min> <q1> <med> <avg> <q3> <max>\n");
+
+    bench_routine_noop(bti, iterations, measurement_array);
+    bench_routine_print("noop", 0, iterations, measurement_array);
     for(cur_size=min_size; cur_size <= max_size; cur_size *= 2)
-        bench_routine(bti, iterations, cur_size);
+    {
+        bench_routine_write(bti, iterations, measurement_array, cur_size);
+        bench_routine_print("write", cur_size, iterations, measurement_array);
+        bench_routine_read(bti, iterations, measurement_array, cur_size);
+        bench_routine_print("read", cur_size, iterations, measurement_array);
+    }
     
     bake_release_instance(bti);
 
     ABT_finalize();
+
+    free(measurement_array);
 
     return(0);
 }
@@ -84,11 +102,10 @@ static double Wtime(void)
     return((double)tp.tv_sec + (double)(tp.tv_nsec) / (double)1000000000.0);
 }
 
-static void bench_routine(bake_target_id_t bti, int iterations, int size)
+static void bench_routine_write(bake_target_id_t bti, int iterations, double *measurement_array, int size)
 {
-    bake_bulk_region_id_t rid;
     int ret;
-    double tm1, tm2, min = 0, max = 0, sum = 0;
+    double tm1, tm2;
     char *buffer;
     uint64_t region_offset = 0;
     int i;
@@ -115,18 +132,29 @@ static void bench_routine(bake_target_id_t bti, int iterations, int size)
         tm2 = Wtime();
         assert(ret == 0);
         region_offset += size;
-
-        sum += tm2-tm1;
-        if(min == 0 || min > (tm2-tm1))
-            min = tm2-tm1;
-        if(max == 0 || max < (tm2-tm1))
-            max = tm2-tm1;
+        measurement_array[i] = tm2-tm1;
     }
 
-    printf("write\t%d\t%d\t%.9f\t%.9f\t%.9f\n", iterations, size, sum/((double)iterations), min, max);
+    /* persist */
+    ret = bake_bulk_persist(bti, rid);
+    assert(ret == 0);
 
-    region_offset = 0;
-    sum = 0;
+    free(buffer);
+
+    return;
+}
+
+static void bench_routine_read(bake_target_id_t bti, int iterations, double *measurement_array, int size)
+{
+    int ret;
+    double tm1, tm2;
+    char *buffer;
+    uint64_t region_offset = 0;
+    int i;
+
+    buffer = calloc(1, size);
+    assert(buffer);
+
     sleep(1);
 
     for(i=0; i<iterations; i++)
@@ -142,34 +170,20 @@ static void bench_routine(bake_target_id_t bti, int iterations, int size)
         tm2 = Wtime();
         assert(ret == 0);
         region_offset += size;
-
-        sum += tm2-tm1;
-        if(min == 0 || min > (tm2-tm1))
-            min = tm2-tm1;
-        if(max == 0 || max < (tm2-tm1))
-            max = tm2-tm1;
+        measurement_array[i] = tm2-tm1;
     }
-
-    printf("read\t%d\t%d\t%.9f\t%.9f\t%.9f\n", iterations, size, sum/((double)iterations), min, max);
-
-    /* persist */
-    ret = bake_bulk_persist(bti, rid);
-    assert(ret == 0);
 
     free(buffer);
 
     return;
 }
 
-static void bench_routine_noop(bake_target_id_t bti, int iterations)
+static void bench_routine_noop(bake_target_id_t bti, int iterations, double *measurement_array)
 {
     int ret;
-    double tm1, tm2, min = 0, max = 0, sum = 0;
+    double tm1, tm2;
     int i;
 
-    min = 0;
-    max = 0;
-    sum = 0;
     sleep(1);
 
     for(i=0; i<iterations; i++)
@@ -180,14 +194,65 @@ static void bench_routine_noop(bake_target_id_t bti, int iterations)
         tm2 = Wtime();
         assert(ret == 0);
 
-        sum += tm2-tm1;
-        if(min == 0 || min > (tm2-tm1))
-            min = tm2-tm1;
-        if(max == 0 || max < (tm2-tm1))
-            max = tm2-tm1;
+        measurement_array[i] = tm2-tm1;
     }
 
-    printf("noop\t%d\t%d\t%.9f\t%.9f\t%.9f\n", iterations, -1, sum/((double)iterations), min, max);
+    return;
+}
+
+static int measurement_cmp(const void* a, const void *b)
+{
+    const double *d_a = a;
+    const double *d_b = b;
+
+    if(*d_a < *d_b)
+        return(-1);
+    else if(*d_a > *d_b)
+        return(1);
+    else
+        return(0);
+}
+
+static void bench_routine_print(const char* op, int size, int iterations, double* measurement_array)
+{
+    double min, max, q1, q3, med, avg, sum;
+    int bracket1, bracket2;
+    int i;
+
+    qsort(measurement_array, iterations, sizeof(double), measurement_cmp);
+
+    min = measurement_array[0];
+    max = measurement_array[iterations-1];
+
+    sum = 0;
+    for(i=0; i<iterations; i++)
+    {
+        sum += measurement_array[i];
+    }
+    avg = sum/(double)iterations;
+
+    bracket1 = iterations/2;
+    if(iterations%2)
+        bracket2 = bracket1 + 1;
+    else
+        bracket2 = bracket1;
+    med = (measurement_array[bracket1] + measurement_array[bracket2])/(double)2;
+
+    bracket1 = iterations/4;
+    if(iterations%4)
+        bracket2 = bracket1 + 1;
+    else
+        bracket2 = bracket1;
+    q1 = (measurement_array[bracket1] + measurement_array[bracket2])/(double)2;
+
+    bracket1 *= 3;
+    if(iterations%4)
+        bracket2 = bracket1 + 1;
+    else
+        bracket2 = bracket1;
+    q3 = (measurement_array[bracket1] + measurement_array[bracket2])/(double)2;
+
+    printf("%s\t%d\t%d\t%.9f\t%.9f\t%.9f\t%.9f\t%.9f\t%.9f\n", op, iterations, size, min, q1, med, avg, q3, max);
 
     return;
 }
