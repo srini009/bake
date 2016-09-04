@@ -3,9 +3,7 @@ ACLOCAL_AMFLAGS = -I m4
 
 bin_PROGRAMS =
 bin_SCRIPTS =
-noinst_LIBRARIES =
 noinst_PROGRAMS =
-lib_LIBRARIES =
 noinst_HEADERS =
 TESTS =
 XFAIL_TESTS = 
@@ -28,10 +26,10 @@ AM_LIBS =
 
 AM_CXXFLAGS = $(AM_CFLAGS)
 
-lib_LIBRARIES += src/libbake-bulk.a
-src_libbake_bulk_a_SOURCES =
+lib_LTLIBRARIES = src/libbake-bulk.la
+src_libbake_bulk_la_SOURCES =
 
-LDADD = src/libbake-bulk.a
+LDADD = src/libbake-bulk.la
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = maint/bake-bulk.pc

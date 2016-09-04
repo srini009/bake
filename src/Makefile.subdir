@@ -1,4 +1,4 @@
-src_libbake_bulk_a_SOURCES += \
+src_libbake_bulk_la_SOURCES += \
  src/bake-bulk.c 
 
 bin_PROGRAMS += \
