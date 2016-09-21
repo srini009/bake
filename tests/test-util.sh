@@ -44,7 +44,7 @@ function test_start_servers ()
             exit 1
         fi
 
-        timeout --signal=9 ${maxtime} src/bake-bulk-server tcp://localhost:$i $TMPBASE/foo-$i.dat &
+        timeout --signal=9 ${maxtime} src/bake-bulk-server tcp://$i $TMPBASE/foo-$i.dat &
         if [ $? -ne 0 ]; then
             # TODO: this doesn't actually work; can't check return code of
             # something executing in background.  We have to rely on the
