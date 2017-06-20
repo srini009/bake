@@ -13,6 +13,9 @@ You can compile and install the latest git revision of NVML as follows:
 * `make`
 * `make install prefix=/home/carns/working/install/`
 
+`make install` will require `pandoc` or you can ignore the error and not build
+the documentation.
+
 ## Compilation
 
 * `./prepare.sh`
