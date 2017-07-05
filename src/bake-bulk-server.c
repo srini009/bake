@@ -7,7 +7,7 @@
 #include <stdio.h>
 #include <assert.h>
 #include <unistd.h>
-#include <uuid.h>
+#include <uuid/uuid.h>
 #include <abt.h>
 #include <abt-snoozer.h>
 #include <margo.h>

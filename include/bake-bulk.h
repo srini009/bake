@@ -7,7 +7,7 @@
 #ifndef __BAKE_BULK_H
 #define __BAKE_BULK_H
 
-#include <uuid.h>
+#include <uuid/uuid.h>
 #include <stdint.h>
  
 /**
