@@ -101,15 +101,6 @@ DECLARE_MARGO_RPC_HANDLER(bake_bulk_probe_ult)
 /* noop */
 DECLARE_MARGO_RPC_HANDLER(bake_bulk_noop_ult)
 
-/* TODO: this should be somewhere else, just putting in this header for
- * convenience right now.  The type should only be visible to the server
- * daemon and the rpc handlers.
- */
-struct bake_bulk_root
-{
-    bake_target_id_t target_id;
-};
-
 
 /* TODO: where should the encoder defs live?  Not in bake-bulk-rpc.c because 
  * we don't really need the rpc handlers to be linked into clients...

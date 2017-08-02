@@ -8,7 +8,6 @@
 #define __BAKE_BULK_CLIENT_H
 
 #include <stdint.h>
-
 #include "bake-bulk.h"
 
 /**
