@@ -13,7 +13,7 @@ CLEANFILES = $(bin_SCRIPTS)
 MAINTAINERCLEANFILES =
 EXTRA_DIST =
 BUILT_SOURCES =
-include_HEADERS = include/bake-bulk.h
+include_HEADERS = include/bake-bulk.h include/bake-bulk-client.h
 
 EXTRA_DIST += \
  prepare.sh 
@@ -26,10 +26,10 @@ AM_LIBS =
 
 AM_CXXFLAGS = $(AM_CFLAGS)
 
-lib_LTLIBRARIES = src/libbake-bulk.la
-src_libbake_bulk_la_SOURCES =
+lib_LTLIBRARIES = src/libbake-bulk-client.la
+src_libbake_bulk_client_la_SOURCES =
 
-LDADD = src/libbake-bulk.la
+LDADD = src/libbake-bulk-client.la
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = maint/bake-bulk.pc

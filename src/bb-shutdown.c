@@ -10,7 +10,7 @@
 
 #include "abt.h"
 #include "abt-snoozer.h"
-#include "bake-bulk.h"
+#include "bake-bulk-client.h"
 
 /* client program that will shut down a BAKE bulk server. */
 

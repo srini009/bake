@@ -15,7 +15,7 @@
 
 #include "abt.h"
 #include "abt-snoozer.h"
-#include "bake-bulk.h"
+#include "bake-bulk-client.h"
 
 static void bench_routine_write(bake_target_id_t bti, int iterations, double* measurement_array, int size);
 static void bench_routine_read(bake_target_id_t bti, int iterations, double* measurement_array, int size);
