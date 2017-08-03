@@ -5,6 +5,7 @@ src_libbake_bulk_server_la_SOURCES += \
  src/bake-bulk-server.c
 
 bin_PROGRAMS += \
+ src/bake-bulk-server-daemon \
  src/bb-shutdown \
  src/bb-copy-to \
  src/bb-copy-from \

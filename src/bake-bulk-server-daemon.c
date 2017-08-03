@@ -109,7 +109,8 @@ int main(int argc, char **argv)
     mid = margo_init_pool(handler_pool, handler_pool, hg_context);
     assert(mid);
 
-    /* XXX BAKE SERVER INIT */
+    /* register the bake bulk server */
+    bake_server_register(mid, bb_pmem_pool, bb_pmem_root);
 
     /* NOTE: at this point this server ULT has two options.  It can wait on
      * whatever mechanism it wants to (however long the daemon should run and

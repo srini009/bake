@@ -7,7 +7,6 @@
 #include <assert.h>
 #include <bake-bulk-server.h>
 #include <libpmemobj.h>
-
 #include "bake-bulk-rpc.h"
 
 /* definition of internal region_id_t identifier for libpmemobj back end */
