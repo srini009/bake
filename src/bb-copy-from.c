@@ -15,7 +15,7 @@
 
 #include "abt.h"
 #include "abt-snoozer.h"
-#include "bake-bulk.h"
+#include "bake-bulk-client.h"
 
 /* client program that will copy a bake bulk region out to a POSIX file */
 

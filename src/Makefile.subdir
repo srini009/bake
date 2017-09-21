@@ -1,13 +1,12 @@
-src_libbake_bulk_la_SOURCES += \
- src/bake-bulk.c 
+src_libbake_bulk_client_la_SOURCES += \
+ src/bake-bulk-client.c
+
+src_libbake_bulk_server_la_SOURCES += \
+ src/bake-bulk-server.c
 
 bin_PROGRAMS += \
- src/bake-bulk-server \
+ src/bake-bulk-server-daemon \
  src/bb-shutdown \
  src/bb-copy-to \
  src/bb-copy-from \
  src/bb-latency-bench
-
-src_bake_bulk_server_SOURCES = \
- src/bake-bulk-server.c \
- src/bake-bulk-rpc.c

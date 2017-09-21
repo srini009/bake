@@ -5,7 +5,7 @@
  */
 
 #include <assert.h>
-#include <bake-bulk.h>
+#include <bake-bulk-client.h>
 #include <margo.h>
 #include "uthash.h"
 #include "bake-bulk-rpc.h"
