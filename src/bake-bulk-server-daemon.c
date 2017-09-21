@@ -8,8 +8,6 @@
 #include <assert.h>
 #include <unistd.h>
 #include <uuid/uuid.h>
-#include <abt.h>
-#include <abt-snoozer.h>
 #include <margo.h>
 #include <libpmemobj.h>
 #include <bake-bulk-server.h>
@@ -18,10 +16,6 @@ int main(int argc, char **argv)
 {
     int ret;
     margo_instance_id mid;
-    ABT_xstream handler_xstream;
-    ABT_pool handler_pool;
-    hg_context_t *hg_context;
-    hg_class_t *hg_class;
     char target_string[64];
     PMEMoid root_oid;
     PMEMobjpool *bb_pmem_pool = NULL;
@@ -53,60 +47,9 @@ int main(int argc, char **argv)
     uuid_unparse(bb_pmem_root->target_id.id, target_string);
     fprintf(stderr, "BAKE target ID: %s\n", target_string);
 
-    /* boilerplate HG initialization steps */
-    /***************************************/
-    hg_class = HG_Init(argv[1], HG_TRUE);
-    if(!hg_class)
-    {
-        fprintf(stderr, "Error: HG_Init()\n");
-        return(-1);
-    }
-    hg_context = HG_Context_create(hg_class);
-    if(!hg_context)
-    {
-        fprintf(stderr, "Error: HG_Context_create()\n");
-        HG_Finalize(hg_class);
-        return(-1);
-    }
-
-    /* set up argobots */
-    /***************************************/
-    ret = ABT_init(argc, argv);
-    if(ret != 0)
-    {
-        fprintf(stderr, "Error: ABT_init()\n");
-        return(-1);
-    }
-
-    /* set primary ES to idle without polling */
-    ret = ABT_snoozer_xstream_self_set();
-    if(ret != 0)
-    {
-        fprintf(stderr, "Error: ABT_snoozer_xstream_self_set()\n");
-        return(-1);
-    }
-
-    /* Find primary pool to use for running rpc handlers */
-    ret = ABT_xstream_self(&handler_xstream);
-    if(ret != 0)
-    {
-        fprintf(stderr, "Error: ABT_xstream_self()\n");
-        return(-1);
-    }
-    ret = ABT_xstream_get_main_pools(handler_xstream, 1, &handler_pool);
-    if(ret != 0)
-    {
-        fprintf(stderr, "Error: ABT_xstream_get_main_pools()\n");
-        return(-1);
-    }
-
-    /* actually start margo */
-    /* provide argobots pools for driving communication progress and
-     * executing rpc handlers as well as class and context for Mercury
-     * communication.
-     */
-    /***************************************/
-    mid = margo_init_pool(handler_pool, handler_pool, hg_context);
+    /* start margo */
+    /* use the main xstream for driving progress and executing rpc handlers */
+    mid = margo_init(argv[1], MARGO_SERVER_MODE, 0, -1);
     assert(mid);
 
     /* register the bake bulk server */
@@ -127,11 +70,6 @@ int main(int argc, char **argv)
      * ABT pool.
      */
     margo_wait_for_finalize(mid);
-
-    ABT_finalize();
-
-    HG_Context_destroy(hg_context);
-    HG_Finalize(hg_class);
 
     pmemobj_close(bb_pmem_pool);
 

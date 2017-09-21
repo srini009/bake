@@ -10,15 +10,13 @@
 #include "uthash.h"
 #include "bake-bulk-rpc.h"
 
-/* Refers to a single Mercury/Margo initialization, for now this is shared by
+/* Refers to a single Margo initialization, for now this is shared by
  * all remote targets.  In the future we probably need to support multiple in
  * case we run atop more than one transport at a time.
  */
-struct hg_instance
+struct bake_margo_instance
 {
     margo_instance_id mid;  
-    hg_class_t *hg_class;
-    hg_context_t *hg_context;
     int refct;
 
     hg_id_t bake_bulk_probe_id;
@@ -52,10 +50,8 @@ struct bake_instance
 struct bake_instance *instance_hash = NULL;
 
 
-struct hg_instance g_hginst = {
+struct bake_margo_instance g_margo_inst = {
     .mid = MARGO_INSTANCE_NULL,
-    .hg_class = NULL,
-    .hg_context = NULL,
     .refct = 0,
 };
 
@@ -68,120 +64,101 @@ static int bake_bulk_eager_read(
 static struct bake_handle_cache_el *get_handle(struct bake_instance *instance, hg_id_t id);
 static void put_handle(struct bake_instance *instance, struct bake_handle_cache_el *el);
 
-static int hg_instance_init(const char *mercury_dest)
+static int bake_margo_instance_init(const char *mercury_dest)
 {
     char hg_na[64] = {0};
     int i;
 
-    /* have we already started a Mercury instance? */
-    if(g_hginst.refct > 0)
+    /* have we already started a Margo instance? */
+    if(g_margo_inst.refct > 0)
     {
-        g_hginst.refct++;
+        g_margo_inst.refct++;
         return(0);
     }
 
-    /* boilerplate HG initialization steps */
-    /***************************************/
-
-    /* initialize Mercury using the transport portion of the destination
+    /* initialize Margo using the transport portion of the destination
      * address (i.e., the part before the first : character if present)
      */
     for(i=0; (i<63 && mercury_dest[i] != '\0' && mercury_dest[i] != ':'); i++)
         hg_na[i] = mercury_dest[i];
 
-    g_hginst.hg_class = HG_Init(hg_na, HG_FALSE);
-    if(!g_hginst.hg_class)
+    g_margo_inst.mid = margo_init(hg_na, MARGO_CLIENT_MODE, 0, 0);
+    if(g_margo_inst.mid == MARGO_INSTANCE_NULL)
     {
         return(-1);
     }
-    g_hginst.hg_context = HG_Context_create(g_hginst.hg_class);
-    if(!g_hginst.hg_context)
-    {
-        HG_Finalize(g_hginst.hg_class);
-        return(-1);
-    }
+    g_margo_inst.refct = 1;
 
     /* register RPCs */
-    g_hginst.bake_bulk_probe_id = 
-        MERCURY_REGISTER(g_hginst.hg_class, 
+    g_margo_inst.bake_bulk_probe_id = 
+        MARGO_REGISTER(g_margo_inst.mid, 
         "bake_bulk_probe_rpc", void, bake_bulk_probe_out_t, 
         NULL);
-    g_hginst.bake_bulk_shutdown_id = 
-        MERCURY_REGISTER(g_hginst.hg_class, 
+    g_margo_inst.bake_bulk_shutdown_id = 
+        MARGO_REGISTER(g_margo_inst.mid, 
         "bake_bulk_shutdown_rpc", void, void, 
         NULL);
-    g_hginst.bake_bulk_create_id = 
-        MERCURY_REGISTER(g_hginst.hg_class, 
+    g_margo_inst.bake_bulk_create_id = 
+        MARGO_REGISTER(g_margo_inst.mid, 
         "bake_bulk_create_rpc", 
         bake_bulk_create_in_t,
         bake_bulk_create_out_t,
         NULL);
-    g_hginst.bake_bulk_write_id = 
-        MERCURY_REGISTER(g_hginst.hg_class, 
+    g_margo_inst.bake_bulk_write_id = 
+        MARGO_REGISTER(g_margo_inst.mid, 
         "bake_bulk_write_rpc", 
         bake_bulk_write_in_t,
         bake_bulk_write_out_t,
         NULL);
-    g_hginst.bake_bulk_eager_write_id = 
-        MERCURY_REGISTER(g_hginst.hg_class, 
+    g_margo_inst.bake_bulk_eager_write_id = 
+        MARGO_REGISTER(g_margo_inst.mid, 
         "bake_bulk_eager_write_rpc", 
         bake_bulk_eager_write_in_t,
         bake_bulk_eager_write_out_t,
         NULL);
-    g_hginst.bake_bulk_eager_read_id = 
-        MERCURY_REGISTER(g_hginst.hg_class, 
+    g_margo_inst.bake_bulk_eager_read_id = 
+        MARGO_REGISTER(g_margo_inst.mid, 
         "bake_bulk_eager_read_rpc", 
         bake_bulk_eager_read_in_t,
         bake_bulk_eager_read_out_t,
         NULL);
-    g_hginst.bake_bulk_persist_id = 
-        MERCURY_REGISTER(g_hginst.hg_class, 
+    g_margo_inst.bake_bulk_persist_id = 
+        MARGO_REGISTER(g_margo_inst.mid, 
         "bake_bulk_persist_rpc", 
         bake_bulk_persist_in_t,
         bake_bulk_persist_out_t,
         NULL);
-    g_hginst.bake_bulk_get_size_id = 
-        MERCURY_REGISTER(g_hginst.hg_class, 
+    g_margo_inst.bake_bulk_get_size_id = 
+        MARGO_REGISTER(g_margo_inst.mid, 
         "bake_bulk_get_size_rpc", 
         bake_bulk_get_size_in_t,
         bake_bulk_get_size_out_t,
         NULL);
-    g_hginst.bake_bulk_read_id = 
-        MERCURY_REGISTER(g_hginst.hg_class, 
+    g_margo_inst.bake_bulk_read_id = 
+        MARGO_REGISTER(g_margo_inst.mid, 
         "bake_bulk_read_rpc", 
         bake_bulk_read_in_t,
         bake_bulk_read_out_t,
         NULL);
-    g_hginst.bake_bulk_noop_id = 
-        MERCURY_REGISTER(g_hginst.hg_class, 
+    g_margo_inst.bake_bulk_noop_id = 
+        MARGO_REGISTER(g_margo_inst.mid, 
         "bake_bulk_noop_rpc", 
         void,
         void,
         NULL);
 
-    g_hginst.mid = margo_init(0, 0, g_hginst.hg_context);
-    if(!g_hginst.mid)
-    {
-        HG_Context_destroy(g_hginst.hg_context);
-        HG_Finalize(g_hginst.hg_class);
-        return(-1);
-    }
-    g_hginst.refct = 1;
-
     return(0);
 }
 
-void hg_instance_finalize(void)
+void bake_margo_instance_finalize(void)
 {
-    g_hginst.refct--;
+    g_margo_inst.refct--;
 
-    assert(g_hginst.refct > -1);
+    assert(g_margo_inst.refct > -1);
 
-    if(g_hginst.refct == 0)
+    if(g_margo_inst.refct == 0)
     {
-        margo_finalize(g_hginst.mid);
-        HG_Context_destroy(g_hginst.hg_context);
-        HG_Finalize(g_hginst.hg_class);
+        margo_finalize(g_margo_inst.mid);
     }
 }
 
@@ -195,50 +172,50 @@ int bake_probe_instance(
     hg_handle_t handle;
     struct bake_instance *new_instance;
 
-    ret = hg_instance_init(mercury_dest);
+    ret = bake_margo_instance_init(mercury_dest);
     if(ret < 0)
         return(ret);
 
     new_instance = calloc(1, sizeof(*new_instance));
     if(!new_instance)
     {
-        hg_instance_finalize();
+        bake_margo_instance_finalize();
         return(-1);
     }
 
-    hret = margo_addr_lookup(g_hginst.mid, mercury_dest, &new_instance->dest);
+    hret = margo_addr_lookup(g_margo_inst.mid, mercury_dest, &new_instance->dest);
     if(hret != HG_SUCCESS)
     {
         free(new_instance);
-        hg_instance_finalize();
+        bake_margo_instance_finalize();
         return(-1);
     }
 
     /* create handle */
-    hret = HG_Create(g_hginst.hg_context, new_instance->dest, 
-        g_hginst.bake_bulk_probe_id, &handle);
+    hret = margo_create(g_margo_inst.mid, new_instance->dest, 
+        g_margo_inst.bake_bulk_probe_id, &handle);
     if(hret != HG_SUCCESS)
     {
         free(new_instance);
-        hg_instance_finalize();
+        bake_margo_instance_finalize();
         return(-1);
     }
 
-    hret = margo_forward(g_hginst.mid, handle, NULL);
+    hret = margo_forward(handle, NULL);
     if(hret != HG_SUCCESS)
     {
         free(new_instance);
-        HG_Destroy(handle);
-        hg_instance_finalize();
+        margo_destroy(handle);
+        bake_margo_instance_finalize();
         return(-1);
     }
 
-    hret = HG_Get_output(handle, &out);
+    hret = margo_get_output(handle, &out);
     if(hret != HG_SUCCESS)
     {
         free(new_instance);
-        HG_Destroy(handle);
-        hg_instance_finalize();
+        margo_destroy(handle);
+        bake_margo_instance_finalize();
         return(-1);
     }
 
@@ -246,13 +223,13 @@ int bake_probe_instance(
     *bti = out.bti;
     new_instance->bti = out.bti;
 
-    HG_Free_output(handle, &out);
-    HG_Destroy(handle);
+    margo_free_output(handle, &out);
+    margo_destroy(handle);
 
     if(ret != 0)
     {
         free(new_instance);
-        hg_instance_finalize();
+        bake_margo_instance_finalize();
     }
     else
     {
@@ -273,9 +250,9 @@ void bake_release_instance(
         return;
     
     HASH_DELETE(hh, instance_hash, instance);
-    HG_Addr_free(g_hginst.hg_class, instance->dest);
+    margo_addr_free(g_margo_inst.mid, instance->dest);
     free(instance);
-    hg_instance_finalize();
+    bake_margo_instance_finalize();
 
     return;
 }
@@ -290,10 +267,10 @@ int bake_shutdown_service(bake_target_id_t bti)
     if(!instance)
         return(-1);
 
-    el = get_handle(instance, g_hginst.bake_bulk_shutdown_id);
+    el = get_handle(instance, g_margo_inst.bake_bulk_shutdown_id);
     assert(el);
 
-    hret = margo_forward(g_hginst.mid, el->handle, NULL);
+    hret = margo_forward(el->handle, NULL);
     if(hret != HG_SUCCESS)
     {
         put_handle(instance, el);
@@ -328,17 +305,17 @@ static int bake_bulk_eager_write(
     in.size = buf_size;
     in.buffer = (char*)buf;
   
-    el = get_handle(instance, g_hginst.bake_bulk_eager_write_id);
+    el = get_handle(instance, g_margo_inst.bake_bulk_eager_write_id);
     assert(el);
 
-    hret = margo_forward(g_hginst.mid, el->handle, &in);
+    hret = margo_forward(el->handle, &in);
     if(hret != HG_SUCCESS)
     {
         put_handle(instance, el);
         return(-1);
     }
 
-    hret = HG_Get_output(el->handle, &out);
+    hret = margo_get_output(el->handle, &out);
     if(hret != HG_SUCCESS)
     {
         put_handle(instance, el);
@@ -347,7 +324,7 @@ static int bake_bulk_eager_write(
     
     ret = out.ret;
 
-    HG_Free_output(el->handle, &out);
+    margo_free_output(el->handle, &out);
     put_handle(instance, el);
 
     return(ret);
@@ -382,36 +359,36 @@ int bake_bulk_write(
     in.rid = rid;
     in.region_offset = region_offset;
 
-    hret = HG_Bulk_create(g_hginst.hg_class, 1, (void**)(&buf), &buf_size, 
+    hret = margo_bulk_create(g_margo_inst.mid, 1, (void**)(&buf), &buf_size, 
         HG_BULK_READ_ONLY, &in.bulk_handle);
     if(hret != HG_SUCCESS)
     {
         return(-1);
     }
    
-    el = get_handle(instance, g_hginst.bake_bulk_write_id);
+    el = get_handle(instance, g_margo_inst.bake_bulk_write_id);
     assert(el);
 
-    hret = margo_forward(g_hginst.mid, el->handle, &in);
+    hret = margo_forward(el->handle, &in);
     if(hret != HG_SUCCESS)
     {
-        HG_Bulk_free(in.bulk_handle);
+        margo_bulk_free(in.bulk_handle);
         put_handle(instance, el);
         return(-1);
     }
 
-    hret = HG_Get_output(el->handle, &out);
+    hret = margo_get_output(el->handle, &out);
     if(hret != HG_SUCCESS)
     {
-        HG_Bulk_free(in.bulk_handle);
+        margo_bulk_free(in.bulk_handle);
         put_handle(instance, el);
         return(-1);
     }
     
     ret = out.ret;
 
-    HG_Free_output(el->handle, &out);
-    HG_Bulk_free(in.bulk_handle);
+    margo_free_output(el->handle, &out);
+    margo_bulk_free(in.bulk_handle);
     put_handle(instance, el);
     return(ret);
 }
@@ -435,17 +412,17 @@ int bake_bulk_create(
     in.bti = bti;
     in.region_size = region_size;
 
-    el = get_handle(instance, g_hginst.bake_bulk_create_id);
+    el = get_handle(instance, g_margo_inst.bake_bulk_create_id);
     assert(el);
 
-    hret = margo_forward(g_hginst.mid, el->handle, &in);
+    hret = margo_forward(el->handle, &in);
     if(hret != HG_SUCCESS)
     {
         put_handle(instance, el);
         return(-1);
     }
 
-    hret = HG_Get_output(el->handle, &out);
+    hret = margo_get_output(el->handle, &out);
     if(hret != HG_SUCCESS)
     {
         put_handle(instance, el);
@@ -455,7 +432,7 @@ int bake_bulk_create(
     ret = out.ret;
     *rid = out.rid;
 
-    HG_Free_output(el->handle, &out);
+    margo_free_output(el->handle, &out);
     put_handle(instance, el);
     return(ret);
 }
@@ -479,17 +456,17 @@ int bake_bulk_persist(
     in.bti = bti;
     in.rid = rid;
 
-    el = get_handle(instance, g_hginst.bake_bulk_persist_id);
+    el = get_handle(instance, g_margo_inst.bake_bulk_persist_id);
     assert(el);
 
-    hret = margo_forward(g_hginst.mid, el->handle, &in);
+    hret = margo_forward(el->handle, &in);
     if(hret != HG_SUCCESS)
     {
         put_handle(instance, el);
         return(-1);
     }
 
-    hret = HG_Get_output(el->handle, &out);
+    hret = margo_get_output(el->handle, &out);
     if(hret != HG_SUCCESS)
     {
         put_handle(instance, el);
@@ -498,7 +475,7 @@ int bake_bulk_persist(
 
     ret = out.ret;
 
-    HG_Free_output(el->handle, &out);
+    margo_free_output(el->handle, &out);
     put_handle(instance, el);
     return(ret);
 }
@@ -522,17 +499,17 @@ int bake_bulk_get_size(
     in.bti = bti;
     in.rid = rid;
 
-    el = get_handle(instance, g_hginst.bake_bulk_get_size_id);
+    el = get_handle(instance, g_margo_inst.bake_bulk_get_size_id);
     assert(el);
 
-    hret = margo_forward(g_hginst.mid, el->handle, &in);
+    hret = margo_forward(el->handle, &in);
     if(hret != HG_SUCCESS)
     {
         put_handle(instance, el);
         return(-1);
     }
 
-    hret = HG_Get_output(el->handle, &out);
+    hret = margo_get_output(el->handle, &out);
     if(hret != HG_SUCCESS)
     {
         put_handle(instance, el);
@@ -542,7 +519,7 @@ int bake_bulk_get_size(
     ret = out.ret;
     *region_size = out.size;
 
-    HG_Free_output(el->handle, &out);
+    margo_free_output(el->handle, &out);
     put_handle(instance, el);
     return(ret);
 }
@@ -558,10 +535,10 @@ int bake_bulk_noop(
     if(!instance)
         return(-1);
 
-    el = get_handle(instance, g_hginst.bake_bulk_noop_id);
+    el = get_handle(instance, g_margo_inst.bake_bulk_noop_id);
     assert(el);
 
-    hret = margo_forward(g_hginst.mid, el->handle, NULL);
+    hret = margo_forward(el->handle, NULL);
     if(hret != HG_SUCCESS)
     {
         put_handle(instance, el);
@@ -599,36 +576,36 @@ int bake_bulk_read(
     in.rid = rid;
     in.region_offset = region_offset;
 
-    hret = HG_Bulk_create(g_hginst.hg_class, 1, (void**)(&buf), &buf_size, 
+    hret = margo_bulk_create(g_margo_inst.mid, 1, (void**)(&buf), &buf_size, 
         HG_BULK_WRITE_ONLY, &in.bulk_handle);
     if(hret != HG_SUCCESS)
     {
         return(-1);
     }
    
-    el = get_handle(instance, g_hginst.bake_bulk_read_id);
+    el = get_handle(instance, g_margo_inst.bake_bulk_read_id);
     assert(el);
 
-    hret = margo_forward(g_hginst.mid, el->handle, &in);
+    hret = margo_forward(el->handle, &in);
     if(hret != HG_SUCCESS)
     {
-        HG_Bulk_free(in.bulk_handle);
+        margo_bulk_free(in.bulk_handle);
         put_handle(instance, el);
         return(-1);
     }
 
-    hret = HG_Get_output(el->handle, &out);
+    hret = margo_get_output(el->handle, &out);
     if(hret != HG_SUCCESS)
     {
-        HG_Bulk_free(in.bulk_handle);
+        margo_bulk_free(in.bulk_handle);
         put_handle(instance, el);
         return(-1);
     }
     
     ret = out.ret;
 
-    HG_Free_output(el->handle, &out);
-    HG_Bulk_free(in.bulk_handle);
+    margo_free_output(el->handle, &out);
+    margo_bulk_free(in.bulk_handle);
     put_handle(instance, el);
     return(ret);
 }
@@ -657,17 +634,17 @@ static int bake_bulk_eager_read(
     in.region_offset = region_offset;
     in.size = buf_size;
    
-    el = get_handle(instance, g_hginst.bake_bulk_eager_read_id);
+    el = get_handle(instance, g_margo_inst.bake_bulk_eager_read_id);
     assert(el);
 
-    hret = margo_forward(g_hginst.mid, el->handle, &in);
+    hret = margo_forward(el->handle, &in);
     if(hret != HG_SUCCESS)
     {
         put_handle(instance, el);
         return(-1);
     }
 
-    hret = HG_Get_output(el->handle, &out);
+    hret = margo_get_output(el->handle, &out);
     if(hret != HG_SUCCESS)
     {
         put_handle(instance, el);
@@ -678,7 +655,7 @@ static int bake_bulk_eager_read(
     if(ret == 0)
         memcpy(buf, out.buffer, out.size);
 
-    HG_Free_output(el->handle, &out);
+    margo_free_output(el->handle, &out);
     put_handle(instance, el);
     return(ret);
 }
@@ -701,7 +678,7 @@ static struct bake_handle_cache_el *get_handle(struct bake_instance *instance, h
     el->id = id;
 
     /* create handle */
-    hret = HG_Create(g_hginst.hg_context, instance->dest, 
+    hret = margo_create(g_margo_inst.mid, instance->dest, 
         id, &el->handle);
     if(hret != HG_SUCCESS)
     {

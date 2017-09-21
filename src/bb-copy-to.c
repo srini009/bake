@@ -13,8 +13,6 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 
-#include "abt.h"
-#include "abt-snoozer.h"
 #include "bake-bulk-client.h"
 
 /* client program that will copy a POSIX file into a bake bulk region */
@@ -60,29 +58,9 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    /* set up Argobots */
-    ret = ABT_init(argc, argv);
-    if(ret != 0)
-    {
-        munmap(local_region, statbuf.st_size);
-        close(fd);
-        fprintf(stderr, "Error: ABT_init()\n");
-        return(-1);
-    }
-    ret = ABT_snoozer_xstream_self_set();
-    if(ret != 0)
-    {
-        ABT_finalize();
-        munmap(local_region, statbuf.st_size);
-        close(fd);
-        fprintf(stderr, "Error: ABT_snoozer_xstream_self_set()\n");
-        return(-1);
-    }
-
     ret = bake_probe_instance(argv[2], &bti);
     if(ret < 0)
     {
-        ABT_finalize();
         munmap(local_region, statbuf.st_size);
         close(fd);
         fprintf(stderr, "Error: bake_probe_instance()\n");
@@ -94,7 +72,6 @@ int main(int argc, char **argv)
     if(ret != 0)
     {
         bake_release_instance(bti);
-        ABT_finalize();
         munmap(local_region, statbuf.st_size);
         close(fd);
         fprintf(stderr, "Error: bake_bulk_create()\n");
@@ -111,7 +88,6 @@ int main(int argc, char **argv)
     if(ret != 0)
     {
         bake_release_instance(bti);
-        ABT_finalize();
         munmap(local_region, statbuf.st_size);
         close(fd);
         fprintf(stderr, "Error: bake_bulk_write()\n");
@@ -125,7 +101,6 @@ int main(int argc, char **argv)
     if(ret != 0)
     {
         bake_release_instance(bti);
-        ABT_finalize();
         fprintf(stderr, "Error: bake_bulk_persist()\n");
         return(-1);
     }
@@ -135,7 +110,6 @@ int main(int argc, char **argv)
     if(ret != 0)
     {
         bake_release_instance(bti);
-        ABT_finalize();
         fprintf(stderr, "Error: bake_bulk_get_size()\n");
         return(-1);
     }
@@ -144,7 +118,6 @@ int main(int argc, char **argv)
 
     if(check_size != statbuf.st_size)
     {
-        ABT_finalize();
         fprintf(stderr, "Error: size mismatch!\n");
         return(-1);
     }
@@ -169,8 +142,6 @@ int main(int argc, char **argv)
         }
     }
    
-    ABT_finalize();
-
     return(0);
 }
 

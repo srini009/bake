@@ -25,39 +25,36 @@ static struct bake_bulk_root *g_pmem_root = NULL;
 void bake_server_register(margo_instance_id mid, PMEMobjpool *bb_pmem_pool,
     struct bake_bulk_root *bb_pmem_root)
 {
-    hg_class_t *hg_class = margo_get_class(mid);
-    assert(hg_class);
-
     /* register RPCs */
-    MERCURY_REGISTER(hg_class, "bake_bulk_shutdown_rpc", void, void,
-        bake_bulk_shutdown_ult_handler);
-    MERCURY_REGISTER(hg_class, "bake_bulk_create_rpc", bake_bulk_create_in_t,
+    MARGO_REGISTER(mid, "bake_bulk_shutdown_rpc", void, void,
+        bake_bulk_shutdown_ult);
+    MARGO_REGISTER(mid, "bake_bulk_create_rpc", bake_bulk_create_in_t,
         bake_bulk_create_out_t,
-        bake_bulk_create_ult_handler);
-    MERCURY_REGISTER(hg_class, "bake_bulk_write_rpc", bake_bulk_write_in_t,
+        bake_bulk_create_ult);
+    MARGO_REGISTER(mid, "bake_bulk_write_rpc", bake_bulk_write_in_t,
         bake_bulk_write_out_t,
-        bake_bulk_write_ult_handler);
-    MERCURY_REGISTER(hg_class, "bake_bulk_eager_write_rpc", bake_bulk_eager_write_in_t,
+        bake_bulk_write_ult);
+    MARGO_REGISTER(mid, "bake_bulk_eager_write_rpc", bake_bulk_eager_write_in_t,
         bake_bulk_eager_write_out_t,
-        bake_bulk_eager_write_ult_handler);
-    MERCURY_REGISTER(hg_class, "bake_bulk_eager_read_rpc", bake_bulk_eager_read_in_t,
+        bake_bulk_eager_write_ult);
+    MARGO_REGISTER(mid, "bake_bulk_eager_read_rpc", bake_bulk_eager_read_in_t,
         bake_bulk_eager_read_out_t,
-        bake_bulk_eager_read_ult_handler);
-    MERCURY_REGISTER(hg_class, "bake_bulk_persist_rpc", bake_bulk_persist_in_t,
+        bake_bulk_eager_read_ult);
+    MARGO_REGISTER(mid, "bake_bulk_persist_rpc", bake_bulk_persist_in_t,
         bake_bulk_persist_out_t,
-        bake_bulk_persist_ult_handler);
-    MERCURY_REGISTER(hg_class, "bake_bulk_get_size_rpc", bake_bulk_get_size_in_t,
+        bake_bulk_persist_ult);
+    MARGO_REGISTER(mid, "bake_bulk_get_size_rpc", bake_bulk_get_size_in_t,
         bake_bulk_get_size_out_t,
-        bake_bulk_get_size_ult_handler);
-    MERCURY_REGISTER(hg_class, "bake_bulk_read_rpc", bake_bulk_read_in_t,
+        bake_bulk_get_size_ult);
+    MARGO_REGISTER(mid, "bake_bulk_read_rpc", bake_bulk_read_in_t,
         bake_bulk_read_out_t,
-        bake_bulk_read_ult_handler);
-    MERCURY_REGISTER(hg_class, "bake_bulk_probe_rpc", void,
+        bake_bulk_read_ult);
+    MARGO_REGISTER(mid, "bake_bulk_probe_rpc", void,
         bake_bulk_probe_out_t,
-        bake_bulk_probe_ult_handler);
-    MERCURY_REGISTER(hg_class, "bake_bulk_noop_rpc", void,
+        bake_bulk_probe_ult);
+    MARGO_REGISTER(mid, "bake_bulk_noop_rpc", void,
         void,
-        bake_bulk_noop_ult_handler);
+        bake_bulk_noop_ult);
 
     /* set global pmem variables needed by the bake server */
     g_pmem_pool = bb_pmem_pool;
@@ -70,19 +67,16 @@ void bake_server_register(margo_instance_id mid, PMEMobjpool *bb_pmem_pool,
 static void bake_bulk_shutdown_ult(hg_handle_t handle)
 {
     hg_return_t hret;
-    struct hg_info *hgi;
     margo_instance_id mid;
 
     // printf("Got RPC request to shutdown.\n");
 
-    hgi = HG_Get_info(handle);
-    assert(hgi);
-    mid = margo_hg_class_to_instance(hgi->hg_class);
+    mid = margo_hg_handle_get_instance(handle);
 
-    hret = margo_respond(mid, handle, NULL);
+    hret = margo_respond(handle, NULL);
     assert(hret == HG_SUCCESS);
 
-    HG_Destroy(handle);
+    margo_destroy(handle);
 
     /* NOTE: we assume that the server daemon is using
      * margo_wait_for_finalize() to suspend until this RPC executes, so there
@@ -108,12 +102,12 @@ static void bake_bulk_create_ult(hg_handle_t handle)
     
     memset(&out, 0, sizeof(out));
 
-    hret = HG_Get_input(handle, &in);
+    hret = margo_get_input(handle, &in);
     if(hret != HG_SUCCESS)
     {
         out.ret = -1;
-        HG_Respond(handle, NULL, NULL, &out);
-        HG_Destroy(handle);
+        margo_respond(handle, &out);
+        margo_destroy(handle);
         return;
     }
 
@@ -121,9 +115,9 @@ static void bake_bulk_create_ult(hg_handle_t handle)
     prid->size = in.region_size;
     out.ret = pmemobj_alloc(g_pmem_pool, &prid->oid, in.region_size, 0, NULL, NULL);
 
-    HG_Free_input(handle, &in);
-    HG_Respond(handle, NULL, NULL, &out);
-    HG_Destroy(handle);
+    margo_free_input(handle, &in);
+    margo_respond(handle, &out);
+    margo_destroy(handle);
     return;
 }
 DEFINE_MARGO_RPC_HANDLER(bake_bulk_create_ult)
@@ -137,7 +131,7 @@ static void bake_bulk_write_ult(hg_handle_t handle)
     char* buffer;
     hg_size_t size;
     hg_bulk_t bulk_handle;
-    struct hg_info *hgi;
+    const struct hg_info *hgi;
     margo_instance_id mid;
     pmemobj_region_id_t* prid;
 
@@ -145,16 +139,16 @@ static void bake_bulk_write_ult(hg_handle_t handle)
     
     memset(&out, 0, sizeof(out));
 
-    hgi = HG_Get_info(handle);
+    hgi = margo_get_info(handle);
     assert(hgi);
-    mid = margo_hg_class_to_instance(hgi->hg_class);
+    mid = margo_hg_info_get_instance(hgi);
 
-    hret = HG_Get_input(handle, &in);
+    hret = margo_get_input(handle, &in);
     if(hret != HG_SUCCESS)
     {
         out.ret = -1;
-        HG_Respond(handle, NULL, NULL, &out);
-        HG_Destroy(handle);
+        margo_respond(handle, &out);
+        margo_destroy(handle);
         return;
     }
 
@@ -165,23 +159,23 @@ static void bake_bulk_write_ult(hg_handle_t handle)
     if(!buffer)
     {
         out.ret = -1;
-        HG_Free_input(handle, &in);
-        HG_Respond(handle, NULL, NULL, &out);
-        HG_Destroy(handle);
+        margo_free_input(handle, &in);
+        margo_respond(handle, &out);
+        margo_destroy(handle);
         return;
     }
 
-    size = HG_Bulk_get_size(in.bulk_handle);
+    size = margo_bulk_get_size(in.bulk_handle);
 
     /* create bulk handle for local side of transfer */
-    hret = HG_Bulk_create(hgi->hg_class, 1, (void**)(&buffer), &size, 
+    hret = margo_bulk_create(mid, 1, (void**)(&buffer), &size, 
         HG_BULK_WRITE_ONLY, &bulk_handle);
     if(hret != HG_SUCCESS)
     {
         out.ret = -1;
-        HG_Free_input(handle, &in);
-        HG_Respond(handle, NULL, NULL, &out);
-        HG_Destroy(handle);
+        margo_free_input(handle, &in);
+        margo_respond(handle, &out);
+        margo_destroy(handle);
         return;
     }
 
@@ -190,19 +184,19 @@ static void bake_bulk_write_ult(hg_handle_t handle)
     if(hret != HG_SUCCESS)
     {
         out.ret = -1;
-        HG_Bulk_free(bulk_handle);
-        HG_Free_input(handle, &in);
-        HG_Respond(handle, NULL, NULL, &out);
-        HG_Destroy(handle);
+        margo_bulk_free(bulk_handle);
+        margo_free_input(handle, &in);
+        margo_respond(handle, &out);
+        margo_destroy(handle);
         return;
     }
 
     out.ret = 0;
 
-    HG_Bulk_free(bulk_handle);
-    HG_Free_input(handle, &in);
-    HG_Respond(handle, NULL, NULL, &out);
-    HG_Destroy(handle);
+    margo_bulk_free(bulk_handle);
+    margo_free_input(handle, &in);
+    margo_respond(handle, &out);
+    margo_destroy(handle);
     return;
 }
 DEFINE_MARGO_RPC_HANDLER(bake_bulk_write_ult)
@@ -216,24 +210,18 @@ static void bake_bulk_eager_write_ult(hg_handle_t handle)
     hg_return_t hret;
     char* buffer;
     hg_bulk_t bulk_handle;
-    struct hg_info *hgi;
-    margo_instance_id mid;
     pmemobj_region_id_t* prid;
 
     // printf("Got RPC request to write bulk region.\n");
     
     memset(&out, 0, sizeof(out));
 
-    hgi = HG_Get_info(handle);
-    assert(hgi);
-    mid = margo_hg_class_to_instance(hgi->hg_class);
-
-    hret = HG_Get_input(handle, &in);
+    hret = margo_get_input(handle, &in);
     if(hret != HG_SUCCESS)
     {
         out.ret = -1;
-        HG_Respond(handle, NULL, NULL, &out);
-        HG_Destroy(handle);
+        margo_respond(handle, &out);
+        margo_destroy(handle);
         return;
     }
 
@@ -244,9 +232,9 @@ static void bake_bulk_eager_write_ult(hg_handle_t handle)
     if(!buffer)
     {
         out.ret = -1;
-        HG_Free_input(handle, &in);
-        HG_Respond(handle, NULL, NULL, &out);
-        HG_Destroy(handle);
+        margo_free_input(handle, &in);
+        margo_respond(handle, &out);
+        margo_destroy(handle);
         return;
     }
 
@@ -254,9 +242,9 @@ static void bake_bulk_eager_write_ult(hg_handle_t handle)
 
     out.ret = 0;
 
-    HG_Free_input(handle, &in);
-    HG_Respond(handle, NULL, NULL, &out);
-    HG_Destroy(handle);
+    margo_free_input(handle, &in);
+    margo_respond(handle, &out);
+    margo_destroy(handle);
     return;
 }
 DEFINE_MARGO_RPC_HANDLER(bake_bulk_eager_write_ult)
@@ -274,12 +262,12 @@ static void bake_bulk_persist_ult(hg_handle_t handle)
     
     memset(&out, 0, sizeof(out));
 
-    hret = HG_Get_input(handle, &in);
+    hret = margo_get_input(handle, &in);
     if(hret != HG_SUCCESS)
     {
         out.ret = -1;
-        HG_Respond(handle, NULL, NULL, &out);
-        HG_Destroy(handle);
+        margo_respond(handle, &out);
+        margo_destroy(handle);
         return;
     }
 
@@ -290,9 +278,9 @@ static void bake_bulk_persist_ult(hg_handle_t handle)
     if(!buffer)
     {
         out.ret = -1;
-        HG_Free_input(handle, &in);
-        HG_Respond(handle, NULL, NULL, &out);
-        HG_Destroy(handle);
+        margo_free_input(handle, &in);
+        margo_respond(handle, &out);
+        margo_destroy(handle);
         return;
     }
 
@@ -301,9 +289,9 @@ static void bake_bulk_persist_ult(hg_handle_t handle)
 
     out.ret = 0;
 
-    HG_Free_input(handle, &in);
-    HG_Respond(handle, NULL, NULL, &out);
-    HG_Destroy(handle);
+    margo_free_input(handle, &in);
+    margo_respond(handle, &out);
+    margo_destroy(handle);
     return;
 }
 DEFINE_MARGO_RPC_HANDLER(bake_bulk_persist_ult)
@@ -320,12 +308,12 @@ static void bake_bulk_get_size_ult(hg_handle_t handle)
     
     memset(&out, 0, sizeof(out));
 
-    hret = HG_Get_input(handle, &in);
+    hret = margo_get_input(handle, &in);
     if(hret != HG_SUCCESS)
     {
         out.ret = -1;
-        HG_Respond(handle, NULL, NULL, &out);
-        HG_Destroy(handle);
+        margo_respond(handle, &out);
+        margo_destroy(handle);
         return;
     }
 
@@ -335,9 +323,9 @@ static void bake_bulk_get_size_ult(hg_handle_t handle)
     out.size = prid->size;
     out.ret = 0;
 
-    HG_Free_input(handle, &in);
-    HG_Respond(handle, NULL, NULL, &out);
-    HG_Destroy(handle);
+    margo_free_input(handle, &in);
+    margo_respond(handle, &out);
+    margo_destroy(handle);
     return;
 }
 DEFINE_MARGO_RPC_HANDLER(bake_bulk_get_size_ult)
@@ -347,8 +335,8 @@ static void bake_bulk_noop_ult(hg_handle_t handle)
 {
     // printf("Got RPC request to noop bulk region.\n");
 
-    HG_Respond(handle, NULL, NULL, NULL);
-    HG_Destroy(handle);
+    margo_respond(handle, NULL);
+    margo_destroy(handle);
     return;
 }
 DEFINE_MARGO_RPC_HANDLER(bake_bulk_noop_ult)
@@ -363,7 +351,7 @@ static void bake_bulk_read_ult(hg_handle_t handle)
     char* buffer;
     hg_size_t size;
     hg_bulk_t bulk_handle;
-    struct hg_info *hgi;
+    const struct hg_info *hgi;
     margo_instance_id mid;
     pmemobj_region_id_t* prid;
 
@@ -371,16 +359,16 @@ static void bake_bulk_read_ult(hg_handle_t handle)
     
     memset(&out, 0, sizeof(out));
 
-    hgi = HG_Get_info(handle);
+    hgi = margo_get_info(handle);
     assert(hgi);
-    mid = margo_hg_class_to_instance(hgi->hg_class);
+    mid = margo_hg_info_get_instance(hgi);
 
-    hret = HG_Get_input(handle, &in);
+    hret = margo_get_input(handle, &in);
     if(hret != HG_SUCCESS)
     {
         out.ret = -1;
-        HG_Respond(handle, NULL, NULL, &out);
-        HG_Destroy(handle);
+        margo_respond(handle, &out);
+        margo_destroy(handle);
         return;
     }
 
@@ -391,23 +379,23 @@ static void bake_bulk_read_ult(hg_handle_t handle)
     if(!buffer)
     {
         out.ret = -1;
-        HG_Free_input(handle, &in);
-        HG_Respond(handle, NULL, NULL, &out);
-        HG_Destroy(handle);
+        margo_free_input(handle, &in);
+        margo_respond(handle, &out);
+        margo_destroy(handle);
         return;
     }
 
-    size = HG_Bulk_get_size(in.bulk_handle);
+    size = margo_bulk_get_size(in.bulk_handle);
 
     /* create bulk handle for local side of transfer */
-    hret = HG_Bulk_create(hgi->hg_class, 1, (void**)(&buffer), &size, 
+    hret = margo_bulk_create(mid, 1, (void**)(&buffer), &size, 
         HG_BULK_READ_ONLY, &bulk_handle);
     if(hret != HG_SUCCESS)
     {
         out.ret = -1;
-        HG_Free_input(handle, &in);
-        HG_Respond(handle, NULL, NULL, &out);
-        HG_Destroy(handle);
+        margo_free_input(handle, &in);
+        margo_respond(handle, &out);
+        margo_destroy(handle);
         return;
     }
 
@@ -416,19 +404,19 @@ static void bake_bulk_read_ult(hg_handle_t handle)
     if(hret != HG_SUCCESS)
     {
         out.ret = -1;
-        HG_Bulk_free(bulk_handle);
-        HG_Free_input(handle, &in);
-        HG_Respond(handle, NULL, NULL, &out);
-        HG_Destroy(handle);
+        margo_bulk_free(bulk_handle);
+        margo_free_input(handle, &in);
+        margo_respond(handle, &out);
+        margo_destroy(handle);
         return;
     }
 
     out.ret = 0;
 
-    HG_Bulk_free(bulk_handle);
-    HG_Free_input(handle, &in);
-    HG_Respond(handle, NULL, NULL, &out);
-    HG_Destroy(handle);
+    margo_bulk_free(bulk_handle);
+    margo_free_input(handle, &in);
+    margo_respond(handle, &out);
+    margo_destroy(handle);
     return;
 }
 DEFINE_MARGO_RPC_HANDLER(bake_bulk_read_ult)
@@ -443,24 +431,18 @@ static void bake_bulk_eager_read_ult(hg_handle_t handle)
     hg_return_t hret;
     char* buffer;
     hg_size_t size;
-    struct hg_info *hgi;
-    margo_instance_id mid;
     pmemobj_region_id_t* prid;
 
     // printf("Got RPC request to read bulk region.\n");
     
     memset(&out, 0, sizeof(out));
 
-    hgi = HG_Get_info(handle);
-    assert(hgi);
-    mid = margo_hg_class_to_instance(hgi->hg_class);
-
-    hret = HG_Get_input(handle, &in);
+    hret = margo_get_input(handle, &in);
     if(hret != HG_SUCCESS)
     {
         out.ret = -1;
-        HG_Respond(handle, NULL, NULL, &out);
-        HG_Destroy(handle);
+        margo_respond(handle, &out);
+        margo_destroy(handle);
         return;
     }
 
@@ -471,9 +453,9 @@ static void bake_bulk_eager_read_ult(hg_handle_t handle)
     if(!buffer)
     {
         out.ret = -1;
-        HG_Free_input(handle, &in);
-        HG_Respond(handle, NULL, NULL, &out);
-        HG_Destroy(handle);
+        margo_free_input(handle, &in);
+        margo_respond(handle, &out);
+        margo_destroy(handle);
         return;
     }
 
@@ -481,9 +463,9 @@ static void bake_bulk_eager_read_ult(hg_handle_t handle)
     out.buffer = buffer;
     out.size = in.size;
 
-    HG_Free_input(handle, &in);
-    HG_Respond(handle, NULL, NULL, &out);
-    HG_Destroy(handle);
+    margo_free_input(handle, &in);
+    margo_respond(handle, &out);
+    margo_destroy(handle);
     return;
 }
 DEFINE_MARGO_RPC_HANDLER(bake_bulk_eager_read_ult)
@@ -500,8 +482,8 @@ static void bake_bulk_probe_ult(hg_handle_t handle)
     out.ret = 0;
     out.bti = g_pmem_root->target_id;
 
-    HG_Respond(handle, NULL, NULL, &out);
-    HG_Destroy(handle);
+    margo_respond(handle, &out);
+    margo_destroy(handle);
     return;
 }
 DEFINE_MARGO_RPC_HANDLER(bake_bulk_probe_ult)

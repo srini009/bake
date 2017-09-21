@@ -8,8 +8,6 @@
 #include <assert.h>
 #include <unistd.h>
 
-#include "abt.h"
-#include "abt-snoozer.h"
 #include "bake-bulk-client.h"
 
 /* client program that will shut down a BAKE bulk server. */
@@ -26,20 +24,6 @@ int main(int argc, char **argv)
         return(-1);
     }       
 
-    /* set up Argobots */
-    ret = ABT_init(argc, argv);
-    if(ret != 0)
-    {
-        fprintf(stderr, "Error: ABT_init()\n");
-        return(-1);
-    }
-    ret = ABT_snoozer_xstream_self_set();
-    if(ret != 0)
-    {
-        fprintf(stderr, "Error: ABT_snoozer_xstream_self_set()\n");
-        return(-1);
-    }
-
     ret = bake_probe_instance(argv[1], &bti);
     if(ret < 0)
     {
@@ -51,8 +35,6 @@ int main(int argc, char **argv)
     bake_shutdown_service(bti);
 
     bake_release_instance(bti);
-
-    ABT_finalize();
 
     return(0);
 }

@@ -13,8 +13,6 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 
-#include "abt.h"
-#include "abt-snoozer.h"
 #include "bake-bulk-client.h"
 
 /* client program that will copy a bake bulk region out to a POSIX file */
@@ -36,25 +34,9 @@ int main(int argc, char **argv)
         return(-1);
     }       
 
-    /* set up Argobots */
-    ret = ABT_init(argc, argv);
-    if(ret != 0)
-    {
-        fprintf(stderr, "Error: ABT_init()\n");
-        return(-1);
-    }
-    ret = ABT_snoozer_xstream_self_set();
-    if(ret != 0)
-    {
-        ABT_finalize();
-        fprintf(stderr, "Error: ABT_snoozer_xstream_self_set()\n");
-        return(-1);
-    }
-
     ret = bake_probe_instance(argv[1], &bti);
     if(ret < 0)
     {
-        ABT_finalize();
         fprintf(stderr, "Error: bake_probe_instance()\n");
         return(-1);
     }
@@ -64,7 +46,6 @@ int main(int argc, char **argv)
     {
         perror("open rid");
         bake_release_instance(bti);
-        ABT_finalize();
         return(-1);
     }
 
@@ -74,7 +55,6 @@ int main(int argc, char **argv)
         perror("read");
         close(region_fd);
         bake_release_instance(bti);
-        ABT_finalize();
         return(-1);
     }
     close(region_fd);
@@ -84,7 +64,6 @@ int main(int argc, char **argv)
     {
         fprintf(stderr, "Error: bake_bulk_get_size()\n");
         bake_release_instance(bti);
-        ABT_finalize();
         return(-1);
     }
 
@@ -93,7 +72,6 @@ int main(int argc, char **argv)
     {
         perror("open output");
         bake_release_instance(bti);
-        ABT_finalize();
         return(-1);
     }
 
@@ -103,7 +81,6 @@ int main(int argc, char **argv)
         perror("ftruncate");
         close(fd);
         bake_release_instance(bti);
-        ABT_finalize();
         return(-1);
     }
 
@@ -113,7 +90,6 @@ int main(int argc, char **argv)
         perror("mmap");
         close(fd);
         bake_release_instance(bti);
-        ABT_finalize();
         return(-1);
     }
 
@@ -129,7 +105,6 @@ int main(int argc, char **argv)
         munmap(local_region, check_size);
         close(fd);
         bake_release_instance(bti);
-        ABT_finalize();
         fprintf(stderr, "Error: bake_bulk_read()\n");
         return(-1);
     }
@@ -137,7 +112,6 @@ int main(int argc, char **argv)
     munmap(local_region, check_size);
     close(fd);
     bake_release_instance(bti);
-    ABT_finalize();
 
     return(0);
 }

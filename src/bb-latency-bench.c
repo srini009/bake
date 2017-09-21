@@ -13,8 +13,6 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 
-#include "abt.h"
-#include "abt-snoozer.h"
 #include "bake-bulk-client.h"
 
 static void bench_routine_write(bake_target_id_t bti, int iterations, double* measurement_array, int size);
@@ -51,25 +49,9 @@ int main(int argc, char **argv)
     measurement_array = malloc(sizeof(*measurement_array)*iterations);
     assert(measurement_array);
 
-    /* set up Argobots */
-    ret = ABT_init(argc, argv);
-    if(ret != 0)
-    {
-        fprintf(stderr, "Error: ABT_init()\n");
-        return(-1);
-    }
-    ret = ABT_snoozer_xstream_self_set();
-    if(ret != 0)
-    {
-        ABT_finalize();
-        fprintf(stderr, "Error: ABT_snoozer_xstream_self_set()\n");
-        return(-1);
-    }
-
     ret = bake_probe_instance(argv[1], &bti);
     if(ret < 0)
     {
-        ABT_finalize();
         fprintf(stderr, "Error: bake_probe_instance()\n");
         return(-1);
     }
@@ -87,8 +69,6 @@ int main(int argc, char **argv)
     }
     
     bake_release_instance(bti);
-
-    ABT_finalize();
 
     free(measurement_array);
 
