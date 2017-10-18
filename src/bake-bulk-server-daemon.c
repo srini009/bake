@@ -16,10 +16,8 @@ int main(int argc, char **argv)
 {
     int ret;
     margo_instance_id mid;
-    char target_string[64];
-    PMEMoid root_oid;
     PMEMobjpool *bb_pmem_pool = NULL;
-    struct bake_bulk_root *bb_pmem_root = NULL;
+    struct bake_bulk_root bb_pmem_root;
 
     if(argc != 3)
     {
@@ -28,24 +26,7 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    /* open pmem pool */
-    bb_pmem_pool = pmemobj_open(argv[2], NULL);
-    if(!bb_pmem_pool)
-    {
-        fprintf(stderr, "pmemobj_open: %s\n", pmemobj_errormsg());
-        return(-1);
-    }
-    
-    /* find root */
-    root_oid = pmemobj_root(bb_pmem_pool, sizeof(*bb_pmem_root));
-    bb_pmem_root = pmemobj_direct(root_oid);
-    if(uuid_is_null(bb_pmem_root->target_id.id))
-    {
-        uuid_generate(bb_pmem_root->target_id.id);
-        pmemobj_persist(bb_pmem_pool, bb_pmem_root, sizeof(*bb_pmem_root));
-    }
-    uuid_unparse(bb_pmem_root->target_id.id, target_string);
-    fprintf(stderr, "BAKE target ID: %s\n", target_string);
+    ret = bake_server_makepool(argv[2], &bb_pmem_pool, &bb_pmem_root);
 
     /* start margo */
     /* use the main xstream for driving progress and executing rpc handlers */
@@ -53,7 +34,7 @@ int main(int argc, char **argv)
     assert(mid);
 
     /* register the bake bulk server */
-    bake_server_register(mid, bb_pmem_pool, bb_pmem_root);
+    bake_server_register(mid, bb_pmem_pool, &bb_pmem_root);
 
     /* NOTE: at this point this server ULT has two options.  It can wait on
      * whatever mechanism it wants to (however long the daemon should run and
