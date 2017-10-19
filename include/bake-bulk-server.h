@@ -16,6 +16,12 @@ struct bake_bulk_root
     bake_target_id_t target_id;
 };
 
+struct bake_pool_info
+{
+    PMEMobjpool           *bb_pmem_pool;
+    struct bake_bulk_root *bb_pmem_root;
+};
+
 /**
  * Register a bake server instance for a given Margo instance.
  *
@@ -25,19 +31,16 @@ struct bake_bulk_root
  */
 void bake_server_register(
     margo_instance_id mid,
-    PMEMobjpool *bb_pmem_pool,
-    struct bake_bulk_root *bb_pmem_root);
+    struct bake_pool_info *pool_info);
 
 /**
  * Convienence function to set up a PMEM backend.
  *
  * @param[in] poolname path to pmem backend file
- * @param[inout] pmem_pool libpmem pool to use for the bake storage service
- * @param[inout] bb_mem_root libpmem root for the bake pool
  *
- * returns 0 on sucess, -1 if anything goes wrong
+ * returns a pointer to an initialized `struct bake_pool_info` on sucess,
+ * NULL if anything goes wrong
  */
-int bake_server_makepool(
-	char *poolname, PMEMobjpool **bb_pmem_pool,
-	struct bake_bulk_root *bb_pmem_root);
+struct bake_pool_info *bake_server_makepool(
+	char *poolname);
 #endif /* __BAKE_BULK_SERVER_H */

@@ -21,38 +21,42 @@ typedef struct {
 static PMEMobjpool *g_pmem_pool = NULL;
 static struct bake_bulk_root *g_pmem_root = NULL;
 
-int bake_server_makepool(
-	char *poolname, PMEMobjpool **bb_pmem_pool,
-	struct bake_bulk_root *bb_pmem_root)
+struct bake_pool_info * bake_server_makepool(
+	char *poolname)
 {
     PMEMoid root_oid;
     char target_string[64];
+    struct bake_pool_info *pool_info;
+
+    pool_info = malloc(sizeof(*pool_info));
 
     /* open pmem pool */
-    *bb_pmem_pool = pmemobj_open(poolname, NULL);
-    if(!bb_pmem_pool)
+    pool_info->bb_pmem_pool = pmemobj_open(poolname, NULL);
+    if(!pool_info->bb_pmem_pool)
     {
         fprintf(stderr, "pmemobj_open: %s\n", pmemobj_errormsg());
-        return(-1);
+        return(NULL);
     }
 
     /* find root */
-    root_oid = pmemobj_root(*bb_pmem_pool, sizeof(*bb_pmem_root));
-    bb_pmem_root = pmemobj_direct(root_oid);
-    if(uuid_is_null(bb_pmem_root->target_id.id))
+    root_oid = pmemobj_root(pool_info->bb_pmem_pool,
+	    sizeof(*(pool_info->bb_pmem_root)) );
+    pool_info->bb_pmem_root = pmemobj_direct(root_oid);
+    if(uuid_is_null(pool_info->bb_pmem_root->target_id.id))
     {
-        uuid_generate(bb_pmem_root->target_id.id);
-        pmemobj_persist(*bb_pmem_pool, bb_pmem_root, sizeof(*bb_pmem_root));
+        uuid_generate(pool_info->bb_pmem_root->target_id.id);
+        pmemobj_persist(pool_info->bb_pmem_pool,
+		pool_info->bb_pmem_root, sizeof(*(pool_info->bb_pmem_root)) );
     }
-    uuid_unparse(bb_pmem_root->target_id.id, target_string);
+    uuid_unparse(pool_info->bb_pmem_root->target_id.id, target_string);
     fprintf(stderr, "BAKE target ID: %s\n", target_string);
 
-    return 0;
+    return pool_info;
 }
 
 
-void bake_server_register(margo_instance_id mid, PMEMobjpool *bb_pmem_pool,
-    struct bake_bulk_root *bb_pmem_root)
+void bake_server_register(margo_instance_id mid,
+	struct bake_pool_info *pool_info)
 {
     /* register RPCs */
     MARGO_REGISTER(mid, "bake_bulk_shutdown_rpc", void, void,
@@ -86,8 +90,8 @@ void bake_server_register(margo_instance_id mid, PMEMobjpool *bb_pmem_pool,
         bake_bulk_noop_ult);
 
     /* set global pmem variables needed by the bake server */
-    g_pmem_pool = bb_pmem_pool;
-    g_pmem_root = bb_pmem_root;
+    g_pmem_pool = pool_info->bb_pmem_pool;
+    g_pmem_root = pool_info->bb_pmem_root;
 
     return;
 }

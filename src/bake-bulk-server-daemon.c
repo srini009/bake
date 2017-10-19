@@ -16,8 +16,7 @@ int main(int argc, char **argv)
 {
     int ret;
     margo_instance_id mid;
-    PMEMobjpool *bb_pmem_pool = NULL;
-    struct bake_bulk_root bb_pmem_root;
+    struct bake_pool_info * pool_info;
 
     if(argc != 3)
     {
@@ -26,7 +25,7 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    ret = bake_server_makepool(argv[2], &bb_pmem_pool, &bb_pmem_root);
+    pool_info = bake_server_makepool(argv[2]);
 
     /* start margo */
     /* use the main xstream for driving progress and executing rpc handlers */
@@ -34,7 +33,7 @@ int main(int argc, char **argv)
     assert(mid);
 
     /* register the bake bulk server */
-    bake_server_register(mid, bb_pmem_pool, &bb_pmem_root);
+    bake_server_register(mid, pool_info);
 
     /* NOTE: at this point this server ULT has two options.  It can wait on
      * whatever mechanism it wants to (however long the daemon should run and
@@ -52,7 +51,7 @@ int main(int argc, char **argv)
      */
     margo_wait_for_finalize(mid);
 
-    pmemobj_close(bb_pmem_pool);
+    pmemobj_close(pool_info->bb_pmem_pool);
 
     return(0);
 }
