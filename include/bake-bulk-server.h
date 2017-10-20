@@ -42,5 +42,5 @@ void bake_server_register(
  * NULL if anything goes wrong
  */
 struct bake_pool_info *bake_server_makepool(
-	char *poolname);
+	const char *poolname);
 #endif /* __BAKE_BULK_SERVER_H */

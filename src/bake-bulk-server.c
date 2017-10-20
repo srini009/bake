@@ -22,7 +22,7 @@ static PMEMobjpool *g_pmem_pool = NULL;
 static struct bake_bulk_root *g_pmem_root = NULL;
 
 struct bake_pool_info * bake_server_makepool(
-	char *poolname)
+	const char *poolname)
 {
     PMEMoid root_oid;
     char target_string[64];
