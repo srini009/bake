@@ -58,6 +58,6 @@ LIBS="$UUID_LIBS $LIBS"
 CPPFLAGS="$UUID_CFLAGS $CPPFLAGS"
 CFLAGS="$UUID_CFLAGS $CFLAGS"
 
-AC_CONFIG_FILES([Makefile maint/bake-bulk.pc])
+AC_CONFIG_FILES([Makefile maint/bake-bulk-client.pc maint/bake-bulk-server.pc])
 AC_OUTPUT
  
