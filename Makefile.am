@@ -33,7 +33,9 @@ src_libbake_bulk_server_la_SOURCES =
 LDADD = src/libbake-bulk-client.la src/libbake-bulk-server.la
 
 pkgconfigdir = $(libdir)/pkgconfig
-pkgconfig_DATA = maint/bake-bulk.pc
+pkgconfig_DATA = maint/bake-bulk-client.pc \
+		 maint/bake-bulk-server.pc
+
 
 include Make.rules
 

@@ -3,10 +3,10 @@ exec_prefix=@exec_prefix@
 libdir=@libdir@
 includedir=@includedir@
 
-Name: bake-bulk
-Description: bulk data access service
+Name: bake-bulk-client
+Description: bulk data access service, client side
 Version: 0.1
 URL: https://xgitlab.cels.anl.gov/sds/bake-bulk
-Requires: margo uuid libpmemobj
-Libs: -L${libdir} -lbake-bulk
+Requires: margo
+Libs: -L${libdir} -lbake-bulk-client
 Cflags: -I${includedir}
