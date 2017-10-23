@@ -4,6 +4,8 @@ src_libbake_bulk_client_la_SOURCES += \
 src_libbake_bulk_server_la_SOURCES += \
  src/bake-bulk-server.c
 
+src_bake_bulk_server_daemon_LDADD = src/libbake-bulk-server.la
+
 bin_PROGRAMS += \
  src/bake-bulk-server-daemon \
  src/bb-shutdown \

@@ -30,7 +30,7 @@ lib_LTLIBRARIES = src/libbake-bulk-client.la src/libbake-bulk-server.la
 src_libbake_bulk_client_la_SOURCES =
 src_libbake_bulk_server_la_SOURCES =
 
-LDADD = src/libbake-bulk-client.la src/libbake-bulk-server.la
+LDADD = src/libbake-bulk-client.la
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = maint/bake-bulk-client.pc \
