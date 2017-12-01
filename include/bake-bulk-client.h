@@ -8,18 +8,21 @@
 #define __BAKE_BULK_CLIENT_H
 
 #include <stdint.h>
+#include "margo.h"
 #include "bake-bulk.h"
 
 /**
  * Obtain identifying information for a bake target through the provided
  * remote mercury address.
  *
- * @param [in] mecury_dest Mercury address in string form
+ * @param [in] mid margo instance
+ * @param [in] dest_addr destination Mercury address
  * @param [out] bti BAKE target identifier
  * @returns 0 on success, -1 on failure
  */
 int bake_probe_instance(
-    const char *mercury_dest,
+    margo_instance_id mid,
+    hg_addr_t dest_addr,
     bake_target_id_t *bti);
   
 /**

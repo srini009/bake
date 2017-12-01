@@ -17,7 +17,6 @@
 struct bake_margo_instance
 {
     margo_instance_id mid;  
-    int refct;
 
     hg_id_t bake_bulk_probe_id;
     hg_id_t bake_bulk_shutdown_id; 
@@ -44,7 +43,6 @@ struct bake_instance *instance_hash = NULL;
 
 struct bake_margo_instance g_margo_inst = {
     .mid = MARGO_INSTANCE_NULL,
-    .refct = 0,
 };
 
 static int bake_bulk_eager_read(
@@ -54,31 +52,12 @@ static int bake_bulk_eager_read(
     void *buf,
     uint64_t buf_size);
 
-
-static int bake_margo_instance_init(const char *mercury_dest)
+/* XXX calling this function again just overwrites the previous global mid...
+ * need to be smarter if we truly want to support multiple client-side mids
+ */
+static int bake_margo_instance_init(margo_instance_id mid)
 {
-    char hg_na[64] = {0};
-    int i;
-
-    /* have we already started a Margo instance? */
-    if(g_margo_inst.refct > 0)
-    {
-        g_margo_inst.refct++;
-        return(0);
-    }
-
-    /* initialize Margo using the transport portion of the destination
-     * address (i.e., the part before the first : character if present)
-     */
-    for(i=0; (i<63 && mercury_dest[i] != '\0' && mercury_dest[i] != ':'); i++)
-        hg_na[i] = mercury_dest[i];
-
-    g_margo_inst.mid = margo_init(hg_na, MARGO_CLIENT_MODE, 0, 0);
-    if(g_margo_inst.mid == MARGO_INSTANCE_NULL)
-    {
-        return(-1);
-    }
-    g_margo_inst.refct = 1;
+    g_margo_inst.mid = mid;
 
     /* register RPCs */
     g_margo_inst.bake_bulk_probe_id = 
@@ -141,20 +120,9 @@ static int bake_margo_instance_init(const char *mercury_dest)
     return(0);
 }
 
-void bake_margo_instance_finalize(void)
-{
-    g_margo_inst.refct--;
-
-    assert(g_margo_inst.refct > -1);
-
-    if(g_margo_inst.refct == 0)
-    {
-        margo_finalize(g_margo_inst.mid);
-    }
-}
-
 int bake_probe_instance(
-    const char *mercury_dest,
+    margo_instance_id mid,
+    hg_addr_t dest_addr,
     bake_target_id_t *bti)
 {
     hg_return_t hret;
@@ -163,22 +131,18 @@ int bake_probe_instance(
     hg_handle_t handle;
     struct bake_instance *new_instance;
 
-    ret = bake_margo_instance_init(mercury_dest);
+    ret = bake_margo_instance_init(mid);
     if(ret < 0)
         return(ret);
 
     new_instance = calloc(1, sizeof(*new_instance));
     if(!new_instance)
-    {
-        bake_margo_instance_finalize();
         return(-1);
-    }
 
-    hret = margo_addr_lookup(g_margo_inst.mid, mercury_dest, &new_instance->dest);
+    hret = margo_addr_dup(g_margo_inst.mid, dest_addr, &new_instance->dest);
     if(hret != HG_SUCCESS)
     {
         free(new_instance);
-        bake_margo_instance_finalize();
         return(-1);
     }
 
@@ -187,26 +151,26 @@ int bake_probe_instance(
         g_margo_inst.bake_bulk_probe_id, &handle);
     if(hret != HG_SUCCESS)
     {
+        margo_addr_free(g_margo_inst.mid, new_instance->dest);
         free(new_instance);
-        bake_margo_instance_finalize();
         return(-1);
     }
 
     hret = margo_forward(handle, NULL);
     if(hret != HG_SUCCESS)
     {
-        free(new_instance);
         margo_destroy(handle);
-        bake_margo_instance_finalize();
+        margo_addr_free(g_margo_inst.mid, new_instance->dest);
+        free(new_instance);
         return(-1);
     }
 
     hret = margo_get_output(handle, &out);
     if(hret != HG_SUCCESS)
     {
-        free(new_instance);
         margo_destroy(handle);
-        bake_margo_instance_finalize();
+        margo_addr_free(g_margo_inst.mid, new_instance->dest);
+        free(new_instance);
         return(-1);
     }
 
@@ -219,8 +183,8 @@ int bake_probe_instance(
 
     if(ret != 0)
     {
+        margo_addr_free(g_margo_inst.mid, new_instance->dest);
         free(new_instance);
-        bake_margo_instance_finalize();
     }
     else
     {
@@ -243,7 +207,6 @@ void bake_release_instance(
     HASH_DELETE(hh, instance_hash, instance);
     margo_addr_free(g_margo_inst.mid, instance->dest);
     free(instance);
-    bake_margo_instance_finalize();
 
     return;
 }
