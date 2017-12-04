@@ -19,8 +19,14 @@
 
 int main(int argc, char **argv) 
 {
-    int ret;
+    int i;
+    char cli_addr_prefix[64] = {0};
+    char *svr_addr_str;
+    hg_addr_t svr_addr;
+    margo_instance_id mid;
     bake_target_id_t bti;
+    hg_return_t hret;
+    int ret;
     bake_bulk_region_id_t rid;
     int fd;
     struct stat statbuf;
@@ -34,7 +40,8 @@ int main(int argc, char **argv)
         fprintf(stderr, "Usage: bb-copy-to <local file> <server addr>\n");
         fprintf(stderr, "  Example: ./bb-copy-to /tmp/foo.dat tcp://localhost:1234\n");
         return(-1);
-    }       
+    }
+    svr_addr_str = argv[2];
 
     fd = open(argv[1], O_RDONLY);
     if(fd < 0)
@@ -58,9 +65,36 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    ret = bake_probe_instance(argv[2], &bti);
+    /* initialize Margo using the transport portion of the server
+     * address (i.e., the part before the first : character if present)
+     */
+    for(i=0; (i<63 && svr_addr_str[i] != '\0' && svr_addr_str[i] != ':'); i++)
+        cli_addr_prefix[i] = svr_addr_str[i];
+
+    mid = margo_init(cli_addr_prefix, MARGO_CLIENT_MODE, 0, -1);
+    if(mid == MARGO_INSTANCE_NULL)
+    {
+        fprintf(stderr, "Error: margo_init()\n");
+        munmap(local_region, statbuf.st_size);
+        close(fd);
+        return -1;
+    }
+
+    hret = margo_addr_lookup(mid, svr_addr_str, &svr_addr);
+    if(hret != HG_SUCCESS)
+    {
+        fprintf(stderr, "Error: margo_addr_lookup()\n");
+        margo_finalize(mid);
+        munmap(local_region, statbuf.st_size);
+        close(fd);
+        return(-1);
+    }
+
+    ret = bake_probe_instance(mid, svr_addr, &bti);
     if(ret < 0)
     {
+        margo_addr_free(mid, svr_addr);
+        margo_finalize(mid);
         munmap(local_region, statbuf.st_size);
         close(fd);
         fprintf(stderr, "Error: bake_probe_instance()\n");
@@ -72,6 +106,8 @@ int main(int argc, char **argv)
     if(ret != 0)
     {
         bake_release_instance(bti);
+        margo_addr_free(mid, svr_addr);
+        margo_finalize(mid);
         munmap(local_region, statbuf.st_size);
         close(fd);
         fprintf(stderr, "Error: bake_bulk_create()\n");
@@ -88,6 +124,8 @@ int main(int argc, char **argv)
     if(ret != 0)
     {
         bake_release_instance(bti);
+        margo_addr_free(mid, svr_addr);
+        margo_finalize(mid);
         munmap(local_region, statbuf.st_size);
         close(fd);
         fprintf(stderr, "Error: bake_bulk_write()\n");
@@ -101,6 +139,8 @@ int main(int argc, char **argv)
     if(ret != 0)
     {
         bake_release_instance(bti);
+        margo_addr_free(mid, svr_addr);
+        margo_finalize(mid);
         fprintf(stderr, "Error: bake_bulk_persist()\n");
         return(-1);
     }
@@ -110,11 +150,15 @@ int main(int argc, char **argv)
     if(ret != 0)
     {
         bake_release_instance(bti);
+        margo_addr_free(mid, svr_addr);
+        margo_finalize(mid);
         fprintf(stderr, "Error: bake_bulk_get_size()\n");
         return(-1);
     }
     
     bake_release_instance(bti);
+    margo_addr_free(mid, svr_addr);
+    margo_finalize(mid);
 
     if(check_size != statbuf.st_size)
     {
