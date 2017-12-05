@@ -161,6 +161,7 @@ static void bake_bulk_write_ult(hg_handle_t handle)
     bake_bulk_write_out_t out;
     bake_bulk_write_in_t in;
     hg_return_t hret;
+    hg_addr_t src_addr;
     char* buffer;
     hg_size_t size;
     hg_bulk_t bulk_handle;
@@ -212,11 +213,33 @@ static void bake_bulk_write_ult(hg_handle_t handle)
         return;
     }
 
-    hret = margo_bulk_transfer(mid, HG_BULK_PULL, hgi->addr, in.bulk_handle,
+    if(in.remote_addr_str)
+    {
+        /* a proxy address was provided to send write data to */
+        hret = margo_addr_lookup(mid, in.remote_addr_str, &src_addr);
+        if(hret != HG_SUCCESS)
+        {
+            out.ret = -1;
+            margo_bulk_free(bulk_handle);
+            margo_free_input(handle, &in);
+            margo_respond(handle, &out);
+            margo_destroy(handle);
+            return;
+        }
+    }
+    else
+    {
+        /* no proxy write, use the source of this request */
+        src_addr = hgi->addr;
+    }
+
+    hret = margo_bulk_transfer(mid, HG_BULK_PULL, src_addr, in.bulk_handle,
         0, bulk_handle, 0, size);
     if(hret != HG_SUCCESS)
     {
         out.ret = -1;
+        if(in.remote_addr_str)
+            margo_addr_free(mid, src_addr);
         margo_bulk_free(bulk_handle);
         margo_free_input(handle, &in);
         margo_respond(handle, &out);
@@ -226,6 +249,8 @@ static void bake_bulk_write_ult(hg_handle_t handle)
 
     out.ret = 0;
 
+    if(in.remote_addr_str)
+        margo_addr_free(mid, src_addr);
     margo_bulk_free(bulk_handle);
     margo_free_input(handle, &in);
     margo_respond(handle, &out);

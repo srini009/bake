@@ -62,7 +62,19 @@ int bake_bulk_write(
     uint64_t region_offset,
     void const *buf,
     uint64_t buf_size);
- 
+
+/**
+ *
+ */
+int bake_bulk_proxy_write(
+    bake_target_id_t bti,
+    bake_bulk_region_id_t rid,
+    uint64_t region_offset,
+    hg_bulk_t remote_bulk,
+    uint64_t remote_offset,
+    hg_addr_t remote_addr,
+    uint64_t size);
+
 /**
  * Persist a bulk region. The region is considered immutable at this point 
  * and reads may be performed on the region.

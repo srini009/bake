@@ -314,6 +314,9 @@ int bake_bulk_write(
     in.bti = bti;
     in.rid = rid;
     in.region_offset = region_offset;
+    in.bulk_offset = 0;
+    in.bulk_size = buf_size;
+    in.remote_addr_str = NULL; /* set remote_addr to NULL to disable proxy write */
 
     hret = margo_bulk_create(g_margo_inst.mid, 1, (void**)(&buf), &buf_size, 
         HG_BULK_READ_ONLY, &in.bulk_handle);
@@ -348,6 +351,67 @@ int bake_bulk_write(
 
     margo_free_output(handle, &out);
     margo_bulk_free(in.bulk_handle);
+    margo_destroy(handle);
+    return(ret);
+}
+
+int bake_bulk_proxy_write(
+    bake_target_id_t bti,
+    bake_bulk_region_id_t rid,
+    uint64_t region_offset,
+    hg_bulk_t remote_bulk,
+    uint64_t remote_offset,
+    hg_addr_t remote_addr,
+    uint64_t size)
+{
+    hg_return_t hret;
+    hg_handle_t handle;
+    bake_bulk_write_in_t in;
+    bake_bulk_write_out_t out;
+    struct bake_instance *instance = NULL;
+    char remote_addr_str[128] = {0};
+    hg_size_t remote_addr_str_sz = 128;
+    int ret;
+
+    HASH_FIND(hh, instance_hash, &bti, sizeof(bti), instance);
+    if(!instance)
+        return(-1);
+
+    hret = margo_addr_to_string(g_margo_inst.mid, remote_addr_str,
+        &remote_addr_str_sz, remote_addr);
+    if(hret != HG_SUCCESS)
+        return(-1);
+
+    in.bti = bti;
+    in.rid = rid;
+    in.region_offset = region_offset;
+    in.bulk_handle = remote_bulk;
+    in.bulk_offset = remote_offset;
+    in.bulk_size = size;
+    in.remote_addr_str = remote_addr_str; /* enable proxy write to remote source */
+
+    hret = margo_create(g_margo_inst.mid, instance->dest,
+        g_margo_inst.bake_bulk_write_id, &handle);
+    if(hret != HG_SUCCESS)
+        return(-1);
+
+    hret = margo_forward(handle, &in);
+    if(hret != HG_SUCCESS)
+    {   
+        margo_destroy(handle);
+        return(-1);
+    }
+    
+    hret = margo_get_output(handle, &out);
+    if(hret != HG_SUCCESS)
+    {   
+        margo_destroy(handle);
+        return(-1);
+    }
+
+    ret = out.ret;
+
+    margo_free_output(handle, &out);
     margo_destroy(handle);
     return(ret);
 }
