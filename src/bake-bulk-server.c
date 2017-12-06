@@ -163,7 +163,6 @@ static void bake_bulk_write_ult(hg_handle_t handle)
     hg_return_t hret;
     hg_addr_t src_addr;
     char* buffer;
-    hg_size_t size;
     hg_bulk_t bulk_handle;
     const struct hg_info *hgi;
     margo_instance_id mid;
@@ -199,10 +198,8 @@ static void bake_bulk_write_ult(hg_handle_t handle)
         return;
     }
 
-    size = margo_bulk_get_size(in.bulk_handle);
-
     /* create bulk handle for local side of transfer */
-    hret = margo_bulk_create(mid, 1, (void**)(&buffer), &size, 
+    hret = margo_bulk_create(mid, 1, (void**)(&buffer), &in.bulk_size, 
         HG_BULK_WRITE_ONLY, &bulk_handle);
     if(hret != HG_SUCCESS)
     {
@@ -234,7 +231,7 @@ static void bake_bulk_write_ult(hg_handle_t handle)
     }
 
     hret = margo_bulk_transfer(mid, HG_BULK_PULL, src_addr, in.bulk_handle,
-        0, bulk_handle, 0, size);
+        in.bulk_offset, bulk_handle, 0, in.bulk_size);
     if(hret != HG_SUCCESS)
     {
         out.ret = -1;
