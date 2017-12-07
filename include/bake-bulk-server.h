@@ -11,6 +11,10 @@
 #include <libpmemobj.h>
 #include "bake-bulk.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct bake_bulk_root
 {
     bake_target_id_t target_id;
@@ -43,4 +47,8 @@ void bake_server_register(
  */
 struct bake_pool_info *bake_server_makepool(
 	const char *poolname);
+
+#ifdef __cplusplus
+}
+#endif
 #endif /* __BAKE_BULK_SERVER_H */

@@ -11,6 +11,10 @@
 #include "margo.h"
 #include "bake-bulk.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * Obtain identifying information for a bake target through the provided
  * remote mercury address.
@@ -149,5 +153,9 @@ int bake_shutdown_service(bake_target_id_t bti);
  */
 int bake_bulk_noop(
     bake_target_id_t bti);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __BAKE_BULK__CLIENT_H */

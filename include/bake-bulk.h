@@ -9,7 +9,11 @@
 
 #include <uuid/uuid.h>
 #include <stdint.h>
- 
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /**
  * Persistent, universal, opaque identifier for a BAKE target.
  * Remains constant if instance is opened, closed, or migrated.
@@ -233,6 +237,11 @@ bake_return_t bake_bulk_region_deprecate(
 bake_return_t bake_bulk_gc(
         bake_instance_t *target,
         bake_request_t *req);
+
+#endif
+
+#ifdef __cplusplus
+}
 #endif
 
 #endif /* __BAKE_BULK_H */
