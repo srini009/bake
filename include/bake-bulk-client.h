@@ -76,7 +76,7 @@ int bake_bulk_proxy_write(
     uint64_t region_offset,
     hg_bulk_t remote_bulk,
     uint64_t remote_offset,
-    hg_addr_t remote_addr,
+    const char* remote_addr,
     uint64_t size);
 
 /**

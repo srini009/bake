@@ -361,7 +361,7 @@ int bake_bulk_proxy_write(
     uint64_t region_offset,
     hg_bulk_t remote_bulk,
     uint64_t remote_offset,
-    hg_addr_t remote_addr,
+    const char* remote_addr,
     uint64_t size)
 {
     hg_return_t hret;
@@ -369,18 +369,21 @@ int bake_bulk_proxy_write(
     bake_bulk_write_in_t in;
     bake_bulk_write_out_t out;
     struct bake_instance *instance = NULL;
+#if 0
     char remote_addr_str[128] = {0};
     hg_size_t remote_addr_str_sz = 128;
+#endif
     int ret;
 
     HASH_FIND(hh, instance_hash, &bti, sizeof(bti), instance);
     if(!instance)
         return(-1);
-
+#if 0
     hret = margo_addr_to_string(g_margo_inst.mid, remote_addr_str,
         &remote_addr_str_sz, remote_addr);
     if(hret != HG_SUCCESS)
         return(-1);
+#endif
 
     in.bti = bti;
     in.rid = rid;
@@ -388,8 +391,11 @@ int bake_bulk_proxy_write(
     in.bulk_handle = remote_bulk;
     in.bulk_offset = remote_offset;
     in.bulk_size = size;
+#if 0
     in.remote_addr_str = remote_addr_str; /* enable proxy write to remote source */
-
+#else
+    in.remote_addr_str = (char*)remote_addr;
+#endif
     hret = margo_create(g_margo_inst.mid, instance->dest,
         g_margo_inst.bake_bulk_write_id, &handle);
     if(hret != HG_SUCCESS)
