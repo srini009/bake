@@ -64,7 +64,7 @@ int bake_server_makepool(
     /* store the target id for this bake pool at the root */
     uuid_generate(root->target_id.id);
     pmemobj_persist(pool, root, sizeof(bake_bulk_root_t));
-#if 1
+#if 0
     char target_string[64];
     uuid_unparse(root->target_id.id, target_string);
     fprintf(stderr, "created BAKE target ID: %s\n", target_string);
@@ -113,7 +113,7 @@ int bake_server_init(
         pmemobj_close(pool);
         return(-1);
     }
-#if 1
+#if 0
     char target_string[64];
     uuid_unparse(root->target_id.id, target_string);
     fprintf(stderr, "opened BAKE target ID: %s\n", target_string);
