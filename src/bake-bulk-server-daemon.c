@@ -7,7 +7,6 @@
 #include <stdio.h>
 #include <assert.h>
 #include <unistd.h>
-#include <uuid/uuid.h>
 #include <margo.h>
 #include <libpmemobj.h>
 #include <bake-bulk-server.h>
@@ -64,12 +63,10 @@ static void parse_args(int argc, char **argv, struct options *opts)
 int main(int argc, char **argv) 
 {
     struct options opts;
-    struct bake_pool_info * pool_info;
     margo_instance_id mid;
+    int ret;
 
     parse_args(argc, argv, &opts);
-
-    pool_info = bake_server_makepool(opts.pmem_pool);
 
     /* start margo */
     /* use the main xstream for driving progress and executing rpc handlers */
@@ -120,7 +117,13 @@ int main(int argc, char **argv)
     }
 
     /* register the bake bulk server */
-    bake_server_register(mid, pool_info);
+    ret = bake_server_init(mid, opts.pmem_pool);
+    if(ret != 0)
+    {
+        fprintf(stderr, "Error: bake_server_init()\n");
+        margo_finalize(mid);
+        return(-1);
+    }
 
     /* NOTE: at this point this server ULT has two options.  It can wait on
      * whatever mechanism it wants to (however long the daemon should run and
@@ -138,7 +141,7 @@ int main(int argc, char **argv)
      */
     margo_wait_for_finalize(mid);
 
-    pmemobj_close(pool_info->bb_pmem_pool);
+    /* XXX pmemobj_close(pool_info->bb_pmem_pool); */
 
     return(0);
 }

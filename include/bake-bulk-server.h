@@ -15,38 +15,31 @@
 extern "C" {
 #endif
 
-struct bake_bulk_root
-{
-    bake_target_id_t target_id;
-};
-
-struct bake_pool_info
-{
-    PMEMobjpool           *bb_pmem_pool;
-    struct bake_bulk_root *bb_pmem_root;
-};
+/**
+ * Creates a bake-bulk pool to use for backend PMEM storage.
+ * NOTE: this function must be called on a pool before the pool
+ *       can be passed to 'bake_server_init'
+ *
+ * @param[in] pool_name path to pmem backend file
+ * @param[in] pool_size size of the created pool
+ * @param[in] pool_mode mode of the created pool
+ * @returns 0 on success, -1 otherwise
+ */
+int bake_server_makepool(
+    const char *pool_name,
+    size_t pool_size,
+    mode_t pool_mode);
 
 /**
  * Register a bake server instance for a given Margo instance.
  *
  * @param[in] mid Margo instance identifier
- * @param[in] bb_pmem_pool libpmem pool to use for the bake storage service
- * @param[in] bb_pmem_root libpmem root for the bake pool
+ * @param[in] pool_name path to pmem backend file
+ * @returns 0 on success, -1 otherwise
  */
-void bake_server_register(
+int bake_server_init(
     margo_instance_id mid,
-    struct bake_pool_info *pool_info);
-
-/**
- * Convienence function to set up a PMEM backend.
- *
- * @param[in] poolname path to pmem backend file
- *
- * returns a pointer to an initialized `struct bake_pool_info` on sucess,
- * NULL if anything goes wrong
- */
-struct bake_pool_info *bake_server_makepool(
-	const char *poolname);
+    const char *pool_name);
 
 #ifdef __cplusplus
 }

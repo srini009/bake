@@ -5,10 +5,16 @@
  */
 
 #include <assert.h>
-#include <bake-bulk-server.h>
 #include <libpmemobj.h>
+#include <bake-bulk-server.h>
 #include "bake-bulk-rpc.h"
 
+/* definition of bake root data structure (just a target_id for now) */
+typedef struct bake_bulk_root
+{   
+    bake_target_id_t target_id;
+} bake_bulk_root_t;
+ 
 /* definition of internal region_id_t identifier for libpmemobj back end */
 typedef struct {
     PMEMoid oid;
@@ -19,45 +25,76 @@ typedef struct {
  * to multiple targets
  */
 static PMEMobjpool *g_pmem_pool = NULL;
-static struct bake_bulk_root *g_pmem_root = NULL;
+static bake_bulk_root_t *g_pmem_root = NULL;
 
-struct bake_pool_info * bake_server_makepool(
-	const char *poolname)
+int bake_server_makepool(
+	const char *pool_name,
+    size_t pool_size,
+    mode_t pool_mode)
 {
+    PMEMobjpool *pool;
     PMEMoid root_oid;
+    bake_bulk_root_t *root;
     char target_string[64];
-    struct bake_pool_info *pool_info;
 
-    pool_info = malloc(sizeof(*pool_info));
-
-    /* open pmem pool */
-    pool_info->bb_pmem_pool = pmemobj_open(poolname, NULL);
-    if(!pool_info->bb_pmem_pool)
+    pool = pmemobj_create(pool_name, NULL, pool_size, pool_mode);
+    if(!pool)
     {
-        fprintf(stderr, "pmemobj_open: %s\n", pmemobj_errormsg());
-        return(NULL);
+        fprintf(stderr, "pmemobj_create: %s\n", pmemobj_errormsg());
+        return(-1);
     }
 
     /* find root */
-    root_oid = pmemobj_root(pool_info->bb_pmem_pool,
-	    sizeof(*(pool_info->bb_pmem_root)) );
-    pool_info->bb_pmem_root = pmemobj_direct(root_oid);
-    if(uuid_is_null(pool_info->bb_pmem_root->target_id.id))
-    {
-        uuid_generate(pool_info->bb_pmem_root->target_id.id);
-        pmemobj_persist(pool_info->bb_pmem_pool,
-		pool_info->bb_pmem_root, sizeof(*(pool_info->bb_pmem_root)) );
-    }
-    uuid_unparse(pool_info->bb_pmem_root->target_id.id, target_string);
-    fprintf(stderr, "BAKE target ID: %s\n", target_string);
+    root_oid = pmemobj_root(pool, sizeof(bake_bulk_root_t));
+    root = pmemobj_direct(root_oid);
 
-    return pool_info;
+    /* store the target id for this bake pool at the root */
+    uuid_generate(root->target_id.id);
+    pmemobj_persist(pool, root, sizeof(bake_bulk_root_t));
+    uuid_unparse(root->target_id.id, target_string);
+    fprintf(stderr, "created BAKE target ID: %s\n", target_string);
+
+    pmemobj_close(pool);
+
+    return(0);
 }
 
-
-void bake_server_register(margo_instance_id mid,
-	struct bake_pool_info *pool_info)
+int bake_server_init(
+    margo_instance_id mid,
+    const char *pool_name)
 {
+    PMEMobjpool *pool;
+    PMEMoid root_oid;
+    bake_bulk_root_t *root;
+    char target_string[64];
+
+    /* make sure to initialize the server only once */
+    if(g_pmem_pool || g_pmem_root)
+    {
+        fprintf(stderr, "Error: bake-bulk server already initialized\n");
+        return(-1);
+    }
+
+    /* open the given pmem pool */
+    pool = pmemobj_open(pool_name, NULL);
+    if(!pool)
+    {
+        fprintf(stderr, "pmemobj_open: %s\n", pmemobj_errormsg());
+        return(-1);
+    }
+
+    /* check to make sure the root is properly set */
+    root_oid = pmemobj_root(pool, sizeof(bake_bulk_root_t));
+    root = pmemobj_direct(root_oid);
+    if(uuid_is_null(root->target_id.id))
+    {
+        fprintf(stderr, "Error: bake-bulk pool is not properly initialized\n");
+        pmemobj_close(pool);
+        return(-1);
+    }
+    uuid_unparse(root->target_id.id, target_string);
+    fprintf(stderr, "opened BAKE target ID: %s\n", target_string);
+
     /* register RPCs */
     MARGO_REGISTER(mid, "bake_bulk_shutdown_rpc", void, void,
         bake_bulk_shutdown_ult);
@@ -90,10 +127,10 @@ void bake_server_register(margo_instance_id mid,
         bake_bulk_noop_ult);
 
     /* set global pmem variables needed by the bake server */
-    g_pmem_pool = pool_info->bb_pmem_pool;
-    g_pmem_root = pool_info->bb_pmem_root;
+    g_pmem_pool = pool;
+    g_pmem_root = root;
 
-    return;
+    return(0);
 }
 
 /* service a remote RPC that instructs the server daemon to shut down */
@@ -101,8 +138,6 @@ static void bake_bulk_shutdown_ult(hg_handle_t handle)
 {
     hg_return_t hret;
     margo_instance_id mid;
-
-    // printf("Got RPC request to shutdown.\n");
 
     mid = margo_hg_handle_get_instance(handle);
 
