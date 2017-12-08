@@ -5,9 +5,11 @@ src_libbake_bulk_server_la_SOURCES += \
  src/bake-bulk-server.c
 
 src_bake_bulk_server_daemon_LDADD = src/libbake-bulk-server.la
+src_bake_bulk_mkpool_LDADD = src/libbake-bulk-server.la
 
 bin_PROGRAMS += \
  src/bake-bulk-server-daemon \
+ src/bake-bulk-mkpool \
  src/bb-shutdown \
  src/bb-copy-to \
  src/bb-copy-from \
