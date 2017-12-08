@@ -26,25 +26,17 @@ function test_start_servers ()
 {
     nservers=${1:-4}
     startwait=${2:-15}
-    maxtime=${3:-120}s
-    repfactor=${4:-0}
-    pid=$$
-    startport=3344
-    endport=`expr 3344 + $nservers - 1`
+    maxtime=${3:-120}
 
     # start daemons
-    for i in `seq $startport $endport`
+    for i in `seq $nservers`
     do
-        truncate -s 100M $TMPBASE/foo-$i.dat
-        if [ $? -ne 0 ]; then
-            exit 1
-        fi
-        pmempool create obj $TMPBASE/foo-$i.dat
+        src/bake-bulk-mkpool -s 100M $TMPBASE/svr-$i.dat
         if [ $? -ne 0 ]; then
             exit 1
         fi
 
-        timeout --signal=9 ${maxtime} src/bake-bulk-server-daemon tcp://localhost:$i $TMPBASE/foo-$i.dat &
+        run_to ${maxtime} src/bake-bulk-server-daemon -f $TMPBASE/svr-$i.addr na+sm $TMPBASE/svr-$i.dat &
         if [ $? -ne 0 ]; then
             # TODO: this doesn't actually work; can't check return code of
             # something executing in background.  We have to rely on the
@@ -57,5 +49,5 @@ function test_start_servers ()
     # wait for servers to start
     sleep ${startwait}
 
-    svr1="tcp://localhost:$startport"
+    svr1=`cat $TMPBASE/svr-1.addr`
 }

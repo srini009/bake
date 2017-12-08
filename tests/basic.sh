@@ -9,15 +9,6 @@ source $srcdir/tests/test-util.sh
 # start 1 server with 2 second wait, 20s timeout
 test_start_servers 1 2 20
 
-# actual test case
-#####################
-
-# run_to 10 src/SOME_EXAMPLE_PROGRAM $svr1
-# if [ $? -ne 0 ]; then
-#     run_to 10 src/bb-shutdown $svr1 &> /dev/null 
-#     wait
-#     exit 1
-# fi
 sleep 1
 
 #####################
