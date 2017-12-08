@@ -125,23 +125,9 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    /* NOTE: at this point this server ULT has two options.  It can wait on
-     * whatever mechanism it wants to (however long the daemon should run and
-     * then call margo_finalize().  Otherwise, it can call
-     * margo_wait_for_finalize() on the assumption that it should block until
-     * some other entity calls margo_finalize().
-     *
-     * This example does the latter.  Margo will be finalized by a special
-     * RPC from the client.
-     *
-     * This approach will allow the server to idle gracefully even when
-     * executed in "single" mode, in which the main thread of the server
-     * daemon and the progress thread for Mercury are executing in the same
-     * ABT pool.
-     */
-    margo_wait_for_finalize(mid);
-
-    /* XXX pmemobj_close(pool_info->bb_pmem_pool); */
+    /* suspend until the bake server gets a shutdown signal from the client */
+    bake_server_wait_for_shutdown();
+    margo_finalize(mid);
 
     return(0);
 }
