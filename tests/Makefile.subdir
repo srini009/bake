@@ -1,3 +1,7 @@
+TESTS_ENVIRONMENT += \
+ TIMEOUT="$(TIMEOUT)" \
+ MKTEMP="$(MKTEMP)"
+
 TESTS += \
  tests/basic.sh \
  tests/copy-to-and-from.sh

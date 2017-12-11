@@ -38,6 +38,28 @@ if test "x$PKG_CONFIG" == "x"; then
    AC_MSG_ERROR([Could not find pkg-config utility!])
 fi
 
+# coreutils checks for OSX
+AC_ARG_VAR([TIMEOUT], timeout program)
+AC_ARG_VAR([MKTEMP], mktemp program)
+
+if test -z "$TIMEOUT" ; then
+    AC_CHECK_PROGS(TIMEOUT, [timeout gtimeout])
+    if test -z "$TIMEOUT" ; then
+        AC_MSG_ERROR([Could not find timeout command (can optionally provide via the TIMEOUT variable)])
+    fi
+else
+    AC_SUBST([TIMEOUT], ["$TIMEOUT"])
+fi
+
+if test -z "$MKTEMP" ; then
+    AC_CHECK_PROGS(MKTEMP, [mktemp gmktemp])
+    if test -z "$MKTEMP" ; then
+        AC_MSG_ERROR([Could not find mktemp command (can optionally provide via the MKTEMP variable)])
+    fi
+else
+    AC_SUBST([MKTEMP], ["$MKTEMP"])
+fi
+
 PKG_CHECK_MODULES([MARGO],[margo],[],
    [AC_MSG_ERROR([Could not find working margo installation!])])
 LIBS="$MARGO_LIBS $LIBS"

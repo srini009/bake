@@ -14,6 +14,7 @@ MAINTAINERCLEANFILES =
 EXTRA_DIST =
 BUILT_SOURCES =
 include_HEADERS = include/bake-bulk.h include/bake-bulk-client.h include/bake-bulk-server.h
+TESTS_ENVIRONMENT =
 
 EXTRA_DIST += \
  prepare.sh 

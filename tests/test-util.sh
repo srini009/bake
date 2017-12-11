@@ -2,10 +2,20 @@
 # General test script utilities
 #
 
+if [ -z "$TIMEOUT" ] ; then
+    echo expected TIMEOUT variable defined to its respective command
+    exit 1
+fi
+
+if [ -z "$MKTEMP" ] ; then
+    echo expected MKTEMP variable defined to its respective command
+    exit 1
+fi
+
 TMPDIR=/dev/shm
 export TMPDIR
 mkdir -p $TMPDIR
-TMPBASE=$(mktemp --tmpdir -d test-XXXXXX)
+TMPBASE=$(${MKTEMP} --tmpdir -d test-XXXXXX)
 
 echo "tmpbase: $TMPBASE"
 
@@ -19,7 +29,7 @@ function run_to ()
 {
     maxtime=${1}s
     shift
-    timeout --signal=9 $maxtime "$@"
+    ${TIMEOUT} --signal=9 $maxtime "$@"
 }
 
 function test_start_servers ()
