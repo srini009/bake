@@ -156,7 +156,7 @@ int main(int argc, char *argv[])
     }
 
     /* check return code */
-    if(out.ret != 2)
+    if(out.ret != 0)
     {
         fprintf(stderr, "Error: unexpected return from bake proxy write RPC\n");
         free(buf);

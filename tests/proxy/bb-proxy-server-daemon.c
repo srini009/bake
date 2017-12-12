@@ -192,7 +192,7 @@ static void proxy_bulk_write_ult(hg_handle_t handle)
     assert(ret == 0);
 
     /* set return value */
-    out.ret = 2;
+    out.ret = 0;
 
     hret = margo_respond(handle, &out);
     assert(hret == HG_SUCCESS);
