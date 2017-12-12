@@ -17,8 +17,6 @@ export TMPDIR
 mkdir -p $TMPDIR
 TMPBASE=$(${MKTEMP} --tmpdir -d test-XXXXXX)
 
-echo "tmpbase: $TMPBASE"
-
 if [ ! -d $TMPBASE ];
 then
   echo "Temp directory doesn't exist: $TMPBASE"

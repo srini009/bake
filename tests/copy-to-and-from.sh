@@ -15,7 +15,7 @@ test_start_servers 1 2 20
 echo "Hello world." > $TMPBASE/foo.dat
 CPOUT=`run_to 10 src/bb-copy-to $TMPBASE/foo.dat $svr1`
 if [ $? -ne 0 ]; then
-    run_to 10 src/bb-shutdown $svr1 &> /dev/null 
+    run_to 10 src/bb-shutdown $svr1
     wait
     exit 1
 fi
@@ -23,7 +23,7 @@ fi
 RID=`echo "$CPOUT" | grep -o -P '/tmp.*$'`
 run_to 10 src/bb-copy-from $svr1 $RID $TMPBASE/foo-out.dat 
 if [ $? -ne 0 ]; then
-    run_to 10 src/bb-shutdown $svr1 &> /dev/null 
+    run_to 10 src/bb-shutdown $svr1
     wait
     exit 1
 fi
@@ -34,7 +34,7 @@ sleep 1
 #####################
 
 # tear down
-run_to 10 src/bb-shutdown $svr1 &> /dev/null 
+run_to 10 src/bb-shutdown $svr1
 if [ $? -ne 0 ]; then
     wait
     exit 1

@@ -13,7 +13,7 @@
 
 struct options
 {
-    char *listen_addr;
+    char *listen_addr_str;
     char *pmem_pool;
     char *host_file;
 };
@@ -54,7 +54,7 @@ static void parse_args(int argc, char **argv, struct options *opts)
         usage(argc, argv);
         exit(EXIT_FAILURE);
     }
-    opts->listen_addr = argv[optind++];
+    opts->listen_addr_str = argv[optind++];
     opts->pmem_pool = argv[optind++];
 
     return;
@@ -70,7 +70,7 @@ int main(int argc, char **argv)
 
     /* start margo */
     /* use the main xstream for driving progress and executing rpc handlers */
-    mid = margo_init(opts.listen_addr, MARGO_SERVER_MODE, 0, -1);
+    mid = margo_init(opts.listen_addr_str, MARGO_SERVER_MODE, 0, -1);
     if(mid == MARGO_INSTANCE_NULL)
     {
         fprintf(stderr, "Error: margo_init()\n");
