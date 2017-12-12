@@ -76,7 +76,12 @@ MERCURY_GEN_PROC(bake_bulk_read_in_t,
     ((bake_target_id_t)(bti))\
     ((bake_bulk_region_id_t)(rid))\
     ((uint64_t)(region_offset))\
-    ((hg_bulk_t)(bulk_handle)))
+    ((hg_bulk_t)(bulk_handle))\
+    ((uint64_t)(bulk_offset))\
+    ((uint64_t)(bulk_size))\
+    ((hg_string_t)(remote_addr_str)))
+    
+
 MERCURY_GEN_PROC(bake_bulk_read_out_t,
     ((int32_t)(ret)))
 DECLARE_MARGO_RPC_HANDLER(bake_bulk_read_ult)

@@ -125,6 +125,18 @@ int bake_bulk_read(
     uint64_t buf_size);
 
 /**
+ *
+ */
+int bake_bulk_proxy_read(
+    bake_target_id_t bti,
+    bake_bulk_region_id_t rid,
+    uint64_t region_offset,
+    hg_bulk_t remote_bulk,
+    uint64_t remote_offset,
+    const char* remote_addr,
+    uint64_t size);
+
+/**
  * Release local resources associated with access to a target; does not
  * modify the target in any way.
  *
