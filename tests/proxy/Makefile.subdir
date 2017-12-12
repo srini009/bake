@@ -1,0 +1,6 @@
+check_PROGRAMS += \
+ tests/proxy/bb-proxy-test \
+ tests/proxy/bb-proxy-server-daemon
+
+TESTS += \
+ tests/proxy/proxy-basic.sh
