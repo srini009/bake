@@ -3,4 +3,4 @@ check_PROGRAMS += \
  tests/proxy/bb-proxy-server-daemon
 
 TESTS += \
- tests/proxy/proxy-basic.sh
+ tests/proxy/proxy-write-read.sh
