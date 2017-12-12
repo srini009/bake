@@ -330,7 +330,7 @@ static void bake_bulk_write_ult(hg_handle_t handle)
 
     if(in.remote_addr_str)
     {
-        /* a proxy address was provided to send write data to */
+        /* a proxy address was provided to pull write data from */
         hret = margo_addr_lookup(mid, in.remote_addr_str, &src_addr);
         if(hret != HG_SUCCESS)
         {
@@ -521,8 +521,8 @@ static void bake_bulk_read_ult(hg_handle_t handle)
     bake_bulk_read_out_t out;
     bake_bulk_read_in_t in;
     hg_return_t hret;
+    hg_addr_t src_addr;
     char* buffer;
-    hg_size_t size;
     hg_bulk_t bulk_handle;
     const struct hg_info *hgi;
     margo_instance_id mid;
@@ -558,10 +558,8 @@ static void bake_bulk_read_ult(hg_handle_t handle)
         return;
     }
 
-    size = margo_bulk_get_size(in.bulk_handle);
-
     /* create bulk handle for local side of transfer */
-    hret = margo_bulk_create(mid, 1, (void**)(&buffer), &size, 
+    hret = margo_bulk_create(mid, 1, (void**)(&buffer), &in.bulk_size, 
         HG_BULK_READ_ONLY, &bulk_handle);
     if(hret != HG_SUCCESS)
     {
@@ -572,11 +570,33 @@ static void bake_bulk_read_ult(hg_handle_t handle)
         return;
     }
 
-    hret = margo_bulk_transfer(mid, HG_BULK_PUSH, hgi->addr, in.bulk_handle,
-        0, bulk_handle, 0, size);
+    if(in.remote_addr_str)
+    {
+        /* a proxy address was provided to push read data to */
+        hret = margo_addr_lookup(mid, in.remote_addr_str, &src_addr);
+        if(hret != HG_SUCCESS)
+        {
+            out.ret = -1;
+            margo_bulk_free(bulk_handle);
+            margo_free_input(handle, &in);
+            margo_respond(handle, &out);
+            margo_destroy(handle);
+            return;
+        }
+    }
+    else
+    {
+        /* no proxy write, use the source of this request */
+        src_addr = hgi->addr;
+    }
+
+    hret = margo_bulk_transfer(mid, HG_BULK_PUSH, src_addr, in.bulk_handle,
+        in.bulk_offset, bulk_handle, 0, in.bulk_size);
     if(hret != HG_SUCCESS)
     {
         out.ret = -1;
+        if(in.remote_addr_str)
+            margo_addr_free(mid, src_addr);
         margo_bulk_free(bulk_handle);
         margo_free_input(handle, &in);
         margo_respond(handle, &out);
@@ -586,6 +606,8 @@ static void bake_bulk_read_ult(hg_handle_t handle)
 
     out.ret = 0;
 
+    if(in.remote_addr_str)
+        margo_addr_free(mid, src_addr);
     margo_bulk_free(bulk_handle);
     margo_free_input(handle, &in);
     margo_respond(handle, &out);
