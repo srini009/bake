@@ -22,8 +22,8 @@ void usage(int argc, char *argv[])
 {
     fprintf(stderr, "Usage: bake-bulk-mkpool [OPTIONS] <pmem_pool>\n");
     fprintf(stderr, "       pmem_pool is the path to the pmemobj pool to create\n");
-    fprintf(stderr, "       [-s size] is the desired size of the pool (%lu is default)\n", PMEMOBJ_MIN_POOL);
-    fprintf(stderr, "Example: ./bake-bulk-mkpool /dev/shm/foo.dat\n");
+    fprintf(stderr, "       [-s size] is the desired size of the pool (K, M, G, etc. suffixes allowed) (%lu is default)\n", PMEMOBJ_MIN_POOL);
+    fprintf(stderr, "Example: ./bake-bulk-mkpool -s 16M /dev/shm/foo.dat\n");
     return;
 }
 
