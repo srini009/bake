@@ -68,7 +68,17 @@ int bake_bulk_write(
     uint64_t buf_size);
 
 /**
+ * Write data into a previously created BAKE region like bake_bulk_write(),
+ * except the write is performed on behalf of some remote entity.
  *
+ * @param [in] bti BAKE target identifier
+ * @param [in] rid identifier for region
+ * @param [in] region_offset offset into the target region to write
+ * @param [in] remote_bulk bulk_handle for remote data region to write from
+ * @param [in] remote_offset offset in the remote bulk handle to write from
+ * @param [in] remote_addr address string of the remote target to write from
+ * @param [in] size size to write from remote bulk handle
+ * @returns 0 on success, -1 on failure
  */
 int bake_bulk_proxy_write(
     bake_target_id_t bti,
@@ -125,7 +135,17 @@ int bake_bulk_read(
     uint64_t buf_size);
 
 /**
+ * Read data from a previously persisted BAKE region like bake_bulk_read(),
+ * except the read is performed on behalf of some remote entity.
  *
+ * @param [in] bti BAKE target identifier
+ * @param [in] rid identifier for region
+ * @param [in] region_offset offset into the target region to write
+ * @param [in] remote_bulk bulk_handle for remote data region to read to
+ * @param [in] remote_offset offset in the remote bulk handle to read to
+ * @param [in] remote_addr address string of the remote target to read to
+ * @param [in] size size to read to remote bulk handle
+ * @returns 0 on success, -1 on failure
  */
 int bake_bulk_proxy_read(
     bake_target_id_t bti,
