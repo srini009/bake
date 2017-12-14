@@ -16,15 +16,15 @@
 struct options
 {
     char *listen_addr_str;
-    char *pmem_pool;
+    char *bake_pool;
     char *host_file;
 };
 
 static void usage(int argc, char **argv)
 {
-    fprintf(stderr, "Usage: bake-server-daemon [OPTIONS] <listen_addr> <pmem_pool>\n");
+    fprintf(stderr, "Usage: bake-server-daemon [OPTIONS] <listen_addr> <bake_pool>\n");
     fprintf(stderr, "       listen_addr is the Mercury address to listen on\n");
-    fprintf(stderr, "       pmem_pool is the path to the pmemobj pool\n");
+    fprintf(stderr, "       bake_pool is the path to the BAKE pool\n");
     fprintf(stderr, "       [-f filename] to write the server address to a file\n");
     fprintf(stderr, "Example: ./bake-server-daemon tcp://localhost:1234 /dev/shm/foo.dat\n");
     return;
@@ -57,7 +57,7 @@ static void parse_args(int argc, char **argv, struct options *opts)
         exit(EXIT_FAILURE);
     }
     opts->listen_addr_str = argv[optind++];
-    opts->pmem_pool = argv[optind++];
+    opts->bake_pool = argv[optind++];
 
     return;
 }
@@ -119,7 +119,7 @@ int main(int argc, char **argv)
     }
 
     /* initialize the BAKE server */
-    ret = bake_server_init(mid, opts.pmem_pool);
+    ret = bake_server_init(mid, opts.bake_pool);
     if(ret != 0)
     {
         fprintf(stderr, "Error: bake_server_init()\n");
