@@ -29,6 +29,7 @@ struct bake_margo_instance
     hg_id_t bake_eager_read_id;
     hg_id_t bake_write_id;
     hg_id_t bake_persist_id;
+    hg_id_t bake_create_write_persist_id;
     hg_id_t bake_get_size_id;
     hg_id_t bake_read_id;
     hg_id_t bake_noop_id;
@@ -59,45 +60,38 @@ static int bake_margo_instance_init(margo_instance_id mid)
 
     /* register RPCs */
     g_margo_inst.bake_probe_id = 
-        MARGO_REGISTER(g_margo_inst.mid, 
-        "bake_probe_rpc", void, bake_probe_out_t, 
-        NULL);
+        MARGO_REGISTER(g_margo_inst.mid, "bake_probe_rpc",
+        void, bake_probe_out_t, NULL);
     g_margo_inst.bake_shutdown_id = 
-        MARGO_REGISTER(g_margo_inst.mid, 
-        "bake_shutdown_rpc", void, void, 
-        NULL);
+        MARGO_REGISTER(g_margo_inst.mid, "bake_shutdown_rpc",
+        void, void, NULL);
     g_margo_inst.bake_create_id = 
-        MARGO_REGISTER(g_margo_inst.mid, 
-        "bake_create_rpc", bake_create_in_t, bake_create_out_t,
-        NULL);
+        MARGO_REGISTER(g_margo_inst.mid, "bake_create_rpc",
+        bake_create_in_t, bake_create_out_t, NULL);
     g_margo_inst.bake_write_id = 
-        MARGO_REGISTER(g_margo_inst.mid, 
-        "bake_write_rpc", bake_write_in_t, bake_write_out_t,
-        NULL);
+        MARGO_REGISTER(g_margo_inst.mid, "bake_write_rpc",
+        bake_write_in_t, bake_write_out_t, NULL);
     g_margo_inst.bake_eager_write_id = 
-        MARGO_REGISTER(g_margo_inst.mid, 
-        "bake_eager_write_rpc", bake_eager_write_in_t, bake_eager_write_out_t,
-        NULL);
+        MARGO_REGISTER(g_margo_inst.mid, "bake_eager_write_rpc",
+        bake_eager_write_in_t, bake_eager_write_out_t, NULL);
     g_margo_inst.bake_eager_read_id = 
-        MARGO_REGISTER(g_margo_inst.mid, 
-        "bake_eager_read_rpc", bake_eager_read_in_t, bake_eager_read_out_t,
-        NULL);
+        MARGO_REGISTER(g_margo_inst.mid, "bake_eager_read_rpc",
+        bake_eager_read_in_t, bake_eager_read_out_t, NULL);
     g_margo_inst.bake_persist_id = 
-        MARGO_REGISTER(g_margo_inst.mid, 
-        "bake_persist_rpc", bake_persist_in_t, bake_persist_out_t,
-        NULL);
+        MARGO_REGISTER(g_margo_inst.mid, "bake_persist_rpc",
+        bake_persist_in_t, bake_persist_out_t, NULL);
+    g_margo_inst.bake_create_write_persist_id =
+        MARGO_REGISTER(g_margo_inst.mid, "bake_create_write_persist_rpc",
+         bake_create_write_persist_in_t, bake_create_write_persist_out_t, NULL);
     g_margo_inst.bake_get_size_id = 
-        MARGO_REGISTER(g_margo_inst.mid, 
-        "bake_get_size_rpc", bake_get_size_in_t, bake_get_size_out_t,
-        NULL);
+        MARGO_REGISTER(g_margo_inst.mid, "bake_get_size_rpc",
+        bake_get_size_in_t, bake_get_size_out_t, NULL);
     g_margo_inst.bake_read_id = 
-        MARGO_REGISTER(g_margo_inst.mid, 
-        "bake_read_rpc", bake_read_in_t, bake_read_out_t,
-        NULL);
+        MARGO_REGISTER(g_margo_inst.mid, "bake_read_rpc",
+        bake_read_in_t, bake_read_out_t, NULL);
     g_margo_inst.bake_noop_id = 
-        MARGO_REGISTER(g_margo_inst.mid, 
-        "bake_noop_rpc", void, void,
-        NULL);
+        MARGO_REGISTER(g_margo_inst.mid, "bake_noop_rpc",
+        void, void, NULL);
 
     return(0);
 }
@@ -476,6 +470,73 @@ int bake_persist(
     ret = out.ret;
 
     margo_free_output(handle, &out);
+    margo_destroy(handle);
+    return(ret);
+}
+
+int bake_create_write_persist(
+    bake_target_id_t bti,
+    uint64_t region_size,
+    uint64_t region_offset,
+    void const *buf,
+    uint64_t buf_size,
+    bake_region_id_t *rid)
+{
+    hg_return_t hret;
+    hg_handle_t handle;
+    bake_create_write_persist_in_t in;
+    bake_create_write_persist_out_t out;
+    int ret;
+    struct bake_instance *instance = NULL;
+
+    /* XXX eager path? */
+
+    HASH_FIND(hh, instance_hash, &bti, sizeof(bti), instance);
+    if(!instance)
+        return(-1);
+
+    in.bti = bti;
+    in.region_size = region_size;
+    in.region_offset = region_offset;
+    in.bulk_offset = 0;
+    in.bulk_size = buf_size;
+    in.remote_addr_str = NULL; /* set remote_addr to NULL to disable proxy write */
+
+    hret = margo_bulk_create(g_margo_inst.mid, 1, (void**)(&buf), &buf_size,
+        HG_BULK_READ_ONLY, &in.bulk_handle);
+    if(hret != HG_SUCCESS)
+        return(-1);
+
+    hret = margo_create(g_margo_inst.mid, instance->dest,
+        g_margo_inst.bake_create_write_persist_id, &handle);
+    if(hret != HG_SUCCESS)
+    {
+        margo_bulk_free(in.bulk_handle);
+        return(-1);
+    }
+
+    hret = margo_forward(handle, &in);
+    if(hret != HG_SUCCESS)
+    {
+        margo_bulk_free(in.bulk_handle);
+        margo_destroy(handle);
+        return(-1);
+    }
+
+    hret = margo_get_output(handle, &out);
+    if(hret != HG_SUCCESS)
+    {
+        margo_bulk_free(in.bulk_handle);
+        margo_destroy(handle);
+        return(-1);
+    }
+
+    ret = out.ret;
+    if(ret == 0)
+        *rid = out.rid;
+
+    margo_free_output(handle, &out);
+    margo_bulk_free(in.bulk_handle);
     margo_destroy(handle);
     return(ret);
 }

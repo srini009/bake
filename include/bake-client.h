@@ -102,6 +102,26 @@ int bake_persist(
     bake_region_id_t rid);
 
 /**
+ * Creates a bounded-size BAKE region, writes data into it, and persists
+ * the reason all in one call/RPC (and thus 1 RTT).
+ *
+ * @param [in] bti BAKE target identifier
+ * @param [in] region_size size of region to be created
+ * @param [in] region_offset offset into the target region to write
+ * @param [in] buf local memory buffer to write
+ * @param [in] buf_size size of local memory buffer to write
+ * @param [out] rid identifier for new region
+ * @returns 0 on success, -1 on failure
+ */
+int bake_create_write_persist(
+    bake_target_id_t bti,
+    uint64_t region_size,
+    uint64_t region_offset,
+    void const *buf,
+    uint64_t buf_size,
+    bake_region_id_t *rid);
+
+/**
  * Checks the size of an existing BAKE region. 
  *
  * @param [in] bti BAKE target identifier

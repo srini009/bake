@@ -62,6 +62,20 @@ MERCURY_GEN_PROC(bake_persist_out_t,
     ((int32_t)(ret)))
 DECLARE_MARGO_RPC_HANDLER(bake_persist_ult)
 
+/* BAKE create/write/persist */
+MERCURY_GEN_PROC(bake_create_write_persist_in_t,
+    ((bake_target_id_t)(bti))\
+    ((uint64_t)(region_size))\
+    ((uint64_t)(region_offset))\
+    ((hg_bulk_t)(bulk_handle))\
+    ((uint64_t)(bulk_offset))\
+    ((uint64_t)(bulk_size))\
+    ((hg_string_t)(remote_addr_str)))
+MERCURY_GEN_PROC(bake_create_write_persist_out_t,
+    ((int32_t)(ret))\
+    ((bake_region_id_t)(rid)))
+DECLARE_MARGO_RPC_HANDLER(bake_create_write_persist_ult)
+
 /* BAKE get size */
 MERCURY_GEN_PROC(bake_get_size_in_t,
     ((bake_target_id_t)(bti))\
