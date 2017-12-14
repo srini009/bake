@@ -1,4 +1,4 @@
-# bake-bulk
+# BAKE
 
 ## Dependencies
 
@@ -32,22 +32,20 @@ modify the configure step listed above to include the following argument:
 
 ## Server daemon execution example (using tmpfs memory as backing store)
 
-* `truncate -s 500M /dev/shm/foo.dat`
-* `pmempool create obj /dev/shm/foo.dat`
-* `bake-bulk-server sm://1/1 /dev/shm/foo.dat`
+* `bake-mkpool -s 500M /dev/shm/foo.dat`
+* `bake-server-daemon sm://1/1 /dev/shm/foo.dat`
 
 ### Explanation
 
-The truncate command creates an empty 500 MiB file in /dev/shm,
-which will act as a ramdisk for storage in this case.  You can skip this step
-if you are using a true NVRAM device file.
+The bake-mkpool command creates a BAKE pool used to store raw data for
+a particular BAKE target. This is essentially a wrapper command around
+pmemobj utilities for creating an empty pool that additionally store
+some BAKE-specific metadata in the created pool. Pools used by the BAKE
+server must be created using this command.
 
-The pmempool command formats the storage device as a pmem target for
-libpmemobj.
+The bake-server-daemon command starts the server daemon.  
 
-The bake-bulk-server command starts the server daemon.  
-
-The first argument to bake-bulk-server is the address for Mercury to
+The first argument to bake-server-daemon is the address for Mercury to
 listen on.  In this case we are using the CCI/SM transport.  For other
 transports this would more likely just be an address and port number
 (e.g. "tcp://localhost:1234").  CCI/SM endpoints are identified by two
@@ -59,17 +57,17 @@ to create subdirectories in /tmp/cci/sm for IPC connection information.
 CCI/SM will create all necessary subdirectories in /tmp/cci.  For example,
 if the command is run on host "carns-x1" with "sm://1/1" then CCI/SM
 will create a /tmp/cci/sm/carns-x1/1/1 directory containing connection
-information for the bake-bulk-server process.
+information for the bake-server-daemon process.
 
-The second argument to bake-bulk-server is the path to the libpmem-formatted
-storage device.
+The second argument to bake-server-daemon is the path to the BAKE pool
+originally created with bake-mkpool.
 
 ## Benchmark execution example
 
-* `./bb-latency-bench sm:///tmp/cci/sm/carns-x1/1/1 100000 4 8`
+* `./bake-latency-bench sm:///tmp/cci/sm/carns-x1/1/1 100000 4 8`
 
-This example runs a sequence of latency benchmarks.  Other bb- utilities
-installed with bake-bulk will perform other rudimentary operations.
+This example runs a sequence of latency benchmarks.  Other utilities
+installed with BAKE will perform other rudimentary operations.
 
 The first argument is the address of the server.  We are using CCI/SM in this
 case, which means that the URL is a path to the connection information of the

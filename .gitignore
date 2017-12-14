@@ -3,14 +3,14 @@
 *.i
 *.s
 *.swp
-bake-bulk-config.h
+bake-config.h
 autom4te.cache/
 config.log
 config.status
 Makefile
 Makefile.in
-bake-bulk-config.h.in
-bake-bulk-config.h.in~
+bake-config.h.in
+bake-config.h.in~
 configure
 cscope.files
 aclocal.m4

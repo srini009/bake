@@ -4,6 +4,8 @@
  * See COPYRIGHT in top-level directory.
  */
 
+#include "bake-config.h"
+
 #include <assert.h>
 #include <libpmemobj.h>
 #include <bake-server.h>

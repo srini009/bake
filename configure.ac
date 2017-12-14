@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.63])
-AC_INIT([bake-bulk], [0.1], [],[],[]) 
+AC_INIT([bake], [0.1], [],[],[]) 
 AC_CONFIG_MACRO_DIR([m4])
 LT_INIT
 
@@ -16,7 +16,7 @@ AM_INIT_AUTOMAKE([foreign subdir-objects -Wall])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
 AC_CONFIG_SRCDIR([README.md])
-AC_CONFIG_HEADERS([bake-bulk-config.h])
+AC_CONFIG_HEADERS([bake-config.h])
 
 # Checks for programs.
 AC_PROG_CC

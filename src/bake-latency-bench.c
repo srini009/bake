@@ -4,6 +4,8 @@
  * See COPYRIGHT in top-level directory.
  */
 
+#include "bake-config.h"
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
