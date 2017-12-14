@@ -5,34 +5,34 @@
  */
 
 #include <assert.h>
-#include <bake-bulk-client.h>
 #include <margo.h>
+#include <bake-client.h>
 #include "uthash.h"
-#include "bake-bulk-rpc.h"
+#include "bake-rpc.h"
 
-#define BAKE_BULK_EAGER_LIMIT 2048
+#define BAKE_EAGER_LIMIT 2048
 
 /* Refers to a single Margo initialization, for now this is shared by
- * all remote targets.  In the future we probably need to support multiple in
- * case we run atop more than one transport at a time.
+ * all remote BAKE targets.  In the future we probably need to support
+ * multiple in case we run atop more than one transport at a time.
  */
 struct bake_margo_instance
 {
     margo_instance_id mid;  
 
-    hg_id_t bake_bulk_probe_id;
-    hg_id_t bake_bulk_shutdown_id; 
-    hg_id_t bake_bulk_create_id;
-    hg_id_t bake_bulk_eager_write_id;
-    hg_id_t bake_bulk_eager_read_id;
-    hg_id_t bake_bulk_write_id;
-    hg_id_t bake_bulk_persist_id;
-    hg_id_t bake_bulk_get_size_id;
-    hg_id_t bake_bulk_read_id;
-    hg_id_t bake_bulk_noop_id;
+    hg_id_t bake_probe_id;
+    hg_id_t bake_shutdown_id; 
+    hg_id_t bake_create_id;
+    hg_id_t bake_eager_write_id;
+    hg_id_t bake_eager_read_id;
+    hg_id_t bake_write_id;
+    hg_id_t bake_persist_id;
+    hg_id_t bake_get_size_id;
+    hg_id_t bake_read_id;
+    hg_id_t bake_noop_id;
 };
 
-/* Refers to an instance connected to a specific target */
+/* Refers to an instance connected to a specific BAKE target */
 struct bake_instance
 {
     bake_target_id_t bti;   /* persistent identifier for this target */
@@ -56,61 +56,45 @@ static int bake_margo_instance_init(margo_instance_id mid)
     g_margo_inst.mid = mid;
 
     /* register RPCs */
-    g_margo_inst.bake_bulk_probe_id = 
+    g_margo_inst.bake_probe_id = 
         MARGO_REGISTER(g_margo_inst.mid, 
-        "bake_bulk_probe_rpc", void, bake_bulk_probe_out_t, 
+        "bake_probe_rpc", void, bake_probe_out_t, 
         NULL);
-    g_margo_inst.bake_bulk_shutdown_id = 
+    g_margo_inst.bake_shutdown_id = 
         MARGO_REGISTER(g_margo_inst.mid, 
-        "bake_bulk_shutdown_rpc", void, void, 
+        "bake_shutdown_rpc", void, void, 
         NULL);
-    g_margo_inst.bake_bulk_create_id = 
+    g_margo_inst.bake_create_id = 
         MARGO_REGISTER(g_margo_inst.mid, 
-        "bake_bulk_create_rpc", 
-        bake_bulk_create_in_t,
-        bake_bulk_create_out_t,
+        "bake_create_rpc", bake_create_in_t, bake_create_out_t,
         NULL);
-    g_margo_inst.bake_bulk_write_id = 
+    g_margo_inst.bake_write_id = 
         MARGO_REGISTER(g_margo_inst.mid, 
-        "bake_bulk_write_rpc", 
-        bake_bulk_write_in_t,
-        bake_bulk_write_out_t,
+        "bake_write_rpc", bake_write_in_t, bake_write_out_t,
         NULL);
-    g_margo_inst.bake_bulk_eager_write_id = 
+    g_margo_inst.bake_eager_write_id = 
         MARGO_REGISTER(g_margo_inst.mid, 
-        "bake_bulk_eager_write_rpc", 
-        bake_bulk_eager_write_in_t,
-        bake_bulk_eager_write_out_t,
+        "bake_eager_write_rpc", bake_eager_write_in_t, bake_eager_write_out_t,
         NULL);
-    g_margo_inst.bake_bulk_eager_read_id = 
+    g_margo_inst.bake_eager_read_id = 
         MARGO_REGISTER(g_margo_inst.mid, 
-        "bake_bulk_eager_read_rpc", 
-        bake_bulk_eager_read_in_t,
-        bake_bulk_eager_read_out_t,
+        "bake_eager_read_rpc", bake_eager_read_in_t, bake_eager_read_out_t,
         NULL);
-    g_margo_inst.bake_bulk_persist_id = 
+    g_margo_inst.bake_persist_id = 
         MARGO_REGISTER(g_margo_inst.mid, 
-        "bake_bulk_persist_rpc", 
-        bake_bulk_persist_in_t,
-        bake_bulk_persist_out_t,
+        "bake_persist_rpc", bake_persist_in_t, bake_persist_out_t,
         NULL);
-    g_margo_inst.bake_bulk_get_size_id = 
+    g_margo_inst.bake_get_size_id = 
         MARGO_REGISTER(g_margo_inst.mid, 
-        "bake_bulk_get_size_rpc", 
-        bake_bulk_get_size_in_t,
-        bake_bulk_get_size_out_t,
+        "bake_get_size_rpc", bake_get_size_in_t, bake_get_size_out_t,
         NULL);
-    g_margo_inst.bake_bulk_read_id = 
+    g_margo_inst.bake_read_id = 
         MARGO_REGISTER(g_margo_inst.mid, 
-        "bake_bulk_read_rpc", 
-        bake_bulk_read_in_t,
-        bake_bulk_read_out_t,
+        "bake_read_rpc", bake_read_in_t, bake_read_out_t,
         NULL);
-    g_margo_inst.bake_bulk_noop_id = 
+    g_margo_inst.bake_noop_id = 
         MARGO_REGISTER(g_margo_inst.mid, 
-        "bake_bulk_noop_rpc", 
-        void,
-        void,
+        "bake_noop_rpc", void, void,
         NULL);
 
     return(0);
@@ -123,7 +107,7 @@ int bake_probe_instance(
 {
     hg_return_t hret;
     int ret;
-    bake_bulk_probe_out_t out;
+    bake_probe_out_t out;
     hg_handle_t handle;
     struct bake_instance *new_instance;
 
@@ -144,7 +128,7 @@ int bake_probe_instance(
 
     /* create handle */
     hret = margo_create(g_margo_inst.mid, new_instance->dest, 
-        g_margo_inst.bake_bulk_probe_id, &handle);
+        g_margo_inst.bake_probe_id, &handle);
     if(hret != HG_SUCCESS)
     {
         margo_addr_free(g_margo_inst.mid, new_instance->dest);
@@ -218,7 +202,7 @@ int bake_shutdown_service(bake_target_id_t bti)
         return(-1);
 
     hret = margo_create(g_margo_inst.mid, instance->dest, 
-        g_margo_inst.bake_bulk_shutdown_id, &handle);
+        g_margo_inst.bake_shutdown_id, &handle);
     if(hret != HG_SUCCESS)
         return(-1);
 
@@ -233,17 +217,17 @@ int bake_shutdown_service(bake_target_id_t bti)
     return(0);
 }
 
-static int bake_bulk_eager_write(
+static int bake_eager_write(
     bake_target_id_t bti,
-    bake_bulk_region_id_t rid,
+    bake_region_id_t rid,
     uint64_t region_offset,
     void const *buf,
     uint64_t buf_size)
 {
     hg_return_t hret;
     hg_handle_t handle;
-    bake_bulk_eager_write_in_t in;
-    bake_bulk_eager_write_out_t out;
+    bake_eager_write_in_t in;
+    bake_eager_write_out_t out;
     int ret;
     struct bake_instance *instance = NULL;
 
@@ -258,7 +242,7 @@ static int bake_bulk_eager_write(
     in.buffer = (char*)buf;
   
     hret = margo_create(g_margo_inst.mid, instance->dest, 
-        g_margo_inst.bake_bulk_eager_write_id, &handle);
+        g_margo_inst.bake_eager_write_id, &handle);
     if(hret != HG_SUCCESS)
         return(-1);
 
@@ -284,22 +268,22 @@ static int bake_bulk_eager_write(
     return(ret);
 }
 
-int bake_bulk_write(
+int bake_write(
     bake_target_id_t bti,
-    bake_bulk_region_id_t rid,
+    bake_region_id_t rid,
     uint64_t region_offset,
     void const *buf,
     uint64_t buf_size)
 {
     hg_return_t hret;
     hg_handle_t handle;
-    bake_bulk_write_in_t in;
-    bake_bulk_write_out_t out;
+    bake_write_in_t in;
+    bake_write_out_t out;
     int ret;
     struct bake_instance *instance = NULL;
 
-    if(buf_size <= BAKE_BULK_EAGER_LIMIT)
-        return(bake_bulk_eager_write(bti, rid, region_offset, buf, buf_size));
+    if(buf_size <= BAKE_EAGER_LIMIT)
+        return(bake_eager_write(bti, rid, region_offset, buf, buf_size));
 
     HASH_FIND(hh, instance_hash, &bti, sizeof(bti), instance);
     if(!instance)
@@ -318,7 +302,7 @@ int bake_bulk_write(
         return(-1);
    
     hret = margo_create(g_margo_inst.mid, instance->dest, 
-        g_margo_inst.bake_bulk_write_id, &handle);
+        g_margo_inst.bake_write_id, &handle);
     if(hret != HG_SUCCESS)
     {
         margo_bulk_free(in.bulk_handle);
@@ -349,9 +333,9 @@ int bake_bulk_write(
     return(ret);
 }
 
-int bake_bulk_proxy_write(
+int bake_proxy_write(
     bake_target_id_t bti,
-    bake_bulk_region_id_t rid,
+    bake_region_id_t rid,
     uint64_t region_offset,
     hg_bulk_t remote_bulk,
     uint64_t remote_offset,
@@ -360,8 +344,8 @@ int bake_bulk_proxy_write(
 {
     hg_return_t hret;
     hg_handle_t handle;
-    bake_bulk_write_in_t in;
-    bake_bulk_write_out_t out;
+    bake_write_in_t in;
+    bake_write_out_t out;
     struct bake_instance *instance = NULL;
     int ret;
 
@@ -378,7 +362,7 @@ int bake_bulk_proxy_write(
     in.remote_addr_str = (char*)remote_addr;
 
     hret = margo_create(g_margo_inst.mid, instance->dest,
-        g_margo_inst.bake_bulk_write_id, &handle);
+        g_margo_inst.bake_write_id, &handle);
     if(hret != HG_SUCCESS)
         return(-1);
 
@@ -403,15 +387,15 @@ int bake_bulk_proxy_write(
     return(ret);
 }
 
-int bake_bulk_create(
+int bake_create(
     bake_target_id_t bti,
     uint64_t region_size,
-    bake_bulk_region_id_t *rid)
+    bake_region_id_t *rid)
 {
     hg_return_t hret;
     hg_handle_t handle;
-    bake_bulk_create_in_t in;
-    bake_bulk_create_out_t out;
+    bake_create_in_t in;
+    bake_create_out_t out;
     int ret;
     struct bake_instance *instance = NULL;
 
@@ -423,7 +407,7 @@ int bake_bulk_create(
     in.region_size = region_size;
 
     hret = margo_create(g_margo_inst.mid, instance->dest,
-        g_margo_inst.bake_bulk_create_id, &handle);
+        g_margo_inst.bake_create_id, &handle);
     if(hret != HG_SUCCESS)
         return(-1);
 
@@ -450,14 +434,14 @@ int bake_bulk_create(
 }
 
 
-int bake_bulk_persist(
+int bake_persist(
     bake_target_id_t bti,
-    bake_bulk_region_id_t rid)
+    bake_region_id_t rid)
 {
     hg_return_t hret;
     hg_handle_t handle;
-    bake_bulk_persist_in_t in;
-    bake_bulk_persist_out_t out;
+    bake_persist_in_t in;
+    bake_persist_out_t out;
     int ret;
     struct bake_instance *instance = NULL;
 
@@ -469,7 +453,7 @@ int bake_bulk_persist(
     in.rid = rid;
 
     hret = margo_create(g_margo_inst.mid, instance->dest,
-        g_margo_inst.bake_bulk_persist_id, &handle);
+        g_margo_inst.bake_persist_id, &handle);
     if(hret != HG_SUCCESS)
         return(-1);
 
@@ -494,15 +478,15 @@ int bake_bulk_persist(
     return(ret);
 }
 
-int bake_bulk_get_size(
+int bake_get_size(
     bake_target_id_t bti,
-    bake_bulk_region_id_t rid,
+    bake_region_id_t rid,
     uint64_t *region_size)
 {
     hg_return_t hret;
     hg_handle_t handle;
-    bake_bulk_get_size_in_t in;
-    bake_bulk_get_size_out_t out;
+    bake_get_size_in_t in;
+    bake_get_size_out_t out;
     int ret;
     struct bake_instance *instance = NULL;
 
@@ -514,7 +498,7 @@ int bake_bulk_get_size(
     in.rid = rid;
 
     hret = margo_create(g_margo_inst.mid, instance->dest,
-        g_margo_inst.bake_bulk_get_size_id, &handle);
+        g_margo_inst.bake_get_size_id, &handle);
     if(hret != HG_SUCCESS)
         return(-1);
 
@@ -540,7 +524,7 @@ int bake_bulk_get_size(
     return(ret);
 }
 
-int bake_bulk_noop(
+int bake_noop(
     bake_target_id_t bti)
 {
     hg_return_t hret;
@@ -552,7 +536,7 @@ int bake_bulk_noop(
         return(-1);
 
     hret = margo_create(g_margo_inst.mid, instance->dest,
-        g_margo_inst.bake_bulk_noop_id, &handle);
+        g_margo_inst.bake_noop_id, &handle);
     if(hret != HG_SUCCESS)
         return(-1);
 
@@ -567,17 +551,17 @@ int bake_bulk_noop(
     return(0);
 }
 
-static int bake_bulk_eager_read(
+static int bake_eager_read(
     bake_target_id_t bti,
-    bake_bulk_region_id_t rid,
+    bake_region_id_t rid,
     uint64_t region_offset,
     void *buf,
     uint64_t buf_size)
 {
     hg_return_t hret;
     hg_handle_t handle;
-    bake_bulk_eager_read_in_t in;
-    bake_bulk_eager_read_out_t out;
+    bake_eager_read_in_t in;
+    bake_eager_read_out_t out;
     int ret;
     struct bake_instance *instance = NULL;
 
@@ -591,7 +575,7 @@ static int bake_bulk_eager_read(
     in.size = buf_size;
 
     hret = margo_create(g_margo_inst.mid, instance->dest,
-        g_margo_inst.bake_bulk_eager_read_id, &handle);
+        g_margo_inst.bake_eager_read_id, &handle);
     if(hret != HG_SUCCESS)
         return(-1);
   
@@ -618,22 +602,22 @@ static int bake_bulk_eager_read(
     return(ret);
 }
 
-int bake_bulk_read(
+int bake_read(
     bake_target_id_t bti,
-    bake_bulk_region_id_t rid,
+    bake_region_id_t rid,
     uint64_t region_offset,
     void *buf,
     uint64_t buf_size)
 {
     hg_return_t hret;
     hg_handle_t handle;
-    bake_bulk_read_in_t in;
-    bake_bulk_read_out_t out;
+    bake_read_in_t in;
+    bake_read_out_t out;
     int ret;
     struct bake_instance *instance = NULL;
 
-    if(buf_size <= BAKE_BULK_EAGER_LIMIT)
-        return(bake_bulk_eager_read(bti, rid, region_offset, buf, buf_size));
+    if(buf_size <= BAKE_EAGER_LIMIT)
+        return(bake_eager_read(bti, rid, region_offset, buf, buf_size));
 
     HASH_FIND(hh, instance_hash, &bti, sizeof(bti), instance);
     if(!instance)
@@ -652,7 +636,7 @@ int bake_bulk_read(
         return(-1);
    
     hret = margo_create(g_margo_inst.mid, instance->dest,
-        g_margo_inst.bake_bulk_read_id, &handle);
+        g_margo_inst.bake_read_id, &handle);
     if(hret != HG_SUCCESS)
     {
         margo_bulk_free(in.bulk_handle);
@@ -683,9 +667,9 @@ int bake_bulk_read(
     return(ret);
 }
 
-int bake_bulk_proxy_read(
+int bake_proxy_read(
     bake_target_id_t bti,
-    bake_bulk_region_id_t rid,
+    bake_region_id_t rid,
     uint64_t region_offset,
     hg_bulk_t remote_bulk,
     uint64_t remote_offset,
@@ -694,8 +678,8 @@ int bake_bulk_proxy_read(
 {
     hg_return_t hret;
     hg_handle_t handle;
-    bake_bulk_read_in_t in;
-    bake_bulk_read_out_t out;
+    bake_read_in_t in;
+    bake_read_out_t out;
     struct bake_instance *instance = NULL;
     int ret;
 
@@ -712,7 +696,7 @@ int bake_bulk_proxy_read(
     in.remote_addr_str = (char*)remote_addr;
 
     hret = margo_create(g_margo_inst.mid, instance->dest,
-        g_margo_inst.bake_bulk_read_id, &handle);
+        g_margo_inst.bake_read_id, &handle);
     if(hret != HG_SUCCESS)
         return(-1);
 

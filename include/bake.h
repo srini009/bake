@@ -4,8 +4,8 @@
  * See COPYRIGHT in top-level directory.
  */
 
-#ifndef __BAKE_BULK_H
-#define __BAKE_BULK_H
+#ifndef __BAKE_H
+#define __BAKE_H
 
 #include <uuid/uuid.h>
 #include <stdint.h>
@@ -23,16 +23,16 @@ typedef struct {
 } bake_target_id_t;
 
 /**
- * Persistent, opaque identifier for a bulk region within a BAKE target.
+ * Persistent, opaque identifier for a region within a BAKE target.
  */
-#define BAKE_BULK_REGION_ID_DATA_SIZE 24
+#define BAKE_REGION_ID_DATA_SIZE 24
 typedef struct {
     uint32_t type;
-    char data[BAKE_BULK_REGION_ID_DATA_SIZE];
-} bake_bulk_region_id_t;
+    char data[BAKE_REGION_ID_DATA_SIZE];
+} bake_region_id_t;
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __BAKE_BULK_H */
+#endif /* __BAKE_H */

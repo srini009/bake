@@ -9,7 +9,7 @@
 #include <unistd.h>
 #include <margo.h>
 #include <libpmemobj.h>
-#include <bake-bulk-server.h>
+#include <bake-server.h>
 
 struct options
 {
@@ -20,11 +20,11 @@ struct options
 
 static void usage(int argc, char **argv)
 {
-    fprintf(stderr, "Usage: bake-bulk-server-daemon [OPTIONS] <listen_addr> <pmem_pool>\n");
+    fprintf(stderr, "Usage: bake-server-daemon [OPTIONS] <listen_addr> <pmem_pool>\n");
     fprintf(stderr, "       listen_addr is the Mercury address to listen on\n");
     fprintf(stderr, "       pmem_pool is the path to the pmemobj pool\n");
     fprintf(stderr, "       [-f filename] to write the server address to a file\n");
-    fprintf(stderr, "Example: ./bake-bulk-server-daemon tcp://localhost:1234 /dev/shm/foo.dat\n");
+    fprintf(stderr, "Example: ./bake-server-daemon tcp://localhost:1234 /dev/shm/foo.dat\n");
     return;
 }
 
@@ -116,7 +116,7 @@ int main(int argc, char **argv)
         fclose(fp);
     }
 
-    /* register the bake bulk server */
+    /* initialize the BAKE server */
     ret = bake_server_init(mid, opts.pmem_pool);
     if(ret != 0)
     {
@@ -125,7 +125,7 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    /* suspend until the bake server gets a shutdown signal from the client */
+    /* suspend until the BAKE server gets a shutdown signal from the client */
     bake_server_wait_for_shutdown();
     margo_finalize(mid);
 

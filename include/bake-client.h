@@ -4,19 +4,19 @@
  * See COPYRIGHT in top-level directory.
  */
 
-#ifndef __BAKE_BULK_CLIENT_H
-#define __BAKE_BULK_CLIENT_H
+#ifndef __BAKE_CLIENT_H
+#define __BAKE_CLIENT_H
 
 #include <stdint.h>
 #include "margo.h"
-#include "bake-bulk.h"
+#include "bake.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /**
- * Obtain identifying information for a bake target through the provided
+ * Obtains identifying information for a BAKE target through the provided
  * remote mercury address.
  *
  * @param [in] mid margo instance
@@ -30,25 +30,25 @@ int bake_probe_instance(
     bake_target_id_t *bti);
   
 /**
- * Create a bounded-size bulk data region.  The resulting region can be
- * written using bulk write operations, and can be persisted (once writes are
- * complete) with a a bulk persist operation.  The region is not valid for
- * read access until persisted.
+ * Creates a bounded-size BAKE data region.  The resulting region can be
+ * written using BAKE write operations, and can be persisted (once writes
+ * are complete) with a a BAKE persist operation.  The region is not valid
+ * for read access until persisted.
  *
  * @param [in] bti BAKE target identifier
  * @param [in] region_size size of region to be created
  * @param [out] rid identifier for new region
  * @returns 0 on success, -1 on failure
  */
-int bake_bulk_create(
+int bake_create(
     bake_target_id_t bti,
     uint64_t region_size,
-    bake_bulk_region_id_t *rid);
+    bake_region_id_t *rid);
  
 /**
- * Writes into a region that was previously created with bake_bulk_create().
+ * Writes into a BAKE region that was previously created with bake_create().
  * Result is not guaranteed to be persistent until explicit
- * bake_bulk_persist() call.
+ * bake_persist() call.
  *
  * Results are undefined if multiple writers (from same process or different
  * processes) perform overlapping writes.
@@ -60,15 +60,15 @@ int bake_bulk_create(
  * @param [in] buf_size size of local memory buffer to write
  * @returns 0 on success, -1 on failure
  */
-int bake_bulk_write(
+int bake_write(
     bake_target_id_t bti,
-    bake_bulk_region_id_t rid,
+    bake_region_id_t rid,
     uint64_t region_offset,
     void const *buf,
     uint64_t buf_size);
 
 /**
- * Write data into a previously created BAKE region like bake_bulk_write(),
+ * Writes data into a previously created BAKE region like bake_write(),
  * except the write is performed on behalf of some remote entity.
  *
  * @param [in] bti BAKE target identifier
@@ -80,9 +80,9 @@ int bake_bulk_write(
  * @param [in] size size to write from remote bulk handle
  * @returns 0 on success, -1 on failure
  */
-int bake_bulk_proxy_write(
+int bake_proxy_write(
     bake_target_id_t bti,
-    bake_bulk_region_id_t rid,
+    bake_region_id_t rid,
     uint64_t region_offset,
     hg_bulk_t remote_bulk,
     uint64_t remote_offset,
@@ -90,32 +90,32 @@ int bake_bulk_proxy_write(
     uint64_t size);
 
 /**
- * Persist a bulk region. The region is considered immutable at this point 
+ * Persists a BAKE region. The region is considered immutable at this point 
  * and reads may be performed on the region.
  *
  * @param [in] bti BAKE target identifier
  * @param [in] rid identifier for region
  * @returns 0 on success, -1 on failure
  */
-int bake_bulk_persist(
+int bake_persist(
     bake_target_id_t bti,
-    bake_bulk_region_id_t rid);
-  
+    bake_region_id_t rid);
+
 /**
- * Check the size of an existing region. 
+ * Checks the size of an existing BAKE region. 
  *
  * @param [in] bti BAKE target identifier
  * @param [in] rid identifier for region
- * @param [out] size sizes of region
+ * @param [out] size size of region
  * @returns 0 on success, -1 on failure
  */
-int bake_bulk_get_size(
+int bake_get_size(
     bake_target_id_t bti,
-    bake_bulk_region_id_t rid,
-    uint64_t *region_size);
+    bake_region_id_t rid,
+    uint64_t *size);
 
 /**
- * Reads from a region that was previously persisted with bake_bulk_persist().
+ * Reads from a BAKE region that was previously persisted with bake_persist().
  *
  * NOTE: for now at least, this call does not support "short" reads.  It
  * either succeeds in reading the requested size or not.
@@ -127,15 +127,15 @@ int bake_bulk_get_size(
  * @param [in] buf_size size of local memory buffer to read into
  * @returns 0 on success, -1 on failure
  */
-int bake_bulk_read(
+int bake_read(
     bake_target_id_t bti,
-    bake_bulk_region_id_t rid,
+    bake_region_id_t rid,
     uint64_t region_offset,
     void *buf,
     uint64_t buf_size);
 
 /**
- * Read data from a previously persisted BAKE region like bake_bulk_read(),
+ * Reads data from a previously persisted BAKE region like bake_read(),
  * except the read is performed on behalf of some remote entity.
  *
  * @param [in] bti BAKE target identifier
@@ -147,9 +147,9 @@ int bake_bulk_read(
  * @param [in] size size to read to remote bulk handle
  * @returns 0 on success, -1 on failure
  */
-int bake_bulk_proxy_read(
+int bake_proxy_read(
     bake_target_id_t bti,
-    bake_bulk_region_id_t rid,
+    bake_region_id_t rid,
     uint64_t region_offset,
     hg_bulk_t remote_bulk,
     uint64_t remote_offset,
@@ -157,8 +157,8 @@ int bake_bulk_proxy_read(
     uint64_t size);
 
 /**
- * Release local resources associated with access to a target; does not
- * modify the target in any way.
+ * Releases local resources associated with access to a BAKE target;
+ * does not modify the target in any way.
  *
  * @param [in] bti BAKE target_identifier
  */
@@ -166,28 +166,25 @@ void bake_release_instance(
     bake_target_id_t bti);
 
 /**
- * Utility function to shut down a remote service
+ * Shuts down a remote BAKE service (given a target ID).
  *
- * @param [in] bti Bake target identifier
+ * @param [in] bti BAKE target identifier
  * @returns 0 on success, -1 on fialure 
  */
-int bake_shutdown_service(bake_target_id_t bti);
-
-/* NOTE: code below is a copy of the bulk portion of the proposed BAKE API.
- * Commented out for now but leaving it in place for reference
- */
+int bake_shutdown_service(
+    bake_target_id_t bti);
 
 /**
- * Issue a no-op 
+ * Issues a BAKE no-op operation.
  *
  * @param [in] bti BAKE target identifier
  * @returns 0 on success, -1 on failure
  */
-int bake_bulk_noop(
+int bake_noop(
     bake_target_id_t bti);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __BAKE_BULK__CLIENT_H */
+#endif /* __BAKE_CLIENT_H */

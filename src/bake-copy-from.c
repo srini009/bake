@@ -13,9 +13,9 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 
-#include "bake-bulk-client.h"
+#include "bake-client.h"
 
-/* client program that will copy a bake bulk region out to a POSIX file */
+/* client program that will copy a BAKE region out to a POSIX file */
 
 int main(int argc, char **argv) 
 {
@@ -27,7 +27,7 @@ int main(int argc, char **argv)
     bake_target_id_t bti;
     hg_return_t hret;
     int ret;
-    bake_bulk_region_id_t rid;
+    bake_region_id_t rid;
     int fd;
     char* local_region;
     int region_fd;
@@ -35,8 +35,8 @@ int main(int argc, char **argv)
  
     if(argc != 4)
     {
-        fprintf(stderr, "Usage: bb-copy-from <server addr> <identifier file> <output file>\n");
-        fprintf(stderr, "  Example: ./bb-copy-from tcp://localhost:1234 /tmp/bb-copy-rid.0GjOlu /tmp/output.dat\n");
+        fprintf(stderr, "Usage: bake-copy-from <server addr> <identifier file> <output file>\n");
+        fprintf(stderr, "  Example: ./bake-copy-from tcp://localhost:1234 /tmp/bb-copy-rid.0GjOlu /tmp/output.dat\n");
         return(-1);
     }
     svr_addr_str = argv[1];
@@ -93,10 +93,10 @@ int main(int argc, char **argv)
     }
     close(region_fd);
 
-    ret = bake_bulk_get_size(bti, rid, &check_size);
+    ret = bake_get_size(bti, rid, &check_size);
     if(ret != 0)
     {
-        fprintf(stderr, "Error: bake_bulk_get_size()\n");
+        fprintf(stderr, "Error: bake_get_size()\n");
         bake_release_instance(bti);
         margo_addr_free(mid, svr_addr);
         margo_finalize(mid);
@@ -136,7 +136,7 @@ int main(int argc, char **argv)
     }
 
     /* transfer data */
-    ret = bake_bulk_read(
+    ret = bake_read(
         bti,
         rid,
         0,
@@ -149,7 +149,7 @@ int main(int argc, char **argv)
         bake_release_instance(bti);
         margo_addr_free(mid, svr_addr);
         margo_finalize(mid);
-        fprintf(stderr, "Error: bake_bulk_read()\n");
+        fprintf(stderr, "Error: bake_read()\n");
         return(-1);
     }
 

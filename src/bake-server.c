@@ -6,16 +6,16 @@
 
 #include <assert.h>
 #include <libpmemobj.h>
-#include <bake-bulk-server.h>
-#include "bake-bulk-rpc.h"
+#include <bake-server.h>
+#include "bake-rpc.h"
 
-/* definition of bake root data structure (just a target_id for now) */
+/* definition of BAKE root data structure (just a target_id for now) */
 typedef struct
 {   
     bake_target_id_t target_id;
-} bake_bulk_root_t;
+} bake_root_t;
  
-/* definition of internal region_id_t identifier for libpmemobj back end */
+/* definition of internal BAKE region_id_t identifier for libpmemobj back end */
 typedef struct
 {
     PMEMoid oid;
@@ -25,21 +25,21 @@ typedef struct
 typedef struct
 {
     PMEMobjpool *pmem_pool;
-    bake_bulk_root_t *pmem_root;
+    bake_root_t *pmem_root;
 
     /* server shutdown conditional logic */
     ABT_mutex shutdown_mutex;
     ABT_cond shutdown_cond;
     int shutdown_flag;
     int ref_count;
-} bake_bulk_server_context_t;
+} bake_server_context_t;
 
-static void bake_server_cleanup(bake_bulk_server_context_t *svr_ctx);
+static void bake_server_cleanup(bake_server_context_t *svr_ctx);
 
 /* TODO: this should not be global in the long run; server may provide access
  * to multiple targets
  */
-static bake_bulk_server_context_t *g_svr_ctx = NULL;
+static bake_server_context_t *g_svr_ctx = NULL;
 
 int bake_server_makepool(
 	const char *pool_name,
@@ -48,7 +48,7 @@ int bake_server_makepool(
 {
     PMEMobjpool *pool;
     PMEMoid root_oid;
-    bake_bulk_root_t *root;
+    bake_root_t *root;
 
     pool = pmemobj_create(pool_name, NULL, pool_size, pool_mode);
     if(!pool)
@@ -58,12 +58,12 @@ int bake_server_makepool(
     }
 
     /* find root */
-    root_oid = pmemobj_root(pool, sizeof(bake_bulk_root_t));
+    root_oid = pmemobj_root(pool, sizeof(bake_root_t));
     root = pmemobj_direct(root_oid);
 
     /* store the target id for this bake pool at the root */
     uuid_generate(root->target_id.id);
-    pmemobj_persist(pool, root, sizeof(bake_bulk_root_t));
+    pmemobj_persist(pool, root, sizeof(bake_root_t));
 #if 0
     char target_string[64];
     uuid_unparse(root->target_id.id, target_string);
@@ -81,13 +81,13 @@ int bake_server_init(
 {
     PMEMobjpool *pool;
     PMEMoid root_oid;
-    bake_bulk_root_t *root;
-    bake_bulk_server_context_t *tmp_svr_ctx;
+    bake_root_t *root;
+    bake_server_context_t *tmp_svr_ctx;
     
     /* make sure to initialize the server only once */
     if(g_svr_ctx)
     {
-        fprintf(stderr, "Error: bake-bulk server already initialized\n");
+        fprintf(stderr, "Error: BAKE server already initialized\n");
         return(-1);
     }
 
@@ -105,11 +105,11 @@ int bake_server_init(
     }
 
     /* check to make sure the root is properly set */
-    root_oid = pmemobj_root(pool, sizeof(bake_bulk_root_t));
+    root_oid = pmemobj_root(pool, sizeof(bake_root_t));
     root = pmemobj_direct(root_oid);
     if(uuid_is_null(root->target_id.id))
     {
-        fprintf(stderr, "Error: bake-bulk pool is not properly initialized\n");
+        fprintf(stderr, "Error: BAKE pool is not properly initialized\n");
         pmemobj_close(pool);
         return(-1);
     }
@@ -120,35 +120,26 @@ int bake_server_init(
 #endif
 
     /* register RPCs */
-    MARGO_REGISTER(mid, "bake_bulk_shutdown_rpc", void, void,
-        bake_bulk_shutdown_ult);
-    MARGO_REGISTER(mid, "bake_bulk_create_rpc", bake_bulk_create_in_t,
-        bake_bulk_create_out_t,
-        bake_bulk_create_ult);
-    MARGO_REGISTER(mid, "bake_bulk_write_rpc", bake_bulk_write_in_t,
-        bake_bulk_write_out_t,
-        bake_bulk_write_ult);
-    MARGO_REGISTER(mid, "bake_bulk_eager_write_rpc", bake_bulk_eager_write_in_t,
-        bake_bulk_eager_write_out_t,
-        bake_bulk_eager_write_ult);
-    MARGO_REGISTER(mid, "bake_bulk_eager_read_rpc", bake_bulk_eager_read_in_t,
-        bake_bulk_eager_read_out_t,
-        bake_bulk_eager_read_ult);
-    MARGO_REGISTER(mid, "bake_bulk_persist_rpc", bake_bulk_persist_in_t,
-        bake_bulk_persist_out_t,
-        bake_bulk_persist_ult);
-    MARGO_REGISTER(mid, "bake_bulk_get_size_rpc", bake_bulk_get_size_in_t,
-        bake_bulk_get_size_out_t,
-        bake_bulk_get_size_ult);
-    MARGO_REGISTER(mid, "bake_bulk_read_rpc", bake_bulk_read_in_t,
-        bake_bulk_read_out_t,
-        bake_bulk_read_ult);
-    MARGO_REGISTER(mid, "bake_bulk_probe_rpc", void,
-        bake_bulk_probe_out_t,
-        bake_bulk_probe_ult);
-    MARGO_REGISTER(mid, "bake_bulk_noop_rpc", void,
-        void,
-        bake_bulk_noop_ult);
+    MARGO_REGISTER(mid, "bake_shutdown_rpc",
+        void, void, bake_shutdown_ult);
+    MARGO_REGISTER(mid, "bake_create_rpc",
+        bake_create_in_t, bake_create_out_t, bake_create_ult);
+    MARGO_REGISTER(mid, "bake_write_rpc",
+        bake_write_in_t, bake_write_out_t, bake_write_ult);
+    MARGO_REGISTER(mid, "bake_eager_write_rpc",
+        bake_eager_write_in_t, bake_eager_write_out_t, bake_eager_write_ult);
+    MARGO_REGISTER(mid, "bake_eager_read_rpc",
+        bake_eager_read_in_t, bake_eager_read_out_t, bake_eager_read_ult);
+    MARGO_REGISTER(mid, "bake_persist_rpc",
+        bake_persist_in_t, bake_persist_out_t, bake_persist_ult);
+    MARGO_REGISTER(mid, "bake_get_size_rpc",
+        bake_get_size_in_t, bake_get_size_out_t, bake_get_size_ult);
+    MARGO_REGISTER(mid, "bake_read_rpc",
+        bake_read_in_t, bake_read_out_t, bake_read_ult);
+    MARGO_REGISTER(mid, "bake_probe_rpc",
+        void, bake_probe_out_t, bake_probe_ult);
+    MARGO_REGISTER(mid, "bake_noop_rpc",
+        void, void, bake_noop_ult);
 
     /* set global server context */
     tmp_svr_ctx->pmem_pool = pool;
@@ -163,7 +154,7 @@ int bake_server_init(
 
 void bake_server_shutdown()
 {
-    bake_bulk_server_context_t *svr_ctx = g_svr_ctx;
+    bake_server_context_t *svr_ctx = g_svr_ctx;
     int do_cleanup;
 
     assert(svr_ctx);
@@ -188,7 +179,7 @@ void bake_server_shutdown()
 
 void bake_server_wait_for_shutdown()
 {
-    bake_bulk_server_context_t *svr_ctx = g_svr_ctx;
+    bake_server_context_t *svr_ctx = g_svr_ctx;
     int do_cleanup;
 
     assert(svr_ctx);
@@ -212,8 +203,8 @@ void bake_server_wait_for_shutdown()
     return;
 }
 
-/* service a remote RPC that instructs the server daemon to shut down */
-static void bake_bulk_shutdown_ult(hg_handle_t handle)
+/* service a remote RPC that instructs the BAKE server to shut down */
+static void bake_shutdown_ult(hg_handle_t handle)
 {
     hg_return_t hret;
     margo_instance_id mid;
@@ -235,20 +226,20 @@ static void bake_bulk_shutdown_ult(hg_handle_t handle)
 
     return;
 }
-DEFINE_MARGO_RPC_HANDLER(bake_bulk_shutdown_ult)
+DEFINE_MARGO_RPC_HANDLER(bake_shutdown_ult)
 
-/* service a remote RPC that creates a bulk region */
-static void bake_bulk_create_ult(hg_handle_t handle)
+/* service a remote RPC that creates a BAKE region */
+static void bake_create_ult(hg_handle_t handle)
 {
-    bake_bulk_create_out_t out;
-    bake_bulk_create_in_t in;
+    bake_create_out_t out;
+    bake_create_in_t in;
     hg_return_t hret;
     pmemobj_region_id_t* prid;
 
     assert(g_svr_ctx);
 
     /* TODO: this check needs to be somewhere else */
-    assert(sizeof(pmemobj_region_id_t) <= BAKE_BULK_REGION_ID_DATA_SIZE);
+    assert(sizeof(pmemobj_region_id_t) <= BAKE_REGION_ID_DATA_SIZE);
     
     memset(&out, 0, sizeof(out));
 
@@ -271,13 +262,13 @@ static void bake_bulk_create_ult(hg_handle_t handle)
     margo_destroy(handle);
     return;
 }
-DEFINE_MARGO_RPC_HANDLER(bake_bulk_create_ult)
+DEFINE_MARGO_RPC_HANDLER(bake_create_ult)
 
-/* service a remote RPC that writes to a bulk region */
-static void bake_bulk_write_ult(hg_handle_t handle)
+/* service a remote RPC that writes to a BAKE region */
+static void bake_write_ult(hg_handle_t handle)
 {
-    bake_bulk_write_out_t out;
-    bake_bulk_write_in_t in;
+    bake_write_out_t out;
+    bake_write_in_t in;
     hg_return_t hret;
     hg_addr_t src_addr;
     char* buffer;
@@ -372,14 +363,13 @@ static void bake_bulk_write_ult(hg_handle_t handle)
     margo_destroy(handle);
     return;
 }
-DEFINE_MARGO_RPC_HANDLER(bake_bulk_write_ult)
+DEFINE_MARGO_RPC_HANDLER(bake_write_ult)
 
-
-/* service a remote RPC that writes to a bulk region in eager mode */
-static void bake_bulk_eager_write_ult(hg_handle_t handle)
+/* service a remote RPC that writes to a BAKE region in eager mode */
+static void bake_eager_write_ult(hg_handle_t handle)
 {
-    bake_bulk_eager_write_out_t out;
-    bake_bulk_eager_write_in_t in;
+    bake_eager_write_out_t out;
+    bake_eager_write_in_t in;
     hg_return_t hret;
     char* buffer;
     hg_bulk_t bulk_handle;
@@ -420,13 +410,13 @@ static void bake_bulk_eager_write_ult(hg_handle_t handle)
     margo_destroy(handle);
     return;
 }
-DEFINE_MARGO_RPC_HANDLER(bake_bulk_eager_write_ult)
+DEFINE_MARGO_RPC_HANDLER(bake_eager_write_ult)
 
-/* service a remote RPC that persists to a bulk region */
-static void bake_bulk_persist_ult(hg_handle_t handle)
+/* service a remote RPC that persists to a BAKE region */
+static void bake_persist_ult(hg_handle_t handle)
 {
-    bake_bulk_persist_out_t out;
-    bake_bulk_persist_in_t in;
+    bake_persist_out_t out;
+    bake_persist_in_t in;
     hg_return_t hret;
     char* buffer;
     pmemobj_region_id_t* prid;
@@ -467,13 +457,13 @@ static void bake_bulk_persist_ult(hg_handle_t handle)
     margo_destroy(handle);
     return;
 }
-DEFINE_MARGO_RPC_HANDLER(bake_bulk_persist_ult)
+DEFINE_MARGO_RPC_HANDLER(bake_persist_ult)
 
-/* service a remote RPC that retrieves the size of a bulk region */
-static void bake_bulk_get_size_ult(hg_handle_t handle)
+/* service a remote RPC that retrieves the size of a BAKE region */
+static void bake_get_size_ult(hg_handle_t handle)
 {
-    bake_bulk_get_size_out_t out;
-    bake_bulk_get_size_in_t in;
+    bake_get_size_out_t out;
+    bake_get_size_in_t in;
     hg_return_t hret;
     pmemobj_region_id_t* prid;
 
@@ -501,10 +491,10 @@ static void bake_bulk_get_size_ult(hg_handle_t handle)
     margo_destroy(handle);
     return;
 }
-DEFINE_MARGO_RPC_HANDLER(bake_bulk_get_size_ult)
+DEFINE_MARGO_RPC_HANDLER(bake_get_size_ult)
 
-/* service a remote RPC for a no-op */
-static void bake_bulk_noop_ult(hg_handle_t handle)
+/* service a remote RPC for a BAKE no-op */
+static void bake_noop_ult(hg_handle_t handle)
 {
     assert(g_svr_ctx);
     
@@ -512,14 +502,14 @@ static void bake_bulk_noop_ult(hg_handle_t handle)
     margo_destroy(handle);
     return;
 }
-DEFINE_MARGO_RPC_HANDLER(bake_bulk_noop_ult)
+DEFINE_MARGO_RPC_HANDLER(bake_noop_ult)
 
 /* TODO consolidate with write handler; read and write are nearly identical */
-/* service a remote RPC that reads to a bulk region */
-static void bake_bulk_read_ult(hg_handle_t handle)
+/* service a remote RPC that reads from a BAKE region */
+static void bake_read_ult(hg_handle_t handle)
 {
-    bake_bulk_read_out_t out;
-    bake_bulk_read_in_t in;
+    bake_read_out_t out;
+    bake_read_in_t in;
     hg_return_t hret;
     hg_addr_t src_addr;
     char* buffer;
@@ -614,14 +604,14 @@ static void bake_bulk_read_ult(hg_handle_t handle)
     margo_destroy(handle);
     return;
 }
-DEFINE_MARGO_RPC_HANDLER(bake_bulk_read_ult)
+DEFINE_MARGO_RPC_HANDLER(bake_read_ult)
 
-/* service a remote RPC that reads to a bulk region and eagerly sends
+/* service a remote RPC that reads from a BAKE region and eagerly sends
  * response */
-static void bake_bulk_eager_read_ult(hg_handle_t handle)
+static void bake_eager_read_ult(hg_handle_t handle)
 {
-    bake_bulk_eager_read_out_t out;
-    bake_bulk_eager_read_in_t in;
+    bake_eager_read_out_t out;
+    bake_eager_read_in_t in;
     hg_return_t hret;
     char* buffer;
     hg_size_t size;
@@ -662,12 +652,12 @@ static void bake_bulk_eager_read_ult(hg_handle_t handle)
     margo_destroy(handle);
     return;
 }
-DEFINE_MARGO_RPC_HANDLER(bake_bulk_eager_read_ult)
+DEFINE_MARGO_RPC_HANDLER(bake_eager_read_ult)
 
-/* service a remote RPC that probes for a target id */
-static void bake_bulk_probe_ult(hg_handle_t handle)
+/* service a remote RPC that probes for a BAKE target id */
+static void bake_probe_ult(hg_handle_t handle)
 {
-    bake_bulk_probe_out_t out;
+    bake_probe_out_t out;
 
     assert(g_svr_ctx);
     
@@ -680,9 +670,9 @@ static void bake_bulk_probe_ult(hg_handle_t handle)
     margo_destroy(handle);
     return;
 }
-DEFINE_MARGO_RPC_HANDLER(bake_bulk_probe_ult)
+DEFINE_MARGO_RPC_HANDLER(bake_probe_ult)
 
-static void bake_server_cleanup(bake_bulk_server_context_t *svr_ctx)
+static void bake_server_cleanup(bake_server_context_t *svr_ctx)
 {
     pmemobj_close(svr_ctx->pmem_pool);
     ABT_mutex_free(&svr_ctx->shutdown_mutex);

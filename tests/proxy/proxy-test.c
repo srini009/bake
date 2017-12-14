@@ -11,7 +11,7 @@
 #include <abt.h>
 #include <margo.h>
 
-#include "bb-proxy-rpc.h"
+#include "proxy-rpc.h"
 
 #define ALLOC_BUF_SIZE 512
 
@@ -28,8 +28,8 @@ static int forward_proxy_read(
     uint64_t buf_size,
     const char *self_addr_str);
 
-static hg_id_t proxy_bulk_write_id;
-static hg_id_t proxy_bulk_read_id;
+static hg_id_t proxy_write_id;
+static hg_id_t proxy_read_id;
 static hg_id_t proxy_shutdown_id;
 
 int main(int argc, char *argv[])
@@ -51,8 +51,8 @@ int main(int argc, char *argv[])
 
     if(argc != 2)
     {
-        fprintf(stderr, "Usage: bb-proxy-test <proxy server addr>\n");
-        fprintf(stderr, "  Example: ./bb-proxy-test tcp://localhost:1234\n");
+        fprintf(stderr, "Usage: proxy-test <proxy server addr>\n");
+        fprintf(stderr, "  Example: ./proxy-test tcp://localhost:1234\n");
         return(-1);
     }
     svr_addr_str = argv[1];
@@ -71,10 +71,10 @@ int main(int argc, char *argv[])
         return(-1);
     }
 
-    proxy_bulk_write_id = MARGO_REGISTER(mid, "proxy_bulk_write",
-        proxy_bulk_write_in_t, proxy_bulk_write_out_t, NULL);
-    proxy_bulk_read_id = MARGO_REGISTER(mid, "proxy_bulk_read",
-        proxy_bulk_read_in_t, proxy_bulk_read_out_t, NULL);
+    proxy_write_id = MARGO_REGISTER(mid, "proxy_write",
+        proxy_write_in_t, proxy_write_out_t, NULL);
+    proxy_read_id = MARGO_REGISTER(mid, "proxy_read",
+        proxy_read_in_t, proxy_read_out_t, NULL);
     proxy_shutdown_id = MARGO_REGISTER(mid, "proxy_shutdown",
         void, void, NULL);
 
@@ -192,8 +192,8 @@ static int forward_proxy_write(
     uint64_t buf_size,
     const char *self_addr_str)
 {
-    proxy_bulk_write_in_t in;
-    proxy_bulk_write_out_t out;
+    proxy_write_in_t in;
+    proxy_write_out_t out;
     hg_handle_t handle;
     hg_return_t hret;
 
@@ -208,7 +208,7 @@ static int forward_proxy_write(
     in.bulk_size = buf_size;
     in.bulk_addr = self_addr_str;
 
-    hret = margo_create(mid, svr_addr, proxy_bulk_write_id, &handle);
+    hret = margo_create(mid, svr_addr, proxy_write_id, &handle);
     if(hret != HG_SUCCESS)
     {
         fprintf(stderr, "Error: margo_create()\n");
@@ -258,8 +258,8 @@ static int forward_proxy_read(
     uint64_t buf_size,
     const char *self_addr_str)
 {
-    proxy_bulk_read_in_t in;
-    proxy_bulk_read_out_t out;
+    proxy_read_in_t in;
+    proxy_read_out_t out;
     hg_handle_t handle;
     hg_return_t hret;
 
@@ -274,7 +274,7 @@ static int forward_proxy_read(
     in.bulk_size = buf_size;
     in.bulk_addr = self_addr_str;
 
-    hret = margo_create(mid, svr_addr, proxy_bulk_read_id, &handle);
+    hret = margo_create(mid, svr_addr, proxy_read_id, &handle);
     if(hret != HG_SUCCESS)
     {
         fprintf(stderr, "Error: margo_create()\n");

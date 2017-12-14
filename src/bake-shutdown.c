@@ -8,9 +8,9 @@
 #include <assert.h>
 #include <unistd.h>
 
-#include "bake-bulk-client.h"
+#include "bake-client.h"
 
-/* client program that will shut down a BAKE bulk server. */
+/* client program that will shut down a BAKE server. */
 
 int main(int argc, char **argv) 
 {
@@ -25,8 +25,8 @@ int main(int argc, char **argv)
  
     if(argc != 2)
     {
-        fprintf(stderr, "Usage: bb-shutdown <server addr to stop>\n");
-        fprintf(stderr, "  Example: ./bb-shutdown tcp://localhost:1234\n");
+        fprintf(stderr, "Usage: bake-shutdown <server addr to stop>\n");
+        fprintf(stderr, "  Example: ./bake-shutdown tcp://localhost:1234\n");
         return(-1);
     }
     svr_addr_str = argv[1];

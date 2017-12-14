@@ -13,9 +13,9 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 
-#include "bake-bulk-client.h"
+#include "bake-client.h"
 
-/* client program that will copy a POSIX file into a bake bulk region */
+/* client program that will copy a POSIX file into a BAKE region */
 
 int main(int argc, char **argv) 
 {
@@ -27,7 +27,7 @@ int main(int argc, char **argv)
     bake_target_id_t bti;
     hg_return_t hret;
     int ret;
-    bake_bulk_region_id_t rid;
+    bake_region_id_t rid;
     int fd;
     struct stat statbuf;
     char* local_region;
@@ -37,8 +37,8 @@ int main(int argc, char **argv)
  
     if(argc != 3)
     {
-        fprintf(stderr, "Usage: bb-copy-to <local file> <server addr>\n");
-        fprintf(stderr, "  Example: ./bb-copy-to /tmp/foo.dat tcp://localhost:1234\n");
+        fprintf(stderr, "Usage: bake-copy-to <local file> <server addr>\n");
+        fprintf(stderr, "  Example: ./bake-copy-to /tmp/foo.dat tcp://localhost:1234\n");
         return(-1);
     }
     svr_addr_str = argv[2];
@@ -102,7 +102,7 @@ int main(int argc, char **argv)
     }
 
     /* create region */
-    ret = bake_bulk_create(bti, statbuf.st_size, &rid);
+    ret = bake_create(bti, statbuf.st_size, &rid);
     if(ret != 0)
     {
         bake_release_instance(bti);
@@ -110,12 +110,12 @@ int main(int argc, char **argv)
         margo_finalize(mid);
         munmap(local_region, statbuf.st_size);
         close(fd);
-        fprintf(stderr, "Error: bake_bulk_create()\n");
+        fprintf(stderr, "Error: bake_create()\n");
         return(-1);
     }
 
     /* transfer data */
-    ret = bake_bulk_write(
+    ret = bake_write(
         bti,
         rid,
         0,
@@ -128,31 +128,31 @@ int main(int argc, char **argv)
         margo_finalize(mid);
         munmap(local_region, statbuf.st_size);
         close(fd);
-        fprintf(stderr, "Error: bake_bulk_write()\n");
+        fprintf(stderr, "Error: bake_write()\n");
         return(-1);
     }
 
     munmap(local_region, statbuf.st_size);
     close(fd);
 
-    ret = bake_bulk_persist(bti, rid);
+    ret = bake_persist(bti, rid);
     if(ret != 0)
     {
         bake_release_instance(bti);
         margo_addr_free(mid, svr_addr);
         margo_finalize(mid);
-        fprintf(stderr, "Error: bake_bulk_persist()\n");
+        fprintf(stderr, "Error: bake_persist()\n");
         return(-1);
     }
 
     /* safety check size */
-    ret = bake_bulk_get_size(bti, rid, &check_size);
+    ret = bake_get_size(bti, rid, &check_size);
     if(ret != 0)
     {
         bake_release_instance(bti);
         margo_addr_free(mid, svr_addr);
         margo_finalize(mid);
-        fprintf(stderr, "Error: bake_bulk_get_size()\n");
+        fprintf(stderr, "Error: bake_get_size()\n");
         return(-1);
     }
     

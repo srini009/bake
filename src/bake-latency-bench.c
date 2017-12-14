@@ -13,7 +13,7 @@
 #include <fcntl.h>
 #include <sys/mman.h>
 
-#include "bake-bulk-client.h"
+#include "bake-client.h"
 
 static void bench_routine_write(bake_target_id_t bti, int iterations, double* measurement_array, int size);
 static void bench_routine_read(bake_target_id_t bti, int iterations, double* measurement_array, int size);
@@ -22,7 +22,7 @@ static void bench_routine_print(const char* op, int size, int iterations, double
 static int measurement_cmp(const void* a, const void *b);
 
 static double *measurement_array = NULL;
-static bake_bulk_region_id_t rid;
+static bake_region_id_t rid;
 
 int main(int argc, char **argv) 
 {
@@ -38,8 +38,8 @@ int main(int argc, char **argv)
  
     if(argc != 5)
     {
-        fprintf(stderr, "Usage: bb-latency-bench <server addr> <iterations> <min_sz> <max_sz>\n");
-        fprintf(stderr, "  Example: ./bb-latency-bench tcp://localhost:1234 1000 4 32\n");
+        fprintf(stderr, "Usage: bake-latency-bench <server addr> <iterations> <min_sz> <max_sz>\n");
+        fprintf(stderr, "  Example: ./bake-latency-bench tcp://localhost:1234 1000 4 32\n");
         return(-1);
     }
     svr_addr_str = argv[1];       
@@ -126,7 +126,7 @@ static void bench_routine_write(bake_target_id_t bti, int iterations, double *me
     assert(buffer);
 
     /* create region */
-    ret = bake_bulk_create(bti, size*iterations, &rid);
+    ret = bake_create(bti, size*iterations, &rid);
     assert(ret == 0);
 
     sleep(1);
@@ -135,7 +135,7 @@ static void bench_routine_write(bake_target_id_t bti, int iterations, double *me
     {
         tm1 = Wtime();
         /* transfer data (writes) */
-        ret = bake_bulk_write(
+        ret = bake_write(
             bti,
             rid,
             region_offset,
@@ -148,7 +148,7 @@ static void bench_routine_write(bake_target_id_t bti, int iterations, double *me
     }
 
     /* persist */
-    ret = bake_bulk_persist(bti, rid);
+    ret = bake_persist(bti, rid);
     assert(ret == 0);
 
     free(buffer);
@@ -173,7 +173,7 @@ static void bench_routine_read(bake_target_id_t bti, int iterations, double *mea
     {
         tm1 = Wtime();
         /* transfer data (reads) */
-        ret = bake_bulk_read(
+        ret = bake_read(
             bti,
             rid,
             region_offset,
@@ -202,7 +202,7 @@ static void bench_routine_noop(bake_target_id_t bti, int iterations, double *mea
     {
         tm1 = Wtime();
         /* noop */
-        ret = bake_bulk_noop(bti);
+        ret = bake_noop(bti);
         tm2 = Wtime();
         assert(ret == 0);
 

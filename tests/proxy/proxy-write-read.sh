@@ -17,7 +17,7 @@ sleep 1
 #####################
 
 # tear down
-run_to 10 tests/proxy/bb-proxy-test $proxy_svr1
+run_to 10 tests/proxy/proxy-test $proxy_svr1
 if [ $? -ne 0 ]; then
     wait
     exit 1

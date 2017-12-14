@@ -1,16 +1,16 @@
-src_libbake_bulk_client_la_SOURCES += \
- src/bake-bulk-client.c
+src_libbake_client_la_SOURCES += \
+ src/bake-client.c
 
-src_libbake_bulk_server_la_SOURCES += \
- src/bake-bulk-server.c
+src_libbake_server_la_SOURCES += \
+ src/bake-server.c
 
-src_bake_bulk_server_daemon_LDADD = src/libbake-bulk-server.la
-src_bake_bulk_mkpool_LDADD = src/libbake-bulk-server.la
+src_bake_server_daemon_LDADD = src/libbake-server.la
+src_bake_mkpool_LDADD = src/libbake-server.la
 
 bin_PROGRAMS += \
- src/bake-bulk-server-daemon \
- src/bake-bulk-mkpool \
- src/bb-shutdown \
- src/bb-copy-to \
- src/bb-copy-from \
- src/bb-latency-bench
+ src/bake-server-daemon \
+ src/bake-mkpool \
+ src/bake-shutdown \
+ src/bake-copy-to \
+ src/bake-copy-from \
+ src/bake-latency-bench

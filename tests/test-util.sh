@@ -39,12 +39,12 @@ function test_start_servers ()
     # start daemons
     for i in `seq $nservers`
     do
-        src/bake-bulk-mkpool -s 100M $TMPBASE/svr-$i.dat
+        src/bake-mkpool -s 100M $TMPBASE/svr-$i.dat
         if [ $? -ne 0 ]; then
             exit 1
         fi
 
-        run_to ${maxtime} src/bake-bulk-server-daemon -f $TMPBASE/svr-$i.addr na+sm $TMPBASE/svr-$i.dat &
+        run_to ${maxtime} src/bake-server-daemon -f $TMPBASE/svr-$i.addr na+sm $TMPBASE/svr-$i.dat &
         if [ $? -ne 0 ]; then
             # TODO: this doesn't actually work; can't check return code of
             # something executing in background.  We have to rely on the

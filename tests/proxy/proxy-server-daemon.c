@@ -10,12 +10,12 @@
 #include <uuid/uuid.h>
 #include <margo.h>
 #include <libpmemobj.h>
-#include <bake-bulk-client.h>
+#include <bake-client.h>
 
-#include "bb-proxy-rpc.h"
+#include "proxy-rpc.h"
 
-DECLARE_MARGO_RPC_HANDLER(proxy_bulk_write_ult)
-DECLARE_MARGO_RPC_HANDLER(proxy_bulk_read_ult)
+DECLARE_MARGO_RPC_HANDLER(proxy_write_ult)
+DECLARE_MARGO_RPC_HANDLER(proxy_read_ult)
 DECLARE_MARGO_RPC_HANDLER(proxy_shutdown_ult)
 
 struct options
@@ -25,21 +25,21 @@ struct options
     char *host_file;
 };
 
-struct bb_proxy_server_context
+struct proxy_server_context
 {
     bake_target_id_t svr_bti;
-    bake_bulk_region_id_t the_rid;
+    bake_region_id_t the_rid;
 };
 
-static struct bb_proxy_server_context *g_proxy_svr_ctx = NULL;
+static struct proxy_server_context *g_proxy_svr_ctx = NULL;
 
 static void usage(int argc, char **argv)
 {
-    fprintf(stderr, "Usage: bb-proxy-server-daemon [OPTIONS] <listen_addr> <bake_server_addr>\n");
+    fprintf(stderr, "Usage: proxy-server-daemon [OPTIONS] <listen_addr> <bake_server_addr>\n");
     fprintf(stderr, "       listen_addr is the Mercury address to listen on\n");
-    fprintf(stderr, "       bake_server_addr is the Mercury address of the bake server\n");
+    fprintf(stderr, "       bake_server_addr is the Mercury address of the BAKE server\n");
     fprintf(stderr, "       [-f filename] to write the proxy server address to a file\n");
-    fprintf(stderr, "Example: ./bb-proxy-server-daemon na+sm na+sm://3005/0\n");
+    fprintf(stderr, "Example: ./proxy-server-daemon na+sm na+sm://3005/0\n");
     return;
 }
 
@@ -137,7 +137,7 @@ int main(int argc, char **argv)
         fclose(fp);
     }
 
-    /* lookup the bake-bulk server address */
+    /* lookup the BAKE server address */
     hret = margo_addr_lookup(mid, opts.bake_svr_addr_str, &bake_svr_addr);
     if(hret != HG_SUCCESS)
     {
@@ -146,7 +146,7 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    /* probe the bake-bulk server for an instance */
+    /* probe the BAKE server for an instance */
     ret = bake_probe_instance(mid, bake_svr_addr, &g_proxy_svr_ctx->svr_bti);
     if(ret < 0)
     {
@@ -156,11 +156,12 @@ int main(int argc, char **argv)
     margo_addr_free(mid, bake_svr_addr);
 
     /* register proxy service RPCs */
-    MARGO_REGISTER(mid, "proxy_bulk_write", proxy_bulk_write_in_t, proxy_bulk_write_out_t,
-        proxy_bulk_write_ult);
-    MARGO_REGISTER(mid, "proxy_bulk_read", proxy_bulk_read_in_t, proxy_bulk_read_out_t,
-        proxy_bulk_read_ult);
-    MARGO_REGISTER(mid, "proxy_shutdown", void, void, proxy_shutdown_ult);
+    MARGO_REGISTER(mid, "proxy_write", proxy_write_in_t, proxy_write_out_t,
+        proxy_write_ult);
+    MARGO_REGISTER(mid, "proxy_read", proxy_read_in_t, proxy_read_out_t,
+        proxy_read_ult);
+    MARGO_REGISTER(mid, "proxy_shutdown", void, void,
+        proxy_shutdown_ult);
 
     /* wait for the shutdown signal */
     margo_wait_for_finalize(mid);
@@ -168,10 +169,10 @@ int main(int argc, char **argv)
     return(0);
 }
 
-static void proxy_bulk_write_ult(hg_handle_t handle)
+static void proxy_write_ult(hg_handle_t handle)
 {
-    proxy_bulk_write_in_t in;
-    proxy_bulk_write_out_t out;
+    proxy_write_in_t in;
+    proxy_write_out_t out;
     hg_return_t hret;
     int ret;
 
@@ -183,18 +184,18 @@ static void proxy_bulk_write_ult(hg_handle_t handle)
 
     /* XXX we need a create_write_persist call to save on RTTs */
 
-    /* create bake region to store this write in */
-    ret = bake_bulk_create(g_proxy_svr_ctx->svr_bti, in.bulk_size,
+    /* create BAKE region to store this write in */
+    ret = bake_create(g_proxy_svr_ctx->svr_bti, in.bulk_size,
         &(g_proxy_svr_ctx->the_rid));
     assert(ret == 0);
 
     /* perform proxy write on behalf of client */
-    ret = bake_bulk_proxy_write(g_proxy_svr_ctx->svr_bti, g_proxy_svr_ctx->the_rid,
+    ret = bake_proxy_write(g_proxy_svr_ctx->svr_bti, g_proxy_svr_ctx->the_rid,
         0, in.bulk_handle, in.bulk_offset, in.bulk_addr, in.bulk_size);
     assert(ret == 0);
 
-    /* persist the bake region */
-    ret = bake_bulk_persist(g_proxy_svr_ctx->svr_bti, g_proxy_svr_ctx->the_rid);
+    /* persist the BAKE region */
+    ret = bake_persist(g_proxy_svr_ctx->svr_bti, g_proxy_svr_ctx->the_rid);
     assert(ret == 0);
 
     /* set return value */
@@ -208,12 +209,12 @@ static void proxy_bulk_write_ult(hg_handle_t handle)
 
     return;
 }
-DEFINE_MARGO_RPC_HANDLER(proxy_bulk_write_ult)
+DEFINE_MARGO_RPC_HANDLER(proxy_write_ult)
 
-static void proxy_bulk_read_ult(hg_handle_t handle)
+static void proxy_read_ult(hg_handle_t handle)
 {
-    proxy_bulk_read_in_t in;
-    proxy_bulk_read_out_t out;
+    proxy_read_in_t in;
+    proxy_read_out_t out;
     hg_return_t hret;
     int ret;
 
@@ -224,7 +225,7 @@ static void proxy_bulk_read_ult(hg_handle_t handle)
     assert(hret == HG_SUCCESS);
 
     /* perform proxy write on behalf of client */
-    ret = bake_bulk_proxy_read(g_proxy_svr_ctx->svr_bti, g_proxy_svr_ctx->the_rid,
+    ret = bake_proxy_read(g_proxy_svr_ctx->svr_bti, g_proxy_svr_ctx->the_rid,
         0, in.bulk_handle, in.bulk_offset, in.bulk_addr, in.bulk_size);
     assert(ret == 0);
 
@@ -239,7 +240,7 @@ static void proxy_bulk_read_ult(hg_handle_t handle)
 
     return;
 }
-DEFINE_MARGO_RPC_HANDLER(proxy_bulk_read_ult)
+DEFINE_MARGO_RPC_HANDLER(proxy_read_ult)
 
 static void proxy_shutdown_ult(hg_handle_t handle)
 {
