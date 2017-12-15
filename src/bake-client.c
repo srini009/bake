@@ -541,6 +541,63 @@ int bake_create_write_persist(
     return(ret);
 }
 
+int bake_create_write_persist_proxy(
+    bake_target_id_t bti,
+    uint64_t region_size,
+    uint64_t region_offset,
+    hg_bulk_t remote_bulk,
+    uint64_t remote_offset,
+    const char* remote_addr,
+    uint64_t size,
+    bake_region_id_t *rid)
+{
+    hg_return_t hret;
+    hg_handle_t handle;
+    bake_create_write_persist_in_t in;
+    bake_create_write_persist_out_t out;
+    int ret;
+    struct bake_instance *instance = NULL;
+
+    HASH_FIND(hh, instance_hash, &bti, sizeof(bti), instance);
+    if(!instance)
+        return(-1);
+
+    in.bti = bti;
+    in.region_size = region_size;
+    in.region_offset = region_offset;
+    in.bulk_handle = remote_bulk;
+    in.bulk_offset = remote_offset;
+    in.bulk_size = size;
+    in.remote_addr_str = (char*)remote_addr;
+
+    hret = margo_create(g_margo_inst.mid, instance->dest,
+        g_margo_inst.bake_create_write_persist_id, &handle);
+    if(hret != HG_SUCCESS)
+        return(-1);
+
+    hret = margo_forward(handle, &in);
+    if(hret != HG_SUCCESS)
+    {
+        margo_destroy(handle);
+        return(-1);
+    }
+
+    hret = margo_get_output(handle, &out);
+    if(hret != HG_SUCCESS)
+    {
+        margo_destroy(handle);
+        return(-1);
+    }
+
+    ret = out.ret;
+    if(ret == 0)
+        *rid = out.rid;
+
+    margo_free_output(handle, &out);
+    margo_destroy(handle);
+    return(ret);
+}
+
 int bake_get_size(
     bake_target_id_t bti,
     bake_region_id_t rid,

@@ -122,6 +122,28 @@ int bake_create_write_persist(
     bake_region_id_t *rid);
 
 /**
+ *
+ * @param [in] bti BAKE target identifier
+ * @param [in] region_size size of region to be created
+ * @param [in] region_offset offset into the target region to write
+ * @param [in] remote_bulk bulk_handle for remote data region to write from
+ * @param [in] remote_offset offset in the remote bulk handle to write from
+ * @param [in] remote_addr address string of the remote target to write from
+ * @param [in] size size to write from remote bulk handle
+ * @param [out] rid identifier for new region
+ * @returns 0 on success, -1 on failure
+ */
+int bake_create_write_persist_proxy(
+    bake_target_id_t bti,
+    uint64_t region_size,
+    uint64_t region_offset,
+    hg_bulk_t remote_bulk,
+    uint64_t remote_offset,
+    const char* remote_addr,
+    uint64_t size,
+    bake_region_id_t *rid);
+
+/**
  * Checks the size of an existing BAKE region. 
  *
  * @param [in] bti BAKE target identifier
