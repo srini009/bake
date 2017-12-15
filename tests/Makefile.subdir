@@ -2,11 +2,16 @@ TESTS_ENVIRONMENT += \
  TIMEOUT="$(TIMEOUT)" \
  MKTEMP="$(MKTEMP)"
 
+check_PROGRAMS += \
+ tests/create-write-persist-test
+
 TESTS += \
  tests/basic.sh \
- tests/copy-to-and-from.sh
+ tests/copy-to-and-from.sh \
+ tests/create-write-persist.sh
 
 EXTRA_DIST += \
  tests/basic.sh \
- tests/copy-to-and-from.sh
+ tests/copy-to-and-from.sh \
+ tests/create-write-persist.sh
 

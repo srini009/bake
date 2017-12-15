@@ -42,7 +42,7 @@ int main(int argc, char *argv[])
     hg_addr_t self_addr;
     char self_addr_str[128];
     hg_size_t self_addr_str_sz = 128;
-    const char *test_str = "This is a test string for bake-proxy-test.";
+    const char *test_str = "This is a test string for proxy test.";
     char *buf;
     uint64_t buf_size;
     hg_handle_t handle;
@@ -313,7 +313,6 @@ static int forward_proxy_read(
     margo_free_output(handle, &out);
     margo_destroy(handle);
     margo_bulk_free(in.bulk_handle);
-
     return(0);
 }
 
