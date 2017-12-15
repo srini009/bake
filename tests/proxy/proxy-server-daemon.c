@@ -22,6 +22,7 @@ struct options
 {
     char *listen_addr_str;
     char *bake_svr_addr_str;
+    int batch_rpc;
     char *host_file;
 };
 
@@ -29,6 +30,7 @@ struct proxy_server_context
 {
     bake_target_id_t svr_bti;
     bake_region_id_t the_rid;
+    int batch_rpc;
 };
 
 static struct proxy_server_context *g_proxy_svr_ctx = NULL;
@@ -38,6 +40,7 @@ static void usage(int argc, char **argv)
     fprintf(stderr, "Usage: proxy-server-daemon [OPTIONS] <listen_addr> <bake_server_addr>\n");
     fprintf(stderr, "       listen_addr is the Mercury address to listen on\n");
     fprintf(stderr, "       bake_server_addr is the Mercury address of the BAKE server\n");
+    fprintf(stderr, "       [-b] to batch the BAKE region create, write, and persist operations in one RPC\n");
     fprintf(stderr, "       [-f filename] to write the proxy server address to a file\n");
     fprintf(stderr, "Example: ./proxy-server-daemon na+sm na+sm://3005/0\n");
     return;
@@ -50,10 +53,13 @@ static void parse_args(int argc, char **argv, struct options *opts)
     memset(opts, 0, sizeof(*opts));
 
     /* get options */
-    while((opt = getopt(argc, argv, "f:")) != -1)
+    while((opt = getopt(argc, argv, "bf:")) != -1)
     {
         switch(opt)
         {
+            case 'b':
+                opts->batch_rpc = 1;
+                break;
             case 'f':
                 opts->host_file = optarg;
                 break;
@@ -89,6 +95,7 @@ int main(int argc, char **argv)
     if(!g_proxy_svr_ctx)
         return(-1);
     memset(g_proxy_svr_ctx, 0, sizeof(*g_proxy_svr_ctx));
+    g_proxy_svr_ctx->batch_rpc = opts.batch_rpc;
 
     /* start margo */
     mid = margo_init(opts.listen_addr_str, MARGO_SERVER_MODE, 0, -1);
@@ -182,21 +189,32 @@ static void proxy_write_ult(hg_handle_t handle)
     hret = margo_get_input(handle, &in);
     assert(hret == HG_SUCCESS);
 
-    /* XXX we need a create_write_persist call to save on RTTs */
+    if(g_proxy_svr_ctx->batch_rpc)
+    {
+        /* create the BAKE region, write to it on behalf of the client,
+         * and persist the region all in one RPC
+         */
+        ret = bake_create_write_persist_proxy(g_proxy_svr_ctx->svr_bti,
+            in.bulk_size, 0, in.bulk_handle, in.bulk_offset, in.bulk_addr,
+            in.bulk_size, &(g_proxy_svr_ctx->the_rid));
+        assert(ret == 0);
+    }
+    else
+    {
+        /* create BAKE region to store this write in */
+        ret = bake_create(g_proxy_svr_ctx->svr_bti, in.bulk_size,
+            &(g_proxy_svr_ctx->the_rid));
+        assert(ret == 0);
 
-    /* create BAKE region to store this write in */
-    ret = bake_create(g_proxy_svr_ctx->svr_bti, in.bulk_size,
-        &(g_proxy_svr_ctx->the_rid));
-    assert(ret == 0);
+        /* perform proxy write on behalf of client */
+        ret = bake_proxy_write(g_proxy_svr_ctx->svr_bti, g_proxy_svr_ctx->the_rid,
+            0, in.bulk_handle, in.bulk_offset, in.bulk_addr, in.bulk_size);
+        assert(ret == 0);
 
-    /* perform proxy write on behalf of client */
-    ret = bake_proxy_write(g_proxy_svr_ctx->svr_bti, g_proxy_svr_ctx->the_rid,
-        0, in.bulk_handle, in.bulk_offset, in.bulk_addr, in.bulk_size);
-    assert(ret == 0);
-
-    /* persist the BAKE region */
-    ret = bake_persist(g_proxy_svr_ctx->svr_bti, g_proxy_svr_ctx->the_rid);
-    assert(ret == 0);
+        /* persist the BAKE region */
+        ret = bake_persist(g_proxy_svr_ctx->svr_bti, g_proxy_svr_ctx->the_rid);
+        assert(ret == 0);
+    }
 
     /* set return value */
     out.ret = 0;

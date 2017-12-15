@@ -3,4 +3,5 @@ check_PROGRAMS += \
  tests/proxy/proxy-server-daemon
 
 TESTS += \
- tests/proxy/proxy-write-read.sh
+ tests/proxy/proxy-write-read.sh \
+ tests/proxy/proxy-create-write-persist-read.sh
