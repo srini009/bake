@@ -107,5 +107,5 @@ int main(int argc, char *argv[])
 
     ret = bake_server_makepool(opts.pmem_pool, opts.pool_size, opts.pool_mode);
 
-    return(0);
+    return(ret);
 }
