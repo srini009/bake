@@ -42,19 +42,6 @@ int bake_server_init(
     margo_instance_id mid,
     const char *pool_name);
 
-/**
- * Shuts down a BAKE server and frees all associated resources.
- */
-void bake_server_shutdown(
-    void);
-
-/**
- * Suspends a BAKE server process until some other entity calls
- * bake_server_shutdown().
- */
-void bake_server_wait_for_shutdown(
-    void);
-
 #ifdef __cplusplus
 }
 #endif

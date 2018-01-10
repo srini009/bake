@@ -128,9 +128,7 @@ int main(int argc, char **argv)
     }
 
     /* suspend until the BAKE server gets a shutdown signal from the client */
-    bake_server_wait_for_shutdown();
-    margo_finalize(mid);
+    margo_wait_for_finalize(mid);
 
     return(0);
 }
-

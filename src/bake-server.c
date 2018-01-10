@@ -28,15 +28,9 @@ typedef struct
 {
     PMEMobjpool *pmem_pool;
     bake_root_t *pmem_root;
-
-    /* server shutdown conditional logic */
-    ABT_mutex shutdown_mutex;
-    ABT_cond shutdown_cond;
-    int shutdown_flag;
-    int ref_count;
 } bake_server_context_t;
 
-static void bake_server_cleanup(bake_server_context_t *svr_ctx);
+static void bake_server_finalize_cb(void *data);
 
 /* TODO: this should not be global in the long run; server may provide access
  * to multiple targets
@@ -146,66 +140,15 @@ int bake_server_init(
     MARGO_REGISTER(mid, "bake_noop_rpc",
         void, void, bake_noop_ult);
 
+    /* install the bake server finalize callback */
+    margo_push_finalize_callback(mid, &bake_server_finalize_cb, tmp_svr_ctx);
+
     /* set global server context */
     tmp_svr_ctx->pmem_pool = pool;
     tmp_svr_ctx->pmem_root = root;
-    tmp_svr_ctx->ref_count = 1;
-    ABT_mutex_create(&tmp_svr_ctx->shutdown_mutex);
-    ABT_cond_create(&tmp_svr_ctx->shutdown_cond);
     g_svr_ctx = tmp_svr_ctx;
 
     return(0);
-}
-
-void bake_server_shutdown()
-{
-    bake_server_context_t *svr_ctx = g_svr_ctx;
-    int do_cleanup;
-
-    assert(svr_ctx);
-
-    ABT_mutex_lock(svr_ctx->shutdown_mutex);
-    svr_ctx->shutdown_flag = 1;
-    ABT_cond_broadcast(svr_ctx->shutdown_cond);
-
-    svr_ctx->ref_count--;
-    do_cleanup = svr_ctx->ref_count == 0;
-
-    ABT_mutex_unlock(svr_ctx->shutdown_mutex);
-
-    if (do_cleanup)
-    {
-        bake_server_cleanup(svr_ctx);
-        g_svr_ctx = NULL;
-    }
-
-    return;
-}
-
-void bake_server_wait_for_shutdown()
-{
-    bake_server_context_t *svr_ctx = g_svr_ctx;
-    int do_cleanup;
-
-    assert(svr_ctx);
-
-    ABT_mutex_lock(svr_ctx->shutdown_mutex);
-
-    svr_ctx->ref_count++;
-    while(!svr_ctx->shutdown_flag)
-        ABT_cond_wait(svr_ctx->shutdown_cond, svr_ctx->shutdown_mutex);
-    svr_ctx->ref_count--;
-    do_cleanup = svr_ctx->ref_count == 0;
-
-    ABT_mutex_unlock(svr_ctx->shutdown_mutex);
-
-    if (do_cleanup)
-    {
-        bake_server_cleanup(svr_ctx);
-        g_svr_ctx = NULL;
-    }
-
-    return;
 }
 
 /* service a remote RPC that instructs the BAKE server to shut down */
@@ -217,17 +160,19 @@ static void bake_shutdown_ult(hg_handle_t handle)
     assert(g_svr_ctx);
 
     mid = margo_hg_handle_get_instance(handle);
-
+    assert(mid != MARGO_INSTANCE_NULL);
     hret = margo_respond(handle, NULL);
     assert(hret == HG_SUCCESS);
 
     margo_destroy(handle);
 
     /* NOTE: we assume that the server daemon is using
-     * bake_server_wait_for_shutdown() to suspend until this RPC executes, so
+     * margo_wait_for_finalize() to suspend until this RPC executes, so
      * there is no need to send any extra signal to notify it.
      */
-    bake_server_shutdown();
+    margo_finalize(mid);
+
+    g_svr_ctx = NULL;
 
     return;
 }
@@ -797,11 +742,12 @@ static void bake_probe_ult(hg_handle_t handle)
 }
 DEFINE_MARGO_RPC_HANDLER(bake_probe_ult)
 
-static void bake_server_cleanup(bake_server_context_t *svr_ctx)
+static void bake_server_finalize_cb(void *data)
 {
+    bake_server_context_t *svr_ctx = (bake_server_context_t *)data;
+    assert(svr_ctx);
+
     pmemobj_close(svr_ctx->pmem_pool);
-    ABT_mutex_free(&svr_ctx->shutdown_mutex);
-    ABT_cond_free(&svr_ctx->shutdown_cond);
     free(svr_ctx);
 
     return;
