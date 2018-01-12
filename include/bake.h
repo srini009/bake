@@ -14,14 +14,9 @@
 extern "C" {
 #endif
 
-/**
- * Persistent, universal, opaque identifier for a BAKE target.
- * Remains constant if instance is opened, closed, or migrated.
- */
 typedef struct {
     uuid_t id;
-} bake_target_id_t;
-
+} bake_uuid_t;
 /**
  * Persistent, opaque identifier for a region within a BAKE target.
  */

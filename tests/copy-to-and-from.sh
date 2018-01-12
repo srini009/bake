@@ -13,7 +13,7 @@ test_start_servers 1 2 20
 #####################
 
 echo "Hello world." > $TMPBASE/foo.dat
-CPOUT=`run_to 10 src/bake-copy-to $TMPBASE/foo.dat $svr1`
+CPOUT=`run_to 10 src/bake-copy-to $TMPBASE/foo.dat $svr1 1`
 if [ $? -ne 0 ]; then
     run_to 10 src/bake-shutdown $svr1
     wait
@@ -21,7 +21,7 @@ if [ $? -ne 0 ]; then
 fi
 
 RID=`echo "$CPOUT" | grep -o -P '/tmp.*$'`
-run_to 10 src/bake-copy-from $svr1 $RID $TMPBASE/foo-out.dat 
+run_to 10 src/bake-copy-from $svr1 1 $RID $TMPBASE/foo-out.dat 
 if [ $? -ne 0 ]; then
     run_to 10 src/bake-shutdown $svr1
     wait

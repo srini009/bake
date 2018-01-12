@@ -16,17 +16,18 @@
 struct options
 {
     char *listen_addr_str;
-    char *bake_pool;
+    unsigned num_pools;
+    char **bake_pools;
     char *host_file;
 };
 
 static void usage(int argc, char **argv)
 {
-    fprintf(stderr, "Usage: bake-server-daemon [OPTIONS] <listen_addr> <bake_pool>\n");
+    fprintf(stderr, "Usage: bake-server-daemon [OPTIONS] <listen_addr> <bake_pool1> <bake_pool2> ...\n");
     fprintf(stderr, "       listen_addr is the Mercury address to listen on\n");
     fprintf(stderr, "       bake_pool is the path to the BAKE pool\n");
     fprintf(stderr, "       [-f filename] to write the server address to a file\n");
-    fprintf(stderr, "Example: ./bake-server-daemon tcp://localhost:1234 /dev/shm/foo.dat\n");
+    fprintf(stderr, "Example: ./bake-server-daemon tcp://localhost:1234 /dev/shm/foo.dat /dev/shm/bar.dat\n");
     return;
 }
 
@@ -51,13 +52,18 @@ static void parse_args(int argc, char **argv, struct options *opts)
     }
 
     /* get required arguments after options */
-    if((argc - optind) != 2)
+    if((argc - optind) < 2)
     {
         usage(argc, argv);
         exit(EXIT_FAILURE);
     }
+    opts->num_pools = argc - optind - 1;
     opts->listen_addr_str = argv[optind++];
-    opts->bake_pool = argv[optind++];
+    opts->bake_pools = calloc(opts->num_pools, sizeof(char*));
+    int i;
+    for(i=0; i < opts->num_pools; i++) {
+        opts->bake_pools[i] = argv[optind++];
+    }
 
     return;
 }
@@ -119,16 +125,24 @@ int main(int argc, char **argv)
     }
 
     /* initialize the BAKE server */
-    ret = bake_server_init(mid, opts.bake_pool);
+    int i;
+    for(i=0; i< opts.num_pools; i++) {
+        ret = bake_provider_register(mid, i+1,
+                BAKE_ABT_POOL_DEFAULT, opts.bake_pools[i],
+                BAKE_PROVIDER_IGNORE);
+    }
+
     if(ret != 0)
     {
-        fprintf(stderr, "Error: bake_server_init()\n");
+        fprintf(stderr, "Error: bake_provider_register()\n");
         margo_finalize(mid);
         return(-1);
     }
 
     /* suspend until the BAKE server gets a shutdown signal from the client */
     margo_wait_for_finalize(mid);
+
+    free(opts.bake_pools);
 
     return(0);
 }

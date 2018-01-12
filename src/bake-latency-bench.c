@@ -33,26 +33,29 @@ int main(int argc, char **argv)
     char *svr_addr_str;
     hg_addr_t svr_addr;
     margo_instance_id mid;
+    bake_client_t bcl;
     bake_target_id_t bti;
+    uint8_t mplex_id;
     hg_return_t hret;
     int ret;
     int min_size, max_size, iterations, cur_size;
  
-    if(argc != 5)
+    if(argc != 6)
     {
-        fprintf(stderr, "Usage: bake-latency-bench <server addr> <iterations> <min_sz> <max_sz>\n");
-        fprintf(stderr, "  Example: ./bake-latency-bench tcp://localhost:1234 1000 4 32\n");
+        fprintf(stderr, "Usage: bake-latency-bench <server addr> <mplex id> <iterations> <min_sz> <max_sz>\n");
+        fprintf(stderr, "  Example: ./bake-latency-bench tcp://localhost:1234 3 1000 4 32\n");
         return(-1);
     }
-    svr_addr_str = argv[1];       
+    svr_addr_str = argv[1];
+    mplex_id = atoi(argv[2]);
 
-    ret = sscanf(argv[2], "%d", &iterations);
+    ret = sscanf(argv[3], "%d", &iterations);
     assert(ret == 1);
 
-    ret = sscanf(argv[3], "%d", &min_size);
+    ret = sscanf(argv[4], "%d", &min_size);
     assert(ret == 1);
 
-    ret = sscanf(argv[4], "%d", &max_size);
+    ret = sscanf(argv[5], "%d", &max_size);
     assert(ret == 1);
 
     measurement_array = malloc(sizeof(*measurement_array)*iterations);
@@ -71,19 +74,29 @@ int main(int argc, char **argv)
         return -1;
     }
 
+    ret = bake_client_init(mid, &bcl);
+    if(ret != 0)
+    {
+        fprintf(stderr, "Error: bake_client_init()\n");
+        margo_finalize(mid);
+        return -1;
+    }
+
     hret = margo_addr_lookup(mid, svr_addr_str, &svr_addr);
     if(hret != HG_SUCCESS)
     {
         fprintf(stderr, "Error: margo_addr_lookup()\n");
+        bake_client_finalize(bcl);
         margo_finalize(mid);
         return(-1);
     }
 
-    ret = bake_probe_instance(mid, svr_addr, &bti);
+    ret = bake_probe_instance(bcl, svr_addr, mplex_id, &bti);
     if(ret < 0)
     {
         fprintf(stderr, "Error: bake_probe_instance()\n");
         margo_addr_free(mid, svr_addr);
+        bake_client_finalize(bcl);
         margo_finalize(mid);
         return(-1);
     }
@@ -100,8 +113,9 @@ int main(int argc, char **argv)
         bench_routine_print("read", cur_size, iterations, measurement_array);
     }
     
-    bake_release_instance(bti);
+    bake_target_id_release(bti);
     margo_addr_free(mid, svr_addr);
+    bake_client_finalize(bcl);
     margo_finalize(mid);
 
     free(measurement_array);

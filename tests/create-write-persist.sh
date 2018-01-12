@@ -14,7 +14,7 @@ sleep 1
 #####################
 
 # tear down
-run_to 10 tests/create-write-persist-test $svr1
+run_to 10 tests/create-write-persist-test $svr1 1
 if [ $? -ne 0 ]; then
     wait
     exit 1

@@ -22,12 +22,15 @@ struct options
 {
     char *listen_addr_str;
     char *bake_svr_addr_str;
+    uint8_t bake_mplex_id;
     int batch_rpc;
     char *host_file;
 };
 
 struct proxy_server_context
 {
+    bake_client_t    bcl;
+    hg_addr_t        svr_addr;
     bake_target_id_t svr_bti;
     bake_region_id_t the_rid;
     int batch_rpc;
@@ -37,7 +40,7 @@ static struct proxy_server_context *g_proxy_svr_ctx = NULL;
 
 static void usage(int argc, char **argv)
 {
-    fprintf(stderr, "Usage: proxy-server-daemon [OPTIONS] <listen_addr> <bake_server_addr>\n");
+    fprintf(stderr, "Usage: proxy-server-daemon [OPTIONS] <listen_addr> <bake_server_addr> <bake mplex id>\n");
     fprintf(stderr, "       listen_addr is the Mercury address to listen on\n");
     fprintf(stderr, "       bake_server_addr is the Mercury address of the BAKE server\n");
     fprintf(stderr, "       [-b] to batch the BAKE region create, write, and persist operations in one RPC\n");
@@ -70,15 +73,21 @@ static void parse_args(int argc, char **argv, struct options *opts)
     }
 
     /* get required arguments after options */
-    if((argc - optind) != 2)
+    if((argc - optind) != 3)
     {
         usage(argc, argv);
         exit(EXIT_FAILURE);
     }
     opts->listen_addr_str = argv[optind++];
     opts->bake_svr_addr_str = argv[optind++];
+    opts->bake_mplex_id = atoi(argv[optind++]);
 
     return;
+}
+
+static void finalize_cb(void* data) {
+    bake_client_t client = (bake_client_t)data;
+    bake_client_finalize(client);
 }
 
 int main(int argc, char **argv) 
@@ -144,17 +153,32 @@ int main(int argc, char **argv)
         fclose(fp);
     }
 
+    /* creating BAKE client */
+    ret = bake_client_init(mid, &g_proxy_svr_ctx->bcl);
+    if(ret != 0)
+    {
+        fprintf(stderr, "Error: bake_client_init()\n");
+        margo_finalize(mid);
+        return -1;
+    }
+
+    margo_push_finalize_callback(mid, finalize_cb, (void*)(g_proxy_svr_ctx->bcl));
+
     /* lookup the BAKE server address */
     hret = margo_addr_lookup(mid, opts.bake_svr_addr_str, &bake_svr_addr);
+    g_proxy_svr_ctx->svr_addr = bake_svr_addr;
+
     if(hret != HG_SUCCESS)
     {
         fprintf(stderr, "Error: margo_addr_to_string()\n");
+        bake_client_finalize(g_proxy_svr_ctx->bcl);
         margo_finalize(mid);
         return(-1);
     }
 
     /* probe the BAKE server for an instance */
-    ret = bake_probe_instance(mid, bake_svr_addr, &g_proxy_svr_ctx->svr_bti);
+    ret = bake_probe_instance(g_proxy_svr_ctx->bcl, 
+                bake_svr_addr, opts.bake_mplex_id, &g_proxy_svr_ctx->svr_bti);
     if(ret < 0)
     {
         fprintf(stderr, "Error: bake_probe_instance()\n");
@@ -277,10 +301,10 @@ static void proxy_shutdown_ult(hg_handle_t handle)
     margo_destroy(handle);
 
     /* forward shutdown to the bake-bulk server */
-    bake_shutdown_service(g_proxy_svr_ctx->svr_bti);
+    bake_shutdown_service(g_proxy_svr_ctx->bcl, g_proxy_svr_ctx->svr_addr);
 
     /* cleanup global state */
-    bake_release_instance(g_proxy_svr_ctx->svr_bti);
+    bake_target_id_release(g_proxy_svr_ctx->svr_bti);
     free(g_proxy_svr_ctx);
 
     margo_finalize(mid);

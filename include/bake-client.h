@@ -15,22 +15,55 @@
 extern "C" {
 #endif
 
+#define BAKE_CLIENT_NULL ((bake_client_t)NULL)
+#define BAKE_TARGET_ID_NULL ((bake_target_id_t)NULL)
+
+typedef struct bake_client* bake_client_t;
+typedef struct bake_target* bake_target_id_t;
+
+/**
+ * Creates a BAKE client attached to the given margo instance.
+ * This will effectively register the RPC needed by BAKE into
+ * the margo instance. The client must be freed with
+ * bake_client_finalize.
+ *
+ * @param[in] mid margo instance
+ * @param[out] client resulting bake client object
+ *
+ * @return 0 on success, -1 on failure
+ */
+int bake_client_init(margo_instance_id mid, bake_client_t* client);
+
+/**
+ * Finalizes a BAKE client.
+ * WARNING: This function must not be called after Margo has been
+ * finalized. If you need to finalize a BAKE client when Margo is
+ * finalized, use margo_push_finalize_callback.
+ *
+ * @param client BAKE client to destroy
+ *
+ * @return 0 on success, -1 on failure
+ */
+int bake_client_finalize(bake_client_t client);
+
 /**
  * Obtains identifying information for a BAKE target through the provided
- * remote mercury address.
+ * remote mercury address and multiplex id.
  *
- * @param [in] mid margo instance
+ * @param [in] client BAKE client
  * @param [in] dest_addr destination Mercury address
+ * @param [in] mplex_id multiplex id
  * @param [out] bti BAKE target identifier
  * @returns 0 on success, -1 on failure
  */
 int bake_probe_instance(
-    margo_instance_id mid,
+    bake_client_t client,
     hg_addr_t dest_addr,
+    uint8_t mplex_id,
     bake_target_id_t *bti);
   
 /**
- * Creates a bounded-size BAKE data region.  The resulting region can be
+ * Creates a bounded-size BAKE data region. The resulting region can be
  * written using BAKE write operations, and can be persisted (once writes
  * are complete) with a a BAKE persist operation.  The region is not valid
  * for read access until persisted.
@@ -204,17 +237,19 @@ int bake_proxy_read(
  *
  * @param [in] bti BAKE target_identifier
  */
-void bake_release_instance(
+void bake_target_id_release(
     bake_target_id_t bti);
 
 /**
- * Shuts down a remote BAKE service (given a target ID).
- *
- * @param [in] bti BAKE target identifier
- * @returns 0 on success, -1 on fialure 
+ * Shuts down a remote BAKE service (given an address).
+ * This will shutdown all the providers on the target address.
+ * 
+ * @param [in] client BAKE client
+ * @param [in] addr address of the server 
+ * @returns 0 on success, -1 on failure 
  */
 int bake_shutdown_service(
-    bake_target_id_t bti);
+    bake_client_t client, hg_addr_t addr);
 
 /**
  * Issues a BAKE no-op operation.

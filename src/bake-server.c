@@ -11,10 +11,10 @@
 #include <bake-server.h>
 #include "bake-rpc.h"
 
-/* definition of BAKE root data structure (just a target_id for now) */
+/* definition of BAKE root data structure (just a uuid for now) */
 typedef struct
 {   
-    bake_target_id_t target_id;
+    bake_uuid_t pool_id;
 } bake_root_t;
  
 /* definition of internal BAKE region_id_t identifier for libpmemobj back end */
@@ -24,7 +24,7 @@ typedef struct
     uint64_t size;
 } pmemobj_region_id_t;
 
-typedef struct
+typedef struct bake_server_context_t
 {
     PMEMobjpool *pmem_pool;
     bake_root_t *pmem_root;
@@ -32,12 +32,7 @@ typedef struct
 
 static void bake_server_finalize_cb(void *data);
 
-/* TODO: this should not be global in the long run; server may provide access
- * to multiple targets
- */
-static bake_server_context_t *g_svr_ctx = NULL;
-
-int bake_server_makepool(
+int bake_makepool(
 	const char *pool_name,
     size_t pool_size,
     mode_t pool_mode)
@@ -58,11 +53,11 @@ int bake_server_makepool(
     root = pmemobj_direct(root_oid);
 
     /* store the target id for this bake pool at the root */
-    uuid_generate(root->target_id.id);
+    uuid_generate(root->pool_id.id);
     pmemobj_persist(pool, root, sizeof(bake_root_t));
 #if 0
     char target_string[64];
-    uuid_unparse(root->target_id.id, target_string);
+    uuid_unparse(root->id, target_string);
     fprintf(stderr, "created BAKE target ID: %s\n", target_string);
 #endif
 
@@ -71,26 +66,21 @@ int bake_server_makepool(
     return(0);
 }
 
-int bake_server_init(
+int bake_provider_register(
     margo_instance_id mid,
-    const char *pool_name)
+    uint32_t mplex_id,
+    ABT_pool abt_pool,
+    const char *pool_name,
+    bake_provider_t* provider)
 {
     PMEMobjpool *pool;
     PMEMoid root_oid;
     bake_root_t *root;
     bake_server_context_t *tmp_svr_ctx;
     
-    /* make sure to initialize the server only once */
-    if(g_svr_ctx)
-    {
-        fprintf(stderr, "Error: BAKE server already initialized\n");
-        return(-1);
-    }
-
-    tmp_svr_ctx = malloc(sizeof(*tmp_svr_ctx));
+    tmp_svr_ctx = calloc(1,sizeof(*tmp_svr_ctx));
     if(!tmp_svr_ctx)
         return(-1);
-    memset(tmp_svr_ctx, 0, sizeof(*tmp_svr_ctx));
 
     /* open the given pmem pool */
     pool = pmemobj_open(pool_name, NULL);
@@ -103,7 +93,7 @@ int bake_server_init(
     /* check to make sure the root is properly set */
     root_oid = pmemobj_root(pool, sizeof(bake_root_t));
     root = pmemobj_direct(root_oid);
-    if(uuid_is_null(root->target_id.id))
+    if(uuid_is_null(root->pool_id.id))
     {
         fprintf(stderr, "Error: BAKE pool is not properly initialized\n");
         pmemobj_close(pool);
@@ -111,34 +101,55 @@ int bake_server_init(
     }
 #if 0
     char target_string[64];
-    uuid_unparse(root->target_id.id, target_string);
+    uuid_unparse(root->id, target_string);
     fprintf(stderr, "opened BAKE target ID: %s\n", target_string);
 #endif
 
     /* register RPCs */
-    MARGO_REGISTER(mid, "bake_shutdown_rpc",
-        void, void, bake_shutdown_ult);
-    MARGO_REGISTER(mid, "bake_create_rpc",
-        bake_create_in_t, bake_create_out_t, bake_create_ult);
-    MARGO_REGISTER(mid, "bake_write_rpc",
-        bake_write_in_t, bake_write_out_t, bake_write_ult);
-    MARGO_REGISTER(mid, "bake_eager_write_rpc",
-        bake_eager_write_in_t, bake_eager_write_out_t, bake_eager_write_ult);
-    MARGO_REGISTER(mid, "bake_eager_read_rpc",
-        bake_eager_read_in_t, bake_eager_read_out_t, bake_eager_read_ult);
-    MARGO_REGISTER(mid, "bake_persist_rpc",
-        bake_persist_in_t, bake_persist_out_t, bake_persist_ult);
-    MARGO_REGISTER(mid, "bake_create_write_persist_rpc",
+    hg_id_t rpc_id;
+    rpc_id = MARGO_REGISTER_MPLEX(mid, "bake_shutdown_rpc",
+        void, void, bake_shutdown_ult, mplex_id, abt_pool);
+    margo_register_data_mplex(mid, rpc_id, mplex_id, (void*)tmp_svr_ctx, NULL);
+    void* test = margo_registered_data_mplex(mid, rpc_id, mplex_id);
+    rpc_id = MARGO_REGISTER_MPLEX(mid, "bake_create_rpc",
+        bake_create_in_t, bake_create_out_t, 
+        bake_create_ult, mplex_id, abt_pool);
+    margo_register_data_mplex(mid, rpc_id, mplex_id, (void*)tmp_svr_ctx, NULL);
+    rpc_id = MARGO_REGISTER_MPLEX(mid, "bake_write_rpc",
+        bake_write_in_t, bake_write_out_t, 
+        bake_write_ult, mplex_id, abt_pool);
+    margo_register_data_mplex(mid, rpc_id, mplex_id, (void*)tmp_svr_ctx, NULL);
+    rpc_id = MARGO_REGISTER_MPLEX(mid, "bake_eager_write_rpc",
+        bake_eager_write_in_t, bake_eager_write_out_t, 
+        bake_eager_write_ult, mplex_id, abt_pool);
+    margo_register_data_mplex(mid, rpc_id, mplex_id, (void*)tmp_svr_ctx, NULL);
+    rpc_id = MARGO_REGISTER_MPLEX(mid, "bake_eager_read_rpc",
+        bake_eager_read_in_t, bake_eager_read_out_t, 
+        bake_eager_read_ult, mplex_id, abt_pool);
+    margo_register_data_mplex(mid, rpc_id, mplex_id, (void*)tmp_svr_ctx, NULL);
+    rpc_id = MARGO_REGISTER_MPLEX(mid, "bake_persist_rpc",
+        bake_persist_in_t, bake_persist_out_t, 
+        bake_persist_ult, mplex_id, abt_pool);
+    margo_register_data_mplex(mid, rpc_id, mplex_id, (void*)tmp_svr_ctx, NULL);
+    rpc_id = MARGO_REGISTER_MPLEX(mid, "bake_create_write_persist_rpc",
         bake_create_write_persist_in_t, bake_create_write_persist_out_t,
-        bake_create_write_persist_ult);
-    MARGO_REGISTER(mid, "bake_get_size_rpc",
-        bake_get_size_in_t, bake_get_size_out_t, bake_get_size_ult);
-    MARGO_REGISTER(mid, "bake_read_rpc",
-        bake_read_in_t, bake_read_out_t, bake_read_ult);
-    MARGO_REGISTER(mid, "bake_probe_rpc",
-        void, bake_probe_out_t, bake_probe_ult);
-    MARGO_REGISTER(mid, "bake_noop_rpc",
-        void, void, bake_noop_ult);
+        bake_create_write_persist_ult, mplex_id, abt_pool);
+    margo_register_data_mplex(mid, rpc_id, mplex_id, (void*)tmp_svr_ctx, NULL);
+    rpc_id = MARGO_REGISTER_MPLEX(mid, "bake_get_size_rpc",
+        bake_get_size_in_t, bake_get_size_out_t, 
+        bake_get_size_ult, mplex_id, abt_pool);
+    margo_register_data_mplex(mid, rpc_id, mplex_id, (void*)tmp_svr_ctx, NULL);
+    rpc_id = MARGO_REGISTER_MPLEX(mid, "bake_read_rpc",
+        bake_read_in_t, bake_read_out_t, 
+        bake_read_ult, mplex_id, abt_pool);
+    margo_register_data_mplex(mid, rpc_id, mplex_id, (void*)tmp_svr_ctx, NULL);
+    rpc_id = MARGO_REGISTER_MPLEX(mid, "bake_probe_rpc",
+        void, bake_probe_out_t, bake_probe_ult, 
+        mplex_id, abt_pool);
+    margo_register_data_mplex(mid, rpc_id, mplex_id, (void*)tmp_svr_ctx, NULL);
+    rpc_id = MARGO_REGISTER_MPLEX(mid, "bake_noop_rpc",
+        void, void, bake_noop_ult, mplex_id, abt_pool);
+    margo_register_data_mplex(mid, rpc_id, mplex_id, (void*)tmp_svr_ctx, NULL);
 
     /* install the bake server finalize callback */
     margo_push_finalize_callback(mid, &bake_server_finalize_cb, tmp_svr_ctx);
@@ -146,7 +157,9 @@ int bake_server_init(
     /* set global server context */
     tmp_svr_ctx->pmem_pool = pool;
     tmp_svr_ctx->pmem_root = root;
-    g_svr_ctx = tmp_svr_ctx;
+
+    if(provider != BAKE_PROVIDER_IGNORE)
+        *provider = tmp_svr_ctx;
 
     return(0);
 }
@@ -156,8 +169,6 @@ static void bake_shutdown_ult(hg_handle_t handle)
 {
     hg_return_t hret;
     margo_instance_id mid;
-
-    assert(g_svr_ctx);
 
     mid = margo_hg_handle_get_instance(handle);
     assert(mid != MARGO_INSTANCE_NULL);
@@ -172,8 +183,6 @@ static void bake_shutdown_ult(hg_handle_t handle)
      */
     margo_finalize(mid);
 
-    g_svr_ctx = NULL;
-
     return;
 }
 DEFINE_MARGO_RPC_HANDLER(bake_shutdown_ult)
@@ -186,8 +195,13 @@ static void bake_create_ult(hg_handle_t handle)
     hg_return_t hret;
     pmemobj_region_id_t* prid;
 
-    assert(g_svr_ctx);
-
+    margo_instance_id mid = margo_hg_handle_get_instance(handle);
+    assert(mid);
+    const struct hg_info* info = margo_get_info(handle);
+    bake_provider_t svr_ctx = 
+        margo_registered_data_mplex(mid, info->id, info->target_id);
+    if(!svr_ctx) 
+        goto respond_with_error;
     /* TODO: this check needs to be somewhere else */
     assert(sizeof(pmemobj_region_id_t) <= BAKE_REGION_ID_DATA_SIZE);
     
@@ -195,22 +209,24 @@ static void bake_create_ult(hg_handle_t handle)
 
     hret = margo_get_input(handle, &in);
     if(hret != HG_SUCCESS)
-    {
-        out.ret = -1;
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
-    }
+        goto respond_with_error;
 
     prid = (pmemobj_region_id_t*)out.rid.data;
     prid->size = in.region_size;
-    out.ret = pmemobj_alloc(g_svr_ctx->pmem_pool, &prid->oid,
+    out.ret = pmemobj_alloc(svr_ctx->pmem_pool, &prid->oid,
         in.region_size, 0, NULL, NULL);
 
     margo_free_input(handle, &in);
     margo_respond(handle, &out);
+
+finish:
     margo_destroy(handle);
     return;
+
+respond_with_error:
+    out.ret = -1;
+    margo_respond(handle, &out);
+    goto finish;
 }
 DEFINE_MARGO_RPC_HANDLER(bake_create_ult)
 
@@ -227,14 +243,19 @@ static void bake_write_ult(hg_handle_t handle)
     margo_instance_id mid;
     pmemobj_region_id_t* prid;
 
-    assert(g_svr_ctx);
-
     memset(&out, 0, sizeof(out));
 
+    mid = margo_hg_handle_get_instance(handle);
+    assert(mid);
     hgi = margo_get_info(handle);
-    assert(hgi);
-    mid = margo_hg_info_get_instance(hgi);
-    assert(mid != MARGO_INSTANCE_NULL);
+    bake_provider_t svr_ctx = 
+        margo_registered_data_mplex(mid, hgi->id, hgi->target_id);
+    if(!svr_ctx) {
+        out.ret = -1;
+        margo_respond(handle, &out);
+        margo_destroy(handle);
+        return;
+    }
 
     hret = margo_get_input(handle, &in);
     if(hret != HG_SUCCESS)
@@ -326,9 +347,19 @@ static void bake_eager_write_ult(hg_handle_t handle)
     hg_bulk_t bulk_handle;
     pmemobj_region_id_t* prid;
 
-    assert(g_svr_ctx);
-
     memset(&out, 0, sizeof(out));
+
+    margo_instance_id mid = margo_hg_handle_get_instance(handle);
+    assert(mid);
+    const struct hg_info* info = margo_get_info(handle);
+    bake_provider_t svr_ctx = 
+        margo_registered_data_mplex(mid, info->id, info->target_id);
+    if(!svr_ctx) {
+        out.ret = -1;
+        margo_respond(handle, &out);
+        margo_destroy(handle);
+        return;
+    }
 
     hret = margo_get_input(handle, &in);
     if(hret != HG_SUCCESS)
@@ -371,10 +402,20 @@ static void bake_persist_ult(hg_handle_t handle)
     hg_return_t hret;
     char* buffer;
     pmemobj_region_id_t* prid;
-
-    assert(g_svr_ctx);
     
     memset(&out, 0, sizeof(out));
+
+    margo_instance_id mid = margo_hg_handle_get_instance(handle);
+    assert(mid);
+    const struct hg_info* info = margo_get_info(handle);
+    bake_provider_t svr_ctx = 
+        margo_registered_data_mplex(mid, info->id, info->target_id);
+    if(!svr_ctx) {
+        out.ret = -1;
+        margo_respond(handle, &out);
+        margo_destroy(handle);
+        return;
+    }
 
     hret = margo_get_input(handle, &in);
     if(hret != HG_SUCCESS)
@@ -399,7 +440,7 @@ static void bake_persist_ult(hg_handle_t handle)
     }
 
     /* TODO: should this have an abt shim in case it blocks? */
-    pmemobj_persist(g_svr_ctx->pmem_pool, buffer, prid->size);
+    pmemobj_persist(svr_ctx->pmem_pool, buffer, prid->size);
 
     out.ret = 0;
 
@@ -423,17 +464,22 @@ static void bake_create_write_persist_ult(hg_handle_t handle)
     int ret;
     pmemobj_region_id_t* prid;
 
-    assert(g_svr_ctx);
+    memset(&out, 0, sizeof(out));
+
+    mid = margo_hg_handle_get_instance(handle);
+    assert(mid);
+    hgi = margo_get_info(handle);
+    bake_provider_t svr_ctx = 
+        margo_registered_data_mplex(mid, hgi->id, hgi->target_id);
+    if(!svr_ctx) {
+        out.ret = -1;
+        margo_respond(handle, &out);
+        margo_destroy(handle);
+        return;
+    }
 
     /* TODO: this check needs to be somewhere else */
     assert(sizeof(pmemobj_region_id_t) <= BAKE_REGION_ID_DATA_SIZE);
-
-    memset(&out, 0, sizeof(out));
-
-    hgi = margo_get_info(handle);
-    assert(hgi);
-    mid = margo_hg_info_get_instance(hgi);
-    assert(mid != MARGO_INSTANCE_NULL);
 
     hret = margo_get_input(handle, &in);
     if(hret != HG_SUCCESS)
@@ -446,7 +492,7 @@ static void bake_create_write_persist_ult(hg_handle_t handle)
 
     prid = (pmemobj_region_id_t*)out.rid.data;
     prid->size = in.region_size;
-    ret = pmemobj_alloc(g_svr_ctx->pmem_pool, &prid->oid,
+    ret = pmemobj_alloc(svr_ctx->pmem_pool, &prid->oid,
         in.region_size, 0, NULL, NULL);
     if(ret != 0)
     {
@@ -515,7 +561,7 @@ static void bake_create_write_persist_ult(hg_handle_t handle)
     }
 
     /* TODO: should this have an abt shim in case it blocks? */
-    pmemobj_persist(g_svr_ctx->pmem_pool, buffer, prid->size);
+    pmemobj_persist(svr_ctx->pmem_pool, buffer, prid->size);
 
     out.ret = 0;
 
@@ -537,10 +583,20 @@ static void bake_get_size_ult(hg_handle_t handle)
     hg_return_t hret;
     pmemobj_region_id_t* prid;
 
-    assert(g_svr_ctx);
-    
     memset(&out, 0, sizeof(out));
 
+    margo_instance_id mid = margo_hg_handle_get_instance(handle);
+    assert(mid);
+    const struct hg_info* hgi = margo_get_info(handle);
+    bake_provider_t svr_ctx = 
+        margo_registered_data_mplex(mid, hgi->id, hgi->target_id);
+    if(!svr_ctx) {
+        out.ret = -1;
+        margo_respond(handle, &out);
+        margo_destroy(handle);
+        return;
+    }
+    
     hret = margo_get_input(handle, &in);
     if(hret != HG_SUCCESS)
     {
@@ -566,7 +622,11 @@ DEFINE_MARGO_RPC_HANDLER(bake_get_size_ult)
 /* service a remote RPC for a BAKE no-op */
 static void bake_noop_ult(hg_handle_t handle)
 {
-    assert(g_svr_ctx);
+    margo_instance_id mid = margo_hg_handle_get_instance(handle);
+    assert(mid);
+    const struct hg_info* hgi = margo_get_info(handle);
+    bake_provider_t svr_ctx = 
+        margo_registered_data_mplex(mid, hgi->id, hgi->target_id);
     
     margo_respond(handle, NULL);
     margo_destroy(handle);
@@ -588,13 +648,19 @@ static void bake_read_ult(hg_handle_t handle)
     margo_instance_id mid;
     pmemobj_region_id_t* prid;
 
-    assert(g_svr_ctx);
-    
     memset(&out, 0, sizeof(out));
 
+    mid = margo_hg_handle_get_instance(handle);
+    assert(mid);
     hgi = margo_get_info(handle);
-    assert(hgi);
-    mid = margo_hg_info_get_instance(hgi);
+    bake_provider_t svr_ctx = 
+        margo_registered_data_mplex(mid, hgi->id, hgi->target_id);
+    if(!svr_ctx) {
+        out.ret = -1;
+        margo_respond(handle, &out);
+        margo_destroy(handle);
+        return;
+    }
 
     hret = margo_get_input(handle, &in);
     if(hret != HG_SUCCESS)
@@ -687,9 +753,19 @@ static void bake_eager_read_ult(hg_handle_t handle)
     hg_size_t size;
     pmemobj_region_id_t* prid;
 
-    assert(g_svr_ctx);
-    
     memset(&out, 0, sizeof(out));
+
+    margo_instance_id mid = margo_hg_handle_get_instance(handle);
+    assert(mid);
+    const struct hg_info* hgi = margo_get_info(handle);
+    bake_provider_t svr_ctx = 
+        margo_registered_data_mplex(mid, hgi->id, hgi->target_id);
+    if(!svr_ctx) {
+        out.ret = -1;
+        margo_respond(handle, &out);
+        margo_destroy(handle);
+        return;
+    }
 
     hret = margo_get_input(handle, &in);
     if(hret != HG_SUCCESS)
@@ -728,13 +804,23 @@ DEFINE_MARGO_RPC_HANDLER(bake_eager_read_ult)
 static void bake_probe_ult(hg_handle_t handle)
 {
     bake_probe_out_t out;
-
-    assert(g_svr_ctx);
     
     memset(&out, 0, sizeof(out));
 
+    margo_instance_id mid = margo_hg_handle_get_instance(handle);
+    assert(mid);
+    const struct hg_info* hgi = margo_get_info(handle);
+    bake_provider_t svr_ctx = 
+        margo_registered_data_mplex(mid, hgi->id, hgi->target_id);
+    if(!svr_ctx) {
+        out.ret = -1;
+        margo_respond(handle, &out);
+        margo_destroy(handle);
+        return;
+    }
+
     out.ret = 0;
-    out.bti = g_svr_ctx->pmem_root->target_id;
+    out.pool_id = svr_ctx->pmem_root->pool_id;
 
     margo_respond(handle, &out);
     margo_destroy(handle);

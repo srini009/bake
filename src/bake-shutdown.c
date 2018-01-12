@@ -54,7 +54,9 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    ret = bake_probe_instance(mid, svr_addr, &bti);
+    bake_client_t bc;
+    ret = bake_client_init(mid, &bc);
+
     if(ret < 0)
     {
         fprintf(stderr, "Error: bake_probe_instance()\n");
@@ -64,10 +66,12 @@ int main(int argc, char **argv)
     }
 
     /* shutdown server */
-    bake_shutdown_service(bti);
+    bake_shutdown_service(bc, svr_addr);
 
-    bake_release_instance(bti);
     margo_addr_free(mid, svr_addr);
+
+    bake_client_finalize(bc);
+
     margo_finalize(mid);
 
     return(0);

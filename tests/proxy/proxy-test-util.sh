@@ -13,7 +13,7 @@ function test_start_proxy_servers ()
     # start daemons
     for i in `seq $nservers`
     do
-        run_to ${maxtime} tests/proxy/proxy-server-daemon $opts -f $TMPBASE/proxy-svr-1.addr na+sm $bake_svr_addr &
+        run_to ${maxtime} tests/proxy/proxy-server-daemon $opts -f $TMPBASE/proxy-svr-1.addr na+sm $bake_svr_addr 1 &
         if [ $? -ne 0 ]; then
             # TODO: this doesn't actually work; can't check return code of
             # something executing in background.  We have to rely on the
