@@ -16,7 +16,7 @@ extern "C" {
 
 typedef struct {
     uuid_t id;
-} bake_uuid_t;
+} bake_target_id_t;
 /**
  * Persistent, opaque identifier for a region within a BAKE target.
  */

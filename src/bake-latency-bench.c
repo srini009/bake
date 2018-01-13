@@ -17,9 +17,9 @@
 
 #include "bake-client.h"
 
-static void bench_routine_write(bake_target_id_t bti, int iterations, double* measurement_array, int size);
-static void bench_routine_read(bake_target_id_t bti, int iterations, double* measurement_array, int size);
-static void bench_routine_noop(bake_target_id_t bti, int iterations, double* measurement_array);
+static void bench_routine_write(bake_provider_handle_t bph, bake_target_id_t bti, int iterations, double* measurement_array, int size);
+static void bench_routine_read(bake_provider_handle_t bph, int iterations, double* measurement_array, int size);
+static void bench_routine_noop(bake_provider_handle_t bph, int iterations, double* measurement_array);
 static void bench_routine_print(const char* op, int size, int iterations, double* measurement_array);
 static int measurement_cmp(const void* a, const void *b);
 
@@ -34,6 +34,8 @@ int main(int argc, char **argv)
     hg_addr_t svr_addr;
     margo_instance_id mid;
     bake_client_t bcl;
+    bake_provider_handle_t bph;
+    uint64_t num_targets;
     bake_target_id_t bti;
     uint8_t mplex_id;
     hg_return_t hret;
@@ -91,10 +93,11 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    ret = bake_probe_instance(bcl, svr_addr, mplex_id, &bti);
+    ret = bake_probe(bph, 1, &bti, &num_targets);
     if(ret < 0)
     {
-        fprintf(stderr, "Error: bake_probe_instance()\n");
+        fprintf(stderr, "Error: bake_probe()\n");
+        bake_provider_handle_release(bph);
         margo_addr_free(mid, svr_addr);
         bake_client_finalize(bcl);
         margo_finalize(mid);
@@ -103,17 +106,17 @@ int main(int argc, char **argv)
 
     printf("# <op> <iterations> <size> <min> <q1> <med> <avg> <q3> <max>\n");
 
-    bench_routine_noop(bti, iterations, measurement_array);
+    bench_routine_noop(bph, iterations, measurement_array);
     bench_routine_print("noop", 0, iterations, measurement_array);
     for(cur_size=min_size; cur_size <= max_size; cur_size *= 2)
     {
-        bench_routine_write(bti, iterations, measurement_array, cur_size);
+        bench_routine_write(bph, bti, iterations, measurement_array, cur_size);
         bench_routine_print("write", cur_size, iterations, measurement_array);
-        bench_routine_read(bti, iterations, measurement_array, cur_size);
+        bench_routine_read(bph, iterations, measurement_array, cur_size);
         bench_routine_print("read", cur_size, iterations, measurement_array);
     }
     
-    bake_target_id_release(bti);
+    bake_provider_handle_release(bph);
     margo_addr_free(mid, svr_addr);
     bake_client_finalize(bcl);
     margo_finalize(mid);
@@ -130,7 +133,7 @@ static double Wtime(void)
     return((double)tp.tv_sec + (double)(tp.tv_nsec) / (double)1000000000.0);
 }
 
-static void bench_routine_write(bake_target_id_t bti, int iterations, double *measurement_array, int size)
+static void bench_routine_write(bake_provider_handle_t bph, bake_target_id_t bti, int iterations, double *measurement_array, int size)
 {
     int ret;
     double tm1, tm2;
@@ -142,7 +145,7 @@ static void bench_routine_write(bake_target_id_t bti, int iterations, double *me
     assert(buffer);
 
     /* create region */
-    ret = bake_create(bti, size*iterations, &rid);
+    ret = bake_create(bph, bti, size*iterations, &rid);
     assert(ret == 0);
 
     sleep(1);
@@ -152,7 +155,7 @@ static void bench_routine_write(bake_target_id_t bti, int iterations, double *me
         tm1 = Wtime();
         /* transfer data (writes) */
         ret = bake_write(
-            bti,
+            bph,
             rid,
             region_offset,
             buffer,
@@ -164,7 +167,7 @@ static void bench_routine_write(bake_target_id_t bti, int iterations, double *me
     }
 
     /* persist */
-    ret = bake_persist(bti, rid);
+    ret = bake_persist(bph, rid);
     assert(ret == 0);
 
     free(buffer);
@@ -172,7 +175,7 @@ static void bench_routine_write(bake_target_id_t bti, int iterations, double *me
     return;
 }
 
-static void bench_routine_read(bake_target_id_t bti, int iterations, double *measurement_array, int size)
+static void bench_routine_read(bake_provider_handle_t bph, int iterations, double *measurement_array, int size)
 {
     int ret;
     double tm1, tm2;
@@ -190,7 +193,7 @@ static void bench_routine_read(bake_target_id_t bti, int iterations, double *mea
         tm1 = Wtime();
         /* transfer data (reads) */
         ret = bake_read(
-            bti,
+            bph,
             rid,
             region_offset,
             buffer,
@@ -206,7 +209,7 @@ static void bench_routine_read(bake_target_id_t bti, int iterations, double *mea
     return;
 }
 
-static void bench_routine_noop(bake_target_id_t bti, int iterations, double *measurement_array)
+static void bench_routine_noop(bake_provider_handle_t bph, int iterations, double *measurement_array)
 {
     int ret;
     double tm1, tm2;
@@ -218,7 +221,7 @@ static void bench_routine_noop(bake_target_id_t bti, int iterations, double *mea
     {
         tm1 = Wtime();
         /* noop */
-        ret = bake_noop(bti);
+        ret = bake_noop(bph);
         tm2 = Wtime();
         assert(ret == 0);
 

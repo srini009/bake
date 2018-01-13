@@ -16,10 +16,10 @@ extern "C" {
 #endif
 
 #define BAKE_CLIENT_NULL ((bake_client_t)NULL)
-#define BAKE_TARGET_ID_NULL ((bake_target_id_t)NULL)
+#define BAKE_PROVIDER_HANDLE_NULL ((bake_provider_handle_t)NULL)
 
 typedef struct bake_client* bake_client_t;
-typedef struct bake_target* bake_target_id_t;
+typedef struct bake_provider_handle* bake_provider_handle_t;
 
 /**
  * Creates a BAKE client attached to the given margo instance.
@@ -46,6 +46,16 @@ int bake_client_init(margo_instance_id mid, bake_client_t* client);
  */
 int bake_client_finalize(bake_client_t client);
 
+int bake_provider_handle_create(
+        bake_client_t client,
+        hg_addr_t addr,
+        uint8_t mplex_id,
+        bake_provider_handle_t* handle);
+
+int bake_provider_handle_ref_incr(bake_provider_handle_t handle);
+
+int bake_provider_handle_release(bake_provider_handle_t handle);
+
 /**
  * Obtains identifying information for a BAKE target through the provided
  * remote mercury address and multiplex id.
@@ -56,11 +66,11 @@ int bake_client_finalize(bake_client_t client);
  * @param [out] bti BAKE target identifier
  * @returns 0 on success, -1 on failure
  */
-int bake_probe_instance(
-    bake_client_t client,
-    hg_addr_t dest_addr,
-    uint8_t mplex_id,
-    bake_target_id_t *bti);
+int bake_probe(
+        bake_provider_handle_t provider,
+        uint64_t max_targets,
+        bake_target_id_t* bti,
+        uint64_t* num_targets);
   
 /**
  * Creates a bounded-size BAKE data region. The resulting region can be
@@ -74,9 +84,10 @@ int bake_probe_instance(
  * @returns 0 on success, -1 on failure
  */
 int bake_create(
-    bake_target_id_t bti,
-    uint64_t region_size,
-    bake_region_id_t *rid);
+        bake_provider_handle_t provider,
+        bake_target_id_t bti,
+        uint64_t region_size,
+        bake_region_id_t *rid);
  
 /**
  * Writes into a BAKE region that was previously created with bake_create().
@@ -94,11 +105,11 @@ int bake_create(
  * @returns 0 on success, -1 on failure
  */
 int bake_write(
-    bake_target_id_t bti,
-    bake_region_id_t rid,
-    uint64_t region_offset,
-    void const *buf,
-    uint64_t buf_size);
+        bake_provider_handle_t provider,
+        bake_region_id_t rid,
+        uint64_t region_offset,
+        void const *buf,
+        uint64_t buf_size);
 
 /**
  * Writes data into a previously created BAKE region like bake_write(),
@@ -114,13 +125,13 @@ int bake_write(
  * @returns 0 on success, -1 on failure
  */
 int bake_proxy_write(
-    bake_target_id_t bti,
-    bake_region_id_t rid,
-    uint64_t region_offset,
-    hg_bulk_t remote_bulk,
-    uint64_t remote_offset,
-    const char* remote_addr,
-    uint64_t size);
+        bake_provider_handle_t provider,
+        bake_region_id_t rid,
+        uint64_t region_offset,
+        hg_bulk_t remote_bulk,
+        uint64_t remote_offset,
+        const char* remote_addr,
+        uint64_t size);
 
 /**
  * Persists a BAKE region. The region is considered immutable at this point 
@@ -131,8 +142,8 @@ int bake_proxy_write(
  * @returns 0 on success, -1 on failure
  */
 int bake_persist(
-    bake_target_id_t bti,
-    bake_region_id_t rid);
+        bake_provider_handle_t provider,
+        bake_region_id_t rid);
 
 /**
  * Creates a bounded-size BAKE region, writes data into it, and persists
@@ -147,12 +158,13 @@ int bake_persist(
  * @returns 0 on success, -1 on failure
  */
 int bake_create_write_persist(
-    bake_target_id_t bti,
-    uint64_t region_size,
-    uint64_t region_offset,
-    void const *buf,
-    uint64_t buf_size,
-    bake_region_id_t *rid);
+        bake_provider_handle_t provider,
+        bake_target_id_t bti,
+        uint64_t region_size,
+        uint64_t region_offset,
+        void const *buf,
+        uint64_t buf_size,
+        bake_region_id_t *rid);
 
 /**
  *
@@ -167,14 +179,15 @@ int bake_create_write_persist(
  * @returns 0 on success, -1 on failure
  */
 int bake_create_write_persist_proxy(
-    bake_target_id_t bti,
-    uint64_t region_size,
-    uint64_t region_offset,
-    hg_bulk_t remote_bulk,
-    uint64_t remote_offset,
-    const char* remote_addr,
-    uint64_t size,
-    bake_region_id_t *rid);
+        bake_provider_handle_t provider,
+        bake_target_id_t bti,
+        uint64_t region_size,
+        uint64_t region_offset,
+        hg_bulk_t remote_bulk,
+        uint64_t remote_offset,
+        const char* remote_addr,
+        uint64_t size,
+        bake_region_id_t *rid);
 
 /**
  * Checks the size of an existing BAKE region. 
@@ -185,9 +198,9 @@ int bake_create_write_persist_proxy(
  * @returns 0 on success, -1 on failure
  */
 int bake_get_size(
-    bake_target_id_t bti,
-    bake_region_id_t rid,
-    uint64_t *size);
+        bake_provider_handle_t provider,
+        bake_region_id_t rid,
+        uint64_t *size);
 
 /**
  * Reads from a BAKE region that was previously persisted with bake_persist().
@@ -203,11 +216,11 @@ int bake_get_size(
  * @returns 0 on success, -1 on failure
  */
 int bake_read(
-    bake_target_id_t bti,
-    bake_region_id_t rid,
-    uint64_t region_offset,
-    void *buf,
-    uint64_t buf_size);
+        bake_provider_handle_t provider,
+        bake_region_id_t rid,
+        uint64_t region_offset,
+        void *buf,
+        uint64_t buf_size);
 
 /**
  * Reads data from a previously persisted BAKE region like bake_read(),
@@ -223,22 +236,13 @@ int bake_read(
  * @returns 0 on success, -1 on failure
  */
 int bake_proxy_read(
-    bake_target_id_t bti,
-    bake_region_id_t rid,
-    uint64_t region_offset,
-    hg_bulk_t remote_bulk,
-    uint64_t remote_offset,
-    const char* remote_addr,
-    uint64_t size);
-
-/**
- * Releases local resources associated with access to a BAKE target;
- * does not modify the target in any way.
- *
- * @param [in] bti BAKE target_identifier
- */
-void bake_target_id_release(
-    bake_target_id_t bti);
+        bake_provider_handle_t provider,
+        bake_region_id_t rid,
+        uint64_t region_offset,
+        hg_bulk_t remote_bulk,
+        uint64_t remote_offset,
+        const char* remote_addr,
+        uint64_t size);
 
 /**
  * Shuts down a remote BAKE service (given an address).
@@ -249,7 +253,7 @@ void bake_target_id_release(
  * @returns 0 on success, -1 on failure 
  */
 int bake_shutdown_service(
-    bake_client_t client, hg_addr_t addr);
+        bake_client_t client, hg_addr_t addr);
 
 /**
  * Issues a BAKE no-op operation.
@@ -257,8 +261,7 @@ int bake_shutdown_service(
  * @param [in] bti BAKE target identifier
  * @returns 0 on success, -1 on failure
  */
-int bake_noop(
-    bake_target_id_t bti);
+int bake_noop(bake_provider_handle_t provider);
 
 #ifdef __cplusplus
 }

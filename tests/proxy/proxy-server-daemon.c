@@ -29,8 +29,9 @@ struct options
 
 struct proxy_server_context
 {
-    bake_client_t    bcl;
     hg_addr_t        svr_addr;
+    bake_client_t    bcl;
+    bake_provider_handle_t svr_bph;
     bake_target_id_t svr_bti;
     bake_region_id_t the_rid;
     int batch_rpc;
@@ -86,8 +87,9 @@ static void parse_args(int argc, char **argv, struct options *opts)
 }
 
 static void finalize_cb(void* data) {
-    bake_client_t client = (bake_client_t)data;
-    bake_client_finalize(client);
+    struct proxy_server_context* ctx = (struct proxy_server_context*)data;
+    bake_provider_handle_release(ctx->svr_bph);
+    bake_client_finalize(ctx->bcl);
 }
 
 int main(int argc, char **argv) 
@@ -162,11 +164,10 @@ int main(int argc, char **argv)
         return -1;
     }
 
-    margo_push_finalize_callback(mid, finalize_cb, (void*)(g_proxy_svr_ctx->bcl));
+    margo_push_finalize_callback(mid, finalize_cb, (void*)(g_proxy_svr_ctx));
 
     /* lookup the BAKE server address */
     hret = margo_addr_lookup(mid, opts.bake_svr_addr_str, &bake_svr_addr);
-    g_proxy_svr_ctx->svr_addr = bake_svr_addr;
 
     if(hret != HG_SUCCESS)
     {
@@ -175,10 +176,24 @@ int main(int argc, char **argv)
         margo_finalize(mid);
         return(-1);
     }
+    g_proxy_svr_ctx->svr_addr = bake_svr_addr;
 
-    /* probe the BAKE server for an instance */
-    ret = bake_probe_instance(g_proxy_svr_ctx->bcl, 
-                bake_svr_addr, opts.bake_mplex_id, &g_proxy_svr_ctx->svr_bti);
+    /* create a BAKE provider handle */
+    ret = bake_provider_handle_create(g_proxy_svr_ctx->bcl,
+            bake_svr_addr, opts.bake_mplex_id, &g_proxy_svr_ctx->svr_bph);
+
+    if(ret != 0)
+    {
+        fprintf(stderr, "Error: bake_provider_handle_create()\n");
+        bake_client_finalize(g_proxy_svr_ctx->bcl);
+        margo_finalize(mid);
+        return -1;
+    }
+
+    /* probe the BAKE server for a target */
+    uint64_t num_targets;
+    ret = bake_probe(g_proxy_svr_ctx->svr_bph, 
+                1, &g_proxy_svr_ctx->svr_bti, &num_targets);
     if(ret < 0)
     {
         fprintf(stderr, "Error: bake_probe_instance()\n");
@@ -218,7 +233,8 @@ static void proxy_write_ult(hg_handle_t handle)
         /* create the BAKE region, write to it on behalf of the client,
          * and persist the region all in one RPC
          */
-        ret = bake_create_write_persist_proxy(g_proxy_svr_ctx->svr_bti,
+        ret = bake_create_write_persist_proxy(
+            g_proxy_svr_ctx->svr_bph, g_proxy_svr_ctx->svr_bti,
             in.bulk_size, 0, in.bulk_handle, in.bulk_offset, in.bulk_addr,
             in.bulk_size, &(g_proxy_svr_ctx->the_rid));
         assert(ret == 0);
@@ -226,17 +242,19 @@ static void proxy_write_ult(hg_handle_t handle)
     else
     {
         /* create BAKE region to store this write in */
-        ret = bake_create(g_proxy_svr_ctx->svr_bti, in.bulk_size,
+        ret = bake_create(
+            g_proxy_svr_ctx->svr_bph,
+            g_proxy_svr_ctx->svr_bti, in.bulk_size,
             &(g_proxy_svr_ctx->the_rid));
         assert(ret == 0);
 
         /* perform proxy write on behalf of client */
-        ret = bake_proxy_write(g_proxy_svr_ctx->svr_bti, g_proxy_svr_ctx->the_rid,
+        ret = bake_proxy_write(g_proxy_svr_ctx->svr_bph, g_proxy_svr_ctx->the_rid,
             0, in.bulk_handle, in.bulk_offset, in.bulk_addr, in.bulk_size);
         assert(ret == 0);
 
         /* persist the BAKE region */
-        ret = bake_persist(g_proxy_svr_ctx->svr_bti, g_proxy_svr_ctx->the_rid);
+        ret = bake_persist(g_proxy_svr_ctx->svr_bph, g_proxy_svr_ctx->the_rid);
         assert(ret == 0);
     }
 
@@ -267,7 +285,7 @@ static void proxy_read_ult(hg_handle_t handle)
     assert(hret == HG_SUCCESS);
 
     /* perform proxy write on behalf of client */
-    ret = bake_proxy_read(g_proxy_svr_ctx->svr_bti, g_proxy_svr_ctx->the_rid,
+    ret = bake_proxy_read(g_proxy_svr_ctx->svr_bph, g_proxy_svr_ctx->the_rid,
         0, in.bulk_handle, in.bulk_offset, in.bulk_addr, in.bulk_size);
     assert(ret == 0);
 
@@ -304,7 +322,6 @@ static void proxy_shutdown_ult(hg_handle_t handle)
     bake_shutdown_service(g_proxy_svr_ctx->bcl, g_proxy_svr_ctx->svr_addr);
 
     /* cleanup global state */
-    bake_target_id_release(g_proxy_svr_ctx->svr_bti);
     free(g_proxy_svr_ctx);
 
     margo_finalize(mid);

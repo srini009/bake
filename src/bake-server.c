@@ -14,7 +14,7 @@
 /* definition of BAKE root data structure (just a uuid for now) */
 typedef struct
 {   
-    bake_uuid_t pool_id;
+    bake_target_id_t pool_id;
 } bake_root_t;
  
 /* definition of internal BAKE region_id_t identifier for libpmemobj back end */
@@ -820,7 +820,7 @@ static void bake_probe_ult(hg_handle_t handle)
     }
 
     out.ret = 0;
-    out.pool_id = svr_ctx->pmem_root->pool_id;
+    out.bti = svr_ctx->pmem_root->pool_id;
 
     margo_respond(handle, &out);
     margo_destroy(handle);

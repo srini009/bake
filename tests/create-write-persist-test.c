@@ -25,6 +25,8 @@ int main(int argc, char *argv[])
     hg_addr_t svr_addr;
     uint8_t mplex_id;
     bake_client_t bcl;
+    bake_provider_handle_t bph;
+    uint64_t num_targets;
     bake_target_id_t bti;
     bake_region_id_t the_rid;
     const char *test_str = "This is a test string for create-write-persist test.";
@@ -74,11 +76,23 @@ int main(int argc, char *argv[])
         return(-1);
     }
 
-    /* obtain info on the server's BAKE target */
-    ret = bake_probe_instance(bcl, svr_addr, mplex_id, &bti);
+    /* create a BAKE provider handle */
+    ret = bake_provider_handle_create(bcl, svr_addr, mplex_id, &bph);
     if(ret != 0)
     {
-        fprintf(stderr, "Error: bake_probe_instance()\n");
+        fprintf(stderr, "Error: bake_provider_handle_create()\n");
+        margo_addr_free(mid, svr_addr);
+        bake_client_finalize(bcl);
+        margo_finalize(mid);
+        return(-1);
+    }
+
+    /* obtain info on the server's BAKE target */
+    ret = bake_probe(bph, 1, &bti, &num_targets);
+    if(ret != 0)
+    {
+        fprintf(stderr, "Error: bake_probe()\n");
+        bake_provider_handle_release(bph);
         margo_addr_free(mid, svr_addr);
         bake_client_finalize(bcl);
         margo_finalize(mid);
@@ -88,7 +102,7 @@ int main(int argc, char *argv[])
     buf = malloc(ALLOC_BUF_SIZE);
     if(!buf)
     {
-        bake_target_id_release(bti);
+        bake_provider_handle_release(bph);
         margo_addr_free(mid, svr_addr);
         bake_client_finalize(bcl);
         margo_finalize(mid);
@@ -101,12 +115,12 @@ int main(int argc, char *argv[])
     strcpy(buf, test_str);
     buf_size = strlen(test_str) + 1;
 
-    ret = bake_create_write_persist(bti, buf_size, 0, buf, buf_size, &the_rid);
+    ret = bake_create_write_persist(bph, bti, buf_size, 0, buf, buf_size, &the_rid);
     if(ret != 0)
     {
         fprintf(stderr, "Error: bake_create_write_persist()\n");
         free(buf);
-        bake_target_id_release(bti);
+        bake_provider_handle_release(bph);
         margo_addr_free(mid, svr_addr);
         bake_client_finalize(bcl);
         margo_finalize(mid);
@@ -118,12 +132,12 @@ int main(int argc, char *argv[])
     /* reset the buffer and read it back via BAKE */
     memset(buf, 0, ALLOC_BUF_SIZE);
 
-    ret = bake_read(bti, the_rid, 0, buf, buf_size);
+    ret = bake_read(bph, the_rid, 0, buf, buf_size);
     if(ret != 0)
     {
         fprintf(stderr, "Error: bake_read()\n");
         free(buf);
-        bake_target_id_release(bti);
+        bake_provider_handle_release(bph);
         margo_addr_free(mid, svr_addr);
         bake_client_finalize(bcl);
         margo_finalize(mid);
@@ -135,7 +149,7 @@ int main(int argc, char *argv[])
     {
         fprintf(stderr, "Error: unexpected buffer contents returned from BAKE\n");
         free(buf);
-        bake_target_id_release(bti);
+        bake_provider_handle_release(bph);
         margo_addr_free(mid, svr_addr);
         bake_client_finalize(bcl);
         margo_finalize(mid);
@@ -148,7 +162,7 @@ int main(int argc, char *argv[])
     /**** cleanup ****/
 
     free(buf);
-    bake_target_id_release(bti);
+    bake_provider_handle_release(bph);
     margo_addr_free(mid, svr_addr);
     bake_client_finalize(bcl);
     margo_finalize(mid);

@@ -27,6 +27,8 @@ int main(int argc, char **argv)
     hg_addr_t svr_addr;
     margo_instance_id mid;
     bake_client_t bcl;
+    bake_provider_handle_t bph;
+    uint64_t num_targets;
     bake_target_id_t bti;
     uint8_t mplex_id;
     hg_return_t hret;
@@ -106,23 +108,36 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    ret = bake_probe_instance(bcl, svr_addr, mplex_id, &bti);
-    if(ret < 0)
+    ret = bake_provider_handle_create(bcl, svr_addr, mplex_id, &bph);
+    if(ret != 0)
     {
         margo_addr_free(mid, svr_addr);
         bake_client_finalize(bcl);
         margo_finalize(mid);
         munmap(local_region, statbuf.st_size);
         close(fd);
-        fprintf(stderr, "Error: bake_probe_instance()\n");
+        fprintf(stderr, "Error: bake_provider_handle_create()\n");
+        return(-1);
+    }
+
+    ret = bake_probe(bph, 1, &bti, &num_targets);
+    if(ret < 0)
+    {
+        bake_provider_handle_release(bph);
+        margo_addr_free(mid, svr_addr);
+        bake_client_finalize(bcl);
+        margo_finalize(mid);
+        munmap(local_region, statbuf.st_size);
+        close(fd);
+        fprintf(stderr, "Error: bake_probe()\n");
         return(-1);
     }
 
     /* create region */
-    ret = bake_create(bti, statbuf.st_size, &rid);
+    ret = bake_create(bph, bti, statbuf.st_size, &rid);
     if(ret != 0)
     {
-        bake_target_id_release(bti);
+        bake_provider_handle_release(bph);
         margo_addr_free(mid, svr_addr);
         bake_client_finalize(bcl);
         margo_finalize(mid);
@@ -134,14 +149,14 @@ int main(int argc, char **argv)
 
     /* transfer data */
     ret = bake_write(
-        bti,
+        bph,
         rid,
         0,
         local_region,
         statbuf.st_size);
     if(ret != 0)
     {
-        bake_target_id_release(bti);
+        bake_provider_handle_release(bph);
         margo_addr_free(mid, svr_addr);
         bake_client_finalize(bcl);
         margo_finalize(mid);
@@ -154,10 +169,10 @@ int main(int argc, char **argv)
     munmap(local_region, statbuf.st_size);
     close(fd);
 
-    ret = bake_persist(bti, rid);
+    ret = bake_persist(bph, rid);
     if(ret != 0)
     {
-        bake_target_id_release(bti);
+        bake_provider_handle_release(bph);
         margo_addr_free(mid, svr_addr);
         bake_client_finalize(bcl);
         margo_finalize(mid);
@@ -166,18 +181,18 @@ int main(int argc, char **argv)
     }
 
     /* safety check size */
-    ret = bake_get_size(bti, rid, &check_size);
+    ret = bake_get_size(bph, rid, &check_size);
     if(ret != 0)
     {
-        bake_target_id_release(bti);
+        bake_provider_handle_release(bph);
         margo_addr_free(mid, svr_addr);
         bake_client_finalize(bcl);
         margo_finalize(mid);
         fprintf(stderr, "Error: bake_get_size()\n");
         return(-1);
     }
-    
-    bake_target_id_release(bti);
+   
+    bake_provider_handle_release(bph);
     margo_addr_free(mid, svr_addr);
     bake_client_finalize(bcl);
     margo_finalize(mid);
