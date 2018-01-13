@@ -46,24 +46,51 @@ int bake_client_init(margo_instance_id mid, bake_client_t* client);
  */
 int bake_client_finalize(bake_client_t client);
 
+/**
+ * Creates a provider handle to point to a particular BAKE provider.
+ *
+ * @param client client managing the provider handle
+ * @param addr address of the provider
+ * @param mplex_id multiplex id of the provider
+ * @param handle resulting handle
+ *
+ * @return 0 on success, -1 on failure
+ */
 int bake_provider_handle_create(
         bake_client_t client,
         hg_addr_t addr,
         uint8_t mplex_id,
         bake_provider_handle_t* handle);
 
+/**
+ * Increment the reference counter of the provider handle
+ *
+ * @param handle provider handle
+ *
+ * @return 0 on success, -1 on failure
+ */
 int bake_provider_handle_ref_incr(bake_provider_handle_t handle);
 
+/**
+ * Decrement the reference counter of the provider handle,
+ * effectively freeing the provider handle when the reference count
+ * is down to 0.
+ *
+ * @param handle provider handle
+ *
+ * @return 0 on success, -1 on failure
+ */
 int bake_provider_handle_release(bake_provider_handle_t handle);
 
 /**
- * Obtains identifying information for a BAKE target through the provided
- * remote mercury address and multiplex id.
+ * Obtains available BAKE targets from a give provider.
+ * If bake_target_id_t is NULL, max_targets is ignored and the
+ * function returns the number of targets available in num_targets.
  *
- * @param [in] client BAKE client
- * @param [in] dest_addr destination Mercury address
- * @param [in] mplex_id multiplex id
- * @param [out] bti BAKE target identifier
+ * @param [in] provider provider handle
+ * @param [in] max_targets maximum number of targets to retrieve
+ * @param [out] bti array of BAKE target identifiers with enough space for max_targets
+ * @param [out] num_targets number of targets returned (at most max_targets)
  * @returns 0 on success, -1 on failure
  */
 int bake_probe(
@@ -78,6 +105,7 @@ int bake_probe(
  * are complete) with a a BAKE persist operation.  The region is not valid
  * for read access until persisted.
  *
+ * @param [in] provider provider handle
  * @param [in] bti BAKE target identifier
  * @param [in] region_size size of region to be created
  * @param [out] rid identifier for new region
@@ -97,7 +125,7 @@ int bake_create(
  * Results are undefined if multiple writers (from same process or different
  * processes) perform overlapping writes.
  *
- * @param [in] bti BAKE target identifier
+ * @param [in] provider provider handle
  * @param [in] rid identifier for region
  * @param [in] region_offset offset into the target region to write
  * @param [in] buf local memory buffer to write
@@ -115,7 +143,7 @@ int bake_write(
  * Writes data into a previously created BAKE region like bake_write(),
  * except the write is performed on behalf of some remote entity.
  *
- * @param [in] bti BAKE target identifier
+ * @param [in] provider provider handle
  * @param [in] rid identifier for region
  * @param [in] region_offset offset into the target region to write
  * @param [in] remote_bulk bulk_handle for remote data region to write from
@@ -137,7 +165,7 @@ int bake_proxy_write(
  * Persists a BAKE region. The region is considered immutable at this point 
  * and reads may be performed on the region.
  *
- * @param [in] bti BAKE target identifier
+ * @param [in] provider provider handle
  * @param [in] rid identifier for region
  * @returns 0 on success, -1 on failure
  */
@@ -149,6 +177,7 @@ int bake_persist(
  * Creates a bounded-size BAKE region, writes data into it, and persists
  * the reason all in one call/RPC (and thus 1 RTT).
  *
+ * @param [in] provider provider handle
  * @param [in] bti BAKE target identifier
  * @param [in] region_size size of region to be created
  * @param [in] region_offset offset into the target region to write
@@ -168,6 +197,7 @@ int bake_create_write_persist(
 
 /**
  *
+ * @param [in] provider provider handle
  * @param [in] bti BAKE target identifier
  * @param [in] region_size size of region to be created
  * @param [in] region_offset offset into the target region to write
@@ -192,7 +222,7 @@ int bake_create_write_persist_proxy(
 /**
  * Checks the size of an existing BAKE region. 
  *
- * @param [in] bti BAKE target identifier
+ * @param [in] provider provider handle
  * @param [in] rid identifier for region
  * @param [out] size size of region
  * @returns 0 on success, -1 on failure
@@ -208,7 +238,7 @@ int bake_get_size(
  * NOTE: for now at least, this call does not support "short" reads.  It
  * either succeeds in reading the requested size or not.
  *
- * @param [in] bti BAKE target identifier
+ * @param [in] provider provider handle
  * @param [in] rid region identifier
  * @param [in] region_offset offset into the target region to read from
  * @param [in] buf local memory buffer read into
@@ -226,7 +256,7 @@ int bake_read(
  * Reads data from a previously persisted BAKE region like bake_read(),
  * except the read is performed on behalf of some remote entity.
  *
- * @param [in] bti BAKE target identifier
+ * @param [in] provider provider handle
  * @param [in] rid identifier for region
  * @param [in] region_offset offset into the target region to write
  * @param [in] remote_bulk bulk_handle for remote data region to read to
@@ -258,7 +288,7 @@ int bake_shutdown_service(
 /**
  * Issues a BAKE no-op operation.
  *
- * @param [in] bti BAKE target identifier
+ * @param [in] provider provider handle
  * @returns 0 on success, -1 on failure
  */
 int bake_noop(bake_provider_handle_t provider);

@@ -144,7 +144,7 @@ int bake_provider_register(
         bake_read_ult, mplex_id, abt_pool);
     margo_register_data_mplex(mid, rpc_id, mplex_id, (void*)tmp_svr_ctx, NULL);
     rpc_id = MARGO_REGISTER_MPLEX(mid, "bake_probe_rpc",
-        void, bake_probe_out_t, bake_probe_ult, 
+        bake_probe_in_t, bake_probe_out_t, bake_probe_ult, 
         mplex_id, abt_pool);
     margo_register_data_mplex(mid, rpc_id, mplex_id, (void*)tmp_svr_ctx, NULL);
     rpc_id = MARGO_REGISTER_MPLEX(mid, "bake_noop_rpc",
@@ -820,7 +820,10 @@ static void bake_probe_ult(hg_handle_t handle)
     }
 
     out.ret = 0;
-    out.bti = svr_ctx->pmem_root->pool_id;
+    // XXX this is where we should handle multiple targets
+    bake_target_id_t targets[1] = { svr_ctx->pmem_root->pool_id };
+    out.targets = targets;
+    out.num_targets = 1;
 
     margo_respond(handle, &out);
     margo_destroy(handle);

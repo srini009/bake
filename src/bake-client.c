@@ -33,6 +33,8 @@ struct bake_client
     hg_id_t bake_get_size_id;
     hg_id_t bake_read_id;
     hg_id_t bake_noop_id;
+
+    uint64_t num_provider_handles;
 };
 
 struct bake_provider_handle {
@@ -49,7 +51,7 @@ static int bake_client_register(bake_client_t client, margo_instance_id mid)
     /* register RPCs */
     client->bake_probe_id = 
         MARGO_REGISTER(mid, "bake_probe_rpc",
-        void, bake_probe_out_t, NULL);
+        bake_probe_in_t, bake_probe_out_t, NULL);
     client->bake_shutdown_id = 
         MARGO_REGISTER(mid, "bake_shutdown_rpc",
         void, void, NULL);
@@ -89,6 +91,8 @@ int bake_client_init(margo_instance_id mid, bake_client_t* client)
     bake_client_t c = (bake_client_t)calloc(1, sizeof(*c));
     if(!c) return -1;
 
+    c->num_provider_handles = 0;
+
     int ret = bake_client_register(c, mid);
     if(ret != 0) return ret;
 
@@ -98,6 +102,11 @@ int bake_client_init(margo_instance_id mid, bake_client_t* client)
 
 int bake_client_finalize(bake_client_t client)
 {
+    if(client->num_provider_handles != 0) {
+        fprintf(stderr, 
+                "[BAKE] Warning: %d provider handles not released before bake_client_finalize was called\n",
+                client->num_provider_handles);
+    }
     free(client);
     return 0;
 }
@@ -110,8 +119,12 @@ int bake_probe(
 {
     hg_return_t hret;
     int ret;
+    bake_probe_in_t in;
     bake_probe_out_t out;
     hg_handle_t handle;
+
+    if(bti == NULL) max_targets = 0;
+    in.max_targets = max_targets;
 
     /* create handle */
     hret = margo_create(
@@ -129,7 +142,7 @@ int bake_probe(
         return -1;
     }
 
-    hret = margo_forward(handle, NULL);
+    hret = margo_forward(handle, &in);
     if(hret != HG_SUCCESS) {
         margo_destroy(handle);
         return -1;
@@ -143,12 +156,19 @@ int bake_probe(
 
     ret = out.ret;
 
+    if(ret == HG_SUCCESS) {
+        if(max_targets == 0) {
+            *num_targets = out.num_targets;
+        } else {
+            uint64_t s = *num_targets > max_targets ? max_targets : *num_targets;
+            if(s > 0) {
+                memcpy(bti, out.targets, sizeof(*bti)*s);
+            }
+        }
+    }
+
     margo_free_output(handle, &out);
     margo_destroy(handle);
-
-    if(ret == HG_SUCCESS) {
-        *bti = out.bti;
-    }
 
     return ret;
 }
@@ -176,6 +196,8 @@ int bake_provider_handle_create(
     provider->mplex_id = mplex_id;
     provider->refcount = 1;
 
+    client->num_provider_handles += 1;
+
     *handle = provider;
     return 0;
 }
@@ -193,6 +215,7 @@ int bake_provider_handle_release(bake_provider_handle_t handle)
     handle->refcount -= 1;
     if(handle->refcount == 0) {
         margo_addr_free(handle->client->mid, handle->addr);
+        handle->client->num_provider_handles -= 1;
         free(handle);
     }
     return 0;

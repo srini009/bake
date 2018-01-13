@@ -15,7 +15,7 @@
 /* encoders for BAKE-specific types */
 static inline hg_return_t hg_proc_bake_target_id_t(hg_proc_t proc, bake_target_id_t *bti);
 static inline hg_return_t hg_proc_bake_region_id_t(hg_proc_t proc, bake_region_id_t *rid);
-
+static inline hg_return_t hg_proc_bake_probe_out_t(hg_proc_t proc, void* out);
 /* BAKE shutdown */
 DECLARE_MARGO_RPC_HANDLER(bake_shutdown_ult)
 
@@ -115,9 +115,17 @@ static inline hg_return_t hg_proc_bake_eager_read_out_t(hg_proc_t proc, void *v_
 DECLARE_MARGO_RPC_HANDLER(bake_eager_read_ult)
 
 /* BAKE probe */
-MERCURY_GEN_PROC(bake_probe_out_t,
-    ((int32_t)(ret))\
-    ((bake_target_id_t)(bti)))
+MERCURY_GEN_PROC(bake_probe_in_t,
+                ((uint64_t)(max_targets)))
+//MERCURY_GEN_PROC(bake_probe_out_t,
+//    ((int32_t)(ret))\
+//    ((bake_target_id_t)(bti)))
+typedef struct
+{
+    int32_t ret;
+    uint64_t num_targets;
+    bake_target_id_t* targets;
+} bake_probe_out_t;
 DECLARE_MARGO_RPC_HANDLER(bake_probe_ult)
 
 /* BAKE noop */
@@ -190,6 +198,25 @@ static inline hg_return_t hg_proc_bake_eager_read_out_t(hg_proc_t proc, void *v_
     }
 
     return(HG_SUCCESS);
+}
+
+static inline hg_return_t hg_proc_bake_probe_out_t(hg_proc_t proc, void* data)
+{
+    bake_probe_out_t* out = (bake_probe_out_t*)data;
+    void* buf = NULL;
+
+    hg_proc_int32_t(proc, &out->ret);
+    hg_proc_uint64_t(proc, &out->num_targets);
+    if(out->num_targets)
+    {
+        buf = hg_proc_save_ptr(proc, out->num_targets * sizeof(bake_target_id_t));
+        if(hg_proc_get_op(proc) == HG_ENCODE)
+            memcpy(buf, out->targets, out->num_targets * sizeof(bake_target_id_t));
+        if(hg_proc_get_op(proc) == HG_DECODE)
+            out->targets = buf;
+        hg_proc_restore_ptr(proc, buf, out->num_targets * sizeof(bake_target_id_t));
+    }
+    return HG_SUCCESS;
 }
 
 #endif /* __BAKE_RPC */
