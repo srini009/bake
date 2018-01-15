@@ -48,40 +48,61 @@ static int bake_client_register(bake_client_t client, margo_instance_id mid)
 {
     client->mid = mid;
 
-    /* register RPCs */
-    client->bake_probe_id = 
-        MARGO_REGISTER(mid, "bake_probe_rpc",
-        bake_probe_in_t, bake_probe_out_t, NULL);
-    client->bake_shutdown_id = 
-        MARGO_REGISTER(mid, "bake_shutdown_rpc",
-        void, void, NULL);
-    client->bake_create_id = 
-        MARGO_REGISTER(mid, "bake_create_rpc",
-        bake_create_in_t, bake_create_out_t, NULL);
-    client->bake_write_id = 
-        MARGO_REGISTER(mid, "bake_write_rpc",
-        bake_write_in_t, bake_write_out_t, NULL);
-    client->bake_eager_write_id = 
-        MARGO_REGISTER(mid, "bake_eager_write_rpc",
-        bake_eager_write_in_t, bake_eager_write_out_t, NULL);
-    client->bake_eager_read_id = 
-        MARGO_REGISTER(mid, "bake_eager_read_rpc",
-        bake_eager_read_in_t, bake_eager_read_out_t, NULL);
-    client->bake_persist_id = 
-        MARGO_REGISTER(mid, "bake_persist_rpc",
-        bake_persist_in_t, bake_persist_out_t, NULL);
-    client->bake_create_write_persist_id =
-        MARGO_REGISTER(mid, "bake_create_write_persist_rpc",
-         bake_create_write_persist_in_t, bake_create_write_persist_out_t, NULL);
-    client->bake_get_size_id = 
-        MARGO_REGISTER(mid, "bake_get_size_rpc",
-        bake_get_size_in_t, bake_get_size_out_t, NULL);
-    client->bake_read_id = 
-        MARGO_REGISTER(mid, "bake_read_rpc",
-        bake_read_in_t, bake_read_out_t, NULL);
-    client->bake_noop_id = 
-        MARGO_REGISTER(mid, "bake_noop_rpc",
-        void, void, NULL);
+    /* check if RPCs have already been registered */
+    hg_bool_t flag;
+    hg_id_t id;
+    margo_registered_name(mid, "bake_probe_rpc", &id, &flag);
+
+    if(flag == HG_TRUE) { /* RPCs already registered */
+
+        margo_registered_name(mid, "bake_probe_rpc",                &client->bake_probe_id,                &flag);
+        margo_registered_name(mid, "bake_shutdown_rpc",             &client->bake_shutdown_id,             &flag);
+        margo_registered_name(mid, "bake_create_rpc",               &client->bake_create_id,               &flag);
+        margo_registered_name(mid, "bake_write_rpc",                &client->bake_write_id,                &flag);
+        margo_registered_name(mid, "bake_eager_write_rpc",          &client->bake_eager_write_id,          &flag);
+        margo_registered_name(mid, "bake_eager_read_rpc",           &client->bake_eager_read_id,           &flag);
+        margo_registered_name(mid, "bake_persist_rpc",              &client->bake_persist_id,              &flag);
+        margo_registered_name(mid, "bake_create_write_persist_rpc", &client->bake_create_write_persist_id, &flag);
+        margo_registered_name(mid, "bake_get_size_rpc",             &client->bake_get_size_id,             &flag);
+        margo_registered_name(mid, "bake_read_rpc",                 &client->bake_read_id,                 &flag);
+        margo_registered_name(mid, "bake_noop_rpc",                 &client->bake_noop_id,                 &flag);
+
+    } else { /* RPCs not already registered */
+
+        client->bake_probe_id = 
+            MARGO_REGISTER(mid, "bake_probe_rpc",
+                    bake_probe_in_t, bake_probe_out_t, NULL);
+        client->bake_shutdown_id = 
+            MARGO_REGISTER(mid, "bake_shutdown_rpc",
+                    void, void, NULL);
+        client->bake_create_id = 
+            MARGO_REGISTER(mid, "bake_create_rpc",
+                    bake_create_in_t, bake_create_out_t, NULL);
+        client->bake_write_id = 
+            MARGO_REGISTER(mid, "bake_write_rpc",
+                    bake_write_in_t, bake_write_out_t, NULL);
+        client->bake_eager_write_id = 
+            MARGO_REGISTER(mid, "bake_eager_write_rpc",
+                    bake_eager_write_in_t, bake_eager_write_out_t, NULL);
+        client->bake_eager_read_id = 
+            MARGO_REGISTER(mid, "bake_eager_read_rpc",
+                    bake_eager_read_in_t, bake_eager_read_out_t, NULL);
+        client->bake_persist_id = 
+            MARGO_REGISTER(mid, "bake_persist_rpc",
+                    bake_persist_in_t, bake_persist_out_t, NULL);
+        client->bake_create_write_persist_id =
+            MARGO_REGISTER(mid, "bake_create_write_persist_rpc",
+                    bake_create_write_persist_in_t, bake_create_write_persist_out_t, NULL);
+        client->bake_get_size_id = 
+            MARGO_REGISTER(mid, "bake_get_size_rpc",
+                    bake_get_size_in_t, bake_get_size_out_t, NULL);
+        client->bake_read_id = 
+            MARGO_REGISTER(mid, "bake_read_rpc",
+                    bake_read_in_t, bake_read_out_t, NULL);
+        client->bake_noop_id = 
+            MARGO_REGISTER(mid, "bake_noop_rpc",
+                    void, void, NULL);
+    }
 
     return(0);
 }
@@ -160,10 +181,11 @@ int bake_probe(
         if(max_targets == 0) {
             *num_targets = out.num_targets;
         } else {
-            uint64_t s = *num_targets > max_targets ? max_targets : *num_targets;
+            uint64_t s = out.num_targets > max_targets ? max_targets : out.num_targets;
             if(s > 0) {
                 memcpy(bti, out.targets, sizeof(*bti)*s);
             }
+            *num_targets = s;
         }
     }
 
@@ -440,7 +462,8 @@ int bake_create(
     }
 
     ret = out.ret;
-    *rid = out.rid;
+    if(ret == 0) 
+        *rid = out.rid;
 
     margo_free_output(handle, &out);
     margo_destroy(handle);
@@ -519,13 +542,14 @@ int bake_create_write_persist(
 
     hret = margo_create(provider->client->mid, provider->addr,
             provider->client->bake_create_write_persist_id, &handle);
-    margo_set_target_id(handle, provider->mplex_id);
 
     if(hret != HG_SUCCESS)
     {
         margo_bulk_free(in.bulk_handle);
         return(-1);
     }
+
+    margo_set_target_id(handle, provider->mplex_id);
 
     hret = margo_forward(handle, &in);
     if(hret != HG_SUCCESS)

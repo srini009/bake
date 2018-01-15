@@ -38,21 +38,86 @@ int bake_makepool(
     mode_t pool_mode);
 
 /**
- * Initializes a BAKE server instance.
+ * Initializes a BAKE provider.
  *
  * @param[in] mid Margo instance identifier
  * @param[in] mplex_id Multiplex id
  * @param[in] pool Pool on which to run the RPC handlers
- * @param[in] pool_name path to PMEM backend file
+ * @param[in] target_name path to PMEM backend file
  * @param[out] provider resulting provider
  * @returns 0 on success, -1 otherwise
  */
 int bake_provider_register(
-    margo_instance_id mid,
-    uint32_t mplex_id,
-    ABT_pool pool,
-    const char *pool_name,
-    bake_provider_t* provider);
+        margo_instance_id mid,
+        uint8_t mplex_id,
+        ABT_pool pool,
+        bake_provider_t* provider);
+
+/**
+ * Makes the provider start managing a target.
+ * The target must have been previously created with bake_makepool,
+ * and it should not be managed by another provider (whether in this
+ * proccess or another).
+ *
+ * @param provider Bake provider
+ * @param target_name path to pmem target
+ * @param target_id resulting id identifying the target
+ *
+ * @return 0 on success, -1 on failure
+ */
+int bake_provider_add_storage_target(
+        bake_provider_t provider,
+        const char *target_name,
+        bake_target_id_t* target_id);
+
+/**
+ * Makes the provider stop managing a target.
+ *
+ * @param provider Bake provider
+ * @param target_id id of the target to remove
+ *
+ * @return 0 on success, -1 on failure
+ */
+int bake_provider_remove_storage_target(
+        bake_provider_t provider,
+        bake_target_id_t target_id);
+
+/**
+ * Removes all the targets associated with a provider.
+ *
+ * @param provider Bake provider
+ *
+ * @return 0 on success, -1 on failure
+ */
+int bake_provider_remove_all_storage_targets(
+        bake_provider_t provider);
+
+/**
+ * Returns the number of targets that this provider manages.
+ *
+ * @param provider Bake provider
+ * @param num_targets resulting number of targets
+ *
+ * @return 0 on success, -1 on failure
+ */
+int bake_provider_count_storage_targets(
+        bake_provider_t provider,
+        uint64_t* num_targets);
+
+/**
+ * List the target ids of the targets managed by this provider.
+ * The targets array must be pre-allocated with at least enough
+ * space to hold all the targets (use bake_provider_count_storage_targets
+ * to know how many storage targets are managed).
+ *
+ * @param provider Bake provider
+ * @param targets resulting targer ids
+ *
+ * @return 0 on success, -1 on failure
+ */
+int bake_provider_list_storage_targets(
+        bake_provider_t provider,
+        bake_target_id_t* targets);
 
 #ifdef __cplusplus
 }

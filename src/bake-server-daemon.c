@@ -13,12 +13,18 @@
 #include <libpmemobj.h>
 #include <bake-server.h>
 
+typedef enum {
+    MODE_TARGETS   = 0,
+    MODE_PROVIDERS = 1
+} mplex_mode_t;
+
 struct options
 {
     char *listen_addr_str;
     unsigned num_pools;
     char **bake_pools;
     char *host_file;
+    mplex_mode_t mplex_mode;
 };
 
 static void usage(int argc, char **argv)
@@ -27,6 +33,7 @@ static void usage(int argc, char **argv)
     fprintf(stderr, "       listen_addr is the Mercury address to listen on\n");
     fprintf(stderr, "       bake_pool is the path to the BAKE pool\n");
     fprintf(stderr, "       [-f filename] to write the server address to a file\n");
+    fprintf(stderr, "       [-m mode] multiplexing mode (providers or targets) for managing multiple pools (default is targets)\n"); 
     fprintf(stderr, "Example: ./bake-server-daemon tcp://localhost:1234 /dev/shm/foo.dat /dev/shm/bar.dat\n");
     return;
 }
@@ -38,12 +45,22 @@ static void parse_args(int argc, char **argv, struct options *opts)
     memset(opts, 0, sizeof(*opts));
 
     /* get options */
-    while((opt = getopt(argc, argv, "f:")) != -1)
+    while((opt = getopt(argc, argv, "f:m:")) != -1)
     {
         switch(opt)
         {
             case 'f':
                 opts->host_file = optarg;
+                break;
+            case 'm':
+                if(0 == strcmp(optarg, "targets"))
+                    opts->mplex_mode = MODE_TARGETS;
+                else if(0 == strcmp(optarg, "providers"))
+                    opts->mplex_mode = MODE_PROVIDERS;
+                else {
+                    fprintf(stderr, "Unrecognized multiplexing mode \"%s\"\n", optarg);
+                    exit(EXIT_FAILURE);
+                }
                 break;
             default:
                 usage(argc, argv);
@@ -125,18 +142,62 @@ int main(int argc, char **argv)
     }
 
     /* initialize the BAKE server */
-    int i;
-    for(i=0; i< opts.num_pools; i++) {
-        ret = bake_provider_register(mid, i+1,
-                BAKE_ABT_POOL_DEFAULT, opts.bake_pools[i],
-                BAKE_PROVIDER_IGNORE);
-    }
+    if(opts.mplex_mode == MODE_PROVIDERS) {
+        int i;
+        for(i=0; i< opts.num_pools; i++) {
+            bake_provider_t provider;
+            bake_target_id_t tid;
+            ret = bake_provider_register(mid, i+1,
+                    BAKE_ABT_POOL_DEFAULT,
+                    &provider);
 
-    if(ret != 0)
-    {
-        fprintf(stderr, "Error: bake_provider_register()\n");
-        margo_finalize(mid);
-        return(-1);
+            if(ret != 0)
+            {
+                fprintf(stderr, "Error: bake_provider_register()\n");
+                margo_finalize(mid);
+                return(-1);
+            }
+
+            ret = bake_provider_add_storage_target(provider, opts.bake_pools[i], &tid);
+
+            if(ret != 0)
+            {
+                fprintf(stderr, "Error: bake_provider_add_storage_target()\n");
+                margo_finalize(mid);
+                return(-1);
+            }
+
+            printf("Provider %d managing new target at multiplex id %d\n", i, i+1);
+        }
+
+    } else {
+
+        int i;
+        bake_provider_t provider;
+        ret = bake_provider_register(mid, 1,
+                BAKE_ABT_POOL_DEFAULT,
+                &provider);
+
+        if(ret != 0)
+        {
+            fprintf(stderr, "Error: bake_provider_register()\n");
+            margo_finalize(mid);                                    
+            return(-1);
+        }
+
+        for(i=0; i < opts.num_pools; i++) {
+            bake_target_id_t tid;
+            ret = bake_provider_add_storage_target(provider, opts.bake_pools[i], &tid);
+
+            if(ret != 0)
+            {
+                fprintf(stderr, "Error: bake_provider_add_storage_target()\n");
+                margo_finalize(mid);                                    
+                return(-1);
+            }
+
+            printf("Provider %d managing new target at multiplex id %d\n", i, i+1);
+        }
     }
 
     /* suspend until the BAKE server gets a shutdown signal from the client */
