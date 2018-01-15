@@ -28,8 +28,6 @@ int main(int argc, char **argv)
     margo_instance_id mid;
     bake_client_t bcl;
     bake_provider_handle_t bph;
-    uint64_t num_targets;
-    bake_target_id_t bti;
     uint8_t mplex_id;
     hg_return_t hret;
     int ret;
@@ -47,6 +45,7 @@ int main(int argc, char **argv)
     }
     svr_addr_str = argv[1];
     mplex_id = atoi(argv[2]);
+
     /* initialize Margo using the transport portion of the server
      * address (i.e., the part before the first : character if present)
      */
@@ -81,17 +80,6 @@ int main(int argc, char **argv)
     if(ret < 0)
     {
         fprintf(stderr, "Error: bake_provider_handle_create()\n");
-        margo_addr_free(mid, svr_addr);
-        bake_client_finalize(bcl);
-        margo_finalize(mid);
-        return(-1);
-    }
-
-    ret = bake_probe(bph, 1, &bti, &num_targets);
-    if(ret < 0)
-    {
-        fprintf(stderr, "Error: bake_probe()\n");
-        bake_provider_handle_release(bph);
         margo_addr_free(mid, svr_addr);
         bake_client_finalize(bcl);
         margo_finalize(mid);

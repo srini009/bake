@@ -28,9 +28,8 @@ int main(int argc, char **argv)
     margo_instance_id mid;
     bake_client_t bcl;
     bake_provider_handle_t bph;
-    uint64_t num_targets;
-    bake_target_id_t bti;
     uint8_t mplex_id;
+    uint32_t target_number;
     hg_return_t hret;
     int ret;
     bake_region_id_t rid;
@@ -41,14 +40,18 @@ int main(int argc, char **argv)
     char region_file[128];
     uint64_t  check_size;
  
-    if(argc != 4)
+    if(argc != 5)
     {
-        fprintf(stderr, "Usage: bake-copy-to <local file> <server addr> <mplex id>\n");
-        fprintf(stderr, "  Example: ./bake-copy-to /tmp/foo.dat tcp://localhost:1234 1\n");
+        fprintf(stderr, "Usage: bake-copy-to <local file> <server addr> <mplex id> <target number>\n");
+        fprintf(stderr, "  Example: ./bake-copy-to /tmp/foo.dat tcp://localhost:1234 1 3\n");
         return(-1);
     }
     svr_addr_str = argv[2];
     mplex_id = atoi(argv[3]);
+    target_number = atoi(argv[4]);
+
+    uint64_t num_targets;
+    bake_target_id_t bti[target_number];
 
     fd = open(argv[1], O_RDONLY);
     if(fd < 0)
@@ -120,7 +123,7 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    ret = bake_probe(bph, 1, &bti, &num_targets);
+    ret = bake_probe(bph, target_number, bti, &num_targets);
     if(ret < 0)
     {
         bake_provider_handle_release(bph);
@@ -133,8 +136,18 @@ int main(int argc, char **argv)
         return(-1);
     }
 
+    if(num_targets < target_number) {
+        fprintf(stderr, "Error: provider has only %d storage targets\n", num_targets);
+        margo_addr_free(mid, svr_addr);
+        bake_client_finalize(bcl);
+        margo_finalize(mid);
+        munmap(local_region, statbuf.st_size);
+        close(fd);
+        return -1;
+    }
+
     /* create region */
-    ret = bake_create(bph, bti, statbuf.st_size, &rid);
+    ret = bake_create(bph, bti[target_number-1], statbuf.st_size, &rid);
     if(ret != 0)
     {
         bake_provider_handle_release(bph);
