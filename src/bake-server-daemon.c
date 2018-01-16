@@ -196,7 +196,7 @@ int main(int argc, char **argv)
                 return(-1);
             }
 
-            printf("Provider %d managing new target at multiplex id %d\n", i, i+1);
+            printf("Provider 0 managing new target at multiplex id %d\n", 1);
         }
     }
 

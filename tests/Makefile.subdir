@@ -8,10 +8,14 @@ check_PROGRAMS += \
 TESTS += \
  tests/basic.sh \
  tests/copy-to-and-from.sh \
+ tests/copy-to-and-from-multi-providers.sh \
+ tests/copy-to-and-from-multi-targets.sh \
  tests/create-write-persist.sh
 
 EXTRA_DIST += \
  tests/basic.sh \
  tests/copy-to-and-from.sh \
+ tests/copy-to-and-from-multi-providers.sh \
+ tests/copy-to-and-from-multi-targets.sh \
  tests/create-write-persist.sh
 
