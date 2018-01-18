@@ -23,7 +23,6 @@ struct bake_client
     margo_instance_id mid;  
 
     hg_id_t bake_probe_id;
-    hg_id_t bake_shutdown_id; 
     hg_id_t bake_create_id;
     hg_id_t bake_eager_write_id;
     hg_id_t bake_eager_read_id;
@@ -56,7 +55,6 @@ static int bake_client_register(bake_client_t client, margo_instance_id mid)
     if(flag == HG_TRUE) { /* RPCs already registered */
 
         margo_registered_name(mid, "bake_probe_rpc",                &client->bake_probe_id,                &flag);
-        margo_registered_name(mid, "bake_shutdown_rpc",             &client->bake_shutdown_id,             &flag);
         margo_registered_name(mid, "bake_create_rpc",               &client->bake_create_id,               &flag);
         margo_registered_name(mid, "bake_write_rpc",                &client->bake_write_id,                &flag);
         margo_registered_name(mid, "bake_eager_write_rpc",          &client->bake_eager_write_id,          &flag);
@@ -72,9 +70,6 @@ static int bake_client_register(bake_client_t client, margo_instance_id mid)
         client->bake_probe_id = 
             MARGO_REGISTER(mid, "bake_probe_rpc",
                     bake_probe_in_t, bake_probe_out_t, NULL);
-        client->bake_shutdown_id = 
-            MARGO_REGISTER(mid, "bake_shutdown_rpc",
-                    void, void, NULL);
         client->bake_create_id = 
             MARGO_REGISTER(mid, "bake_create_rpc",
                     bake_create_in_t, bake_create_out_t, NULL);
@@ -245,24 +240,7 @@ int bake_provider_handle_release(bake_provider_handle_t handle)
   
 int bake_shutdown_service(bake_client_t client, hg_addr_t addr)
 {
-    hg_return_t hret;
-    hg_handle_t handle;
-
-    hret = margo_create(client->mid, addr, 
-            client->bake_shutdown_id, &handle);
-
-    if(hret != HG_SUCCESS)
-        return(-1);
-
-    hret = margo_forward(handle, NULL);
-    if(hret != HG_SUCCESS)
-    {
-        margo_destroy(handle);
-        return(-1);
-    }
-
-    margo_destroy(handle);
-    return(0);
+    return margo_shutdown_remote_instance(client->mid, addr);
 }
 
 static int bake_eager_write(

@@ -101,10 +101,6 @@ int bake_provider_register(
 
     /* register RPCs */
     hg_id_t rpc_id;
-    rpc_id = MARGO_REGISTER_MPLEX(mid, "bake_shutdown_rpc",
-            void, void, bake_shutdown_ult, mplex_id, abt_pool);
-    margo_register_data_mplex(mid, rpc_id, mplex_id, (void*)tmp_svr_ctx, NULL);
-    void* test = margo_registered_data_mplex(mid, rpc_id, mplex_id);
     rpc_id = MARGO_REGISTER_MPLEX(mid, "bake_create_rpc",
             bake_create_in_t, bake_create_out_t, 
             bake_create_ult, mplex_id, abt_pool);
@@ -254,30 +250,7 @@ int bake_provider_list_storage_targets(
     return 0;
 }
 
-/* service a remote RPC that instructs the BAKE server to shut down */
-static void bake_shutdown_ult(hg_handle_t handle)
-{
-    hg_return_t hret;
-    margo_instance_id mid;
-
-    mid = margo_hg_handle_get_instance(handle);
-    assert(mid != MARGO_INSTANCE_NULL);
-    hret = margo_respond(handle, NULL);
-    assert(hret == HG_SUCCESS);
-
-    margo_destroy(handle);
-
-    /* NOTE: we assume that the server daemon is using
-     * margo_wait_for_finalize() to suspend until this RPC executes, so
-     * there is no need to send any extra signal to notify it.
-     */
-    margo_finalize(mid);
-
-    return;
-}
-DEFINE_MARGO_RPC_HANDLER(bake_shutdown_ult)
-
-    /* service a remote RPC that creates a BAKE region */
+/* service a remote RPC that creates a BAKE region */
 static void bake_create_ult(hg_handle_t handle)
 {
     bake_create_out_t out;

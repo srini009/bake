@@ -102,6 +102,8 @@ int main(int argc, char **argv)
         return(-1);
     }
 
+    margo_enable_remote_shutdown(mid);
+
     if(opts.host_file)
     {
         /* write the server address to file if requested */
