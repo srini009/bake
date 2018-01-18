@@ -295,6 +295,10 @@ static void bake_create_ult(hg_handle_t handle)
         goto respond_with_error;
     }
 
+    hret = margo_get_input(handle, &in);
+    if(hret != HG_SUCCESS)
+        goto respond_with_error;
+
     /* find the pmem pool */
     bake_pmem_entry_t* entry = find_pmem_entry(svr_ctx, in.bti);
     if(entry == NULL) {
@@ -306,10 +310,6 @@ static void bake_create_ult(hg_handle_t handle)
     assert(sizeof(pmemobj_region_id_t) <= BAKE_REGION_ID_DATA_SIZE);
 
     memset(&out, 0, sizeof(out));
-
-    hret = margo_get_input(handle, &in);
-    if(hret != HG_SUCCESS)
-        goto respond_with_error;
 
     prid = (pmemobj_region_id_t*)out.rid.data;
     prid->size = in.region_size;
