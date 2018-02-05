@@ -72,6 +72,28 @@ int bake_provider_handle_create(
 int bake_provider_handle_ref_incr(bake_provider_handle_t handle);
 
 /**
+ * Get the limit (in bytes) bellow which this provider handle will use
+ * eager mode (i.e. packing data into the RPC instead of using RDMA). 
+ *
+ * @param[in] handle provider handle
+ * @param[out] limit limit
+ *
+ * @return 0 on success, -1 on failure
+ */
+int bake_provider_handle_get_eager_limit(bake_provider_handle_t handle, uint64_t* limit);
+
+/**
+ * Set the limit (in bytes) bellow which this provider handle will use
+ * eager mode (i.e. packing data into the RPC instead of using RDMA).
+ *
+ * @param[in] handle provider handle
+ * @param[in] limit limit
+ *
+ * @return 0 on success, -1 on failure
+ */
+int bake_provider_handle_set_eager_limit(bake_provider_handle_t handle, uint64_t limit);
+
+/**
  * Decrement the reference counter of the provider handle,
  * effectively freeing the provider handle when the reference count
  * is down to 0.

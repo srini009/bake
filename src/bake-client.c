@@ -12,7 +12,7 @@
 #include "uthash.h"
 #include "bake-rpc.h"
 
-#define BAKE_EAGER_LIMIT 2048
+#define BAKE_DEFAULT_EAGER_LIMIT 2048
 
 /* Refers to a single Margo initialization, for now this is shared by
  * all remote BAKE targets.  In the future we probably need to support
@@ -41,6 +41,7 @@ struct bake_provider_handle {
     hg_addr_t           addr;
     uint8_t             mplex_id;
     uint64_t            refcount;
+    uint64_t            eager_limit;
 };
 
 static int bake_client_register(bake_client_t client, margo_instance_id mid)
@@ -212,10 +213,25 @@ int bake_provider_handle_create(
     provider->client   = client;
     provider->mplex_id = mplex_id;
     provider->refcount = 1;
+    provider->eager_limit = BAKE_DEFAULT_EAGER_LIMIT;
 
     client->num_provider_handles += 1;
 
     *handle = provider;
+    return 0;
+}
+
+int bake_provider_handle_get_eager_limit(bake_provider_handle_t handle, uint64_t* limit)
+{
+    if(handle == BAKE_PROVIDER_HANDLE_NULL) return -1;
+    *limit = handle->eager_limit;
+    return 0;
+}
+
+int bake_provider_handle_set_eager_limit(bake_provider_handle_t handle, uint64_t limit)
+{
+    if(handle == BAKE_PROVIDER_HANDLE_NULL) return -1;
+    handle->eager_limit = limit;
     return 0;
 }
 
@@ -303,7 +319,7 @@ int bake_write(
     bake_write_out_t out;
     int ret;
 
-    if(buf_size <= BAKE_EAGER_LIMIT)
+    if(buf_size <= provider->eager_limit)
         return(bake_eager_write(provider, rid, region_offset, buf, buf_size));
 
     in.rid = rid;
@@ -735,7 +751,7 @@ int bake_read(
     bake_read_out_t out;
     int ret;
 
-    if(buf_size <= BAKE_EAGER_LIMIT)
+    if(buf_size <= provider->eager_limit)
         return(bake_eager_read(provider, rid, region_offset, buf, buf_size));
 
     in.rid = rid;
