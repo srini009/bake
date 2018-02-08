@@ -8,8 +8,8 @@
 #define __BAKE_CLIENT_H
 
 #include <stdint.h>
-#include "margo.h"
-#include "bake.h"
+#include <margo.h>
+#include <bake.h>
 
 #ifdef __cplusplus
 extern "C" {

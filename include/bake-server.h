@@ -9,7 +9,7 @@
 
 #include <margo.h>
 #include <libpmemobj.h>
-#include "bake.h"
+#include <bake.h>
 
 #ifdef __cplusplus
 extern "C" {
