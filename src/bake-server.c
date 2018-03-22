@@ -226,6 +226,7 @@ int bake_provider_remove_all_storage_targets(
         pmemobj_close(p->pmem_pool);
         free(p);
     }
+    provider->num_targets = 0;
     return 0;
 }
 
