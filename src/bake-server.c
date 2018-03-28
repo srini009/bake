@@ -77,7 +77,7 @@ int bake_makepool(
 
 int bake_provider_register(
         margo_instance_id mid,
-        uint8_t mplex_id,
+        uint8_t provider_id,
         ABT_pool abt_pool,
         bake_provider_t* provider)
 {
@@ -87,9 +87,9 @@ int bake_provider_register(
     {
         hg_id_t id;
         hg_bool_t flag;
-        margo_registered_name_mplex(mid, "bake_probe_rpc", mplex_id, &id, &flag);
+        margo_provider_registered_name(mid, "bake_probe_rpc", provider_id, &id, &flag);
         if(flag == HG_TRUE) {
-            fprintf(stderr, "bake_provider_register(): a provider with the same mplex id (%d) already exists\n", mplex_id);
+            fprintf(stderr, "bake_provider_register(): a provider with the same id (%d) already exists\n", provider_id);
             return -1;
         }
     }
@@ -101,45 +101,45 @@ int bake_provider_register(
 
     /* register RPCs */
     hg_id_t rpc_id;
-    rpc_id = MARGO_REGISTER_MPLEX(mid, "bake_create_rpc",
+    rpc_id = MARGO_REGISTER_PROVIDER(mid, "bake_create_rpc",
             bake_create_in_t, bake_create_out_t, 
-            bake_create_ult, mplex_id, abt_pool);
-    margo_register_data_mplex(mid, rpc_id, mplex_id, (void*)tmp_svr_ctx, NULL);
-    rpc_id = MARGO_REGISTER_MPLEX(mid, "bake_write_rpc",
+            bake_create_ult, provider_id, abt_pool);
+    margo_register_data(mid, rpc_id, (void*)tmp_svr_ctx, NULL);
+    rpc_id = MARGO_REGISTER_PROVIDER(mid, "bake_write_rpc",
             bake_write_in_t, bake_write_out_t, 
-            bake_write_ult, mplex_id, abt_pool);
-    margo_register_data_mplex(mid, rpc_id, mplex_id, (void*)tmp_svr_ctx, NULL);
-    rpc_id = MARGO_REGISTER_MPLEX(mid, "bake_eager_write_rpc",
+            bake_write_ult, provider_id, abt_pool);
+    margo_register_data(mid, rpc_id, (void*)tmp_svr_ctx, NULL);
+    rpc_id = MARGO_REGISTER_PROVIDER(mid, "bake_eager_write_rpc",
             bake_eager_write_in_t, bake_eager_write_out_t, 
-            bake_eager_write_ult, mplex_id, abt_pool);
-    margo_register_data_mplex(mid, rpc_id, mplex_id, (void*)tmp_svr_ctx, NULL);
-    rpc_id = MARGO_REGISTER_MPLEX(mid, "bake_eager_read_rpc",
+            bake_eager_write_ult, provider_id, abt_pool);
+    margo_register_data(mid, rpc_id, (void*)tmp_svr_ctx, NULL);
+    rpc_id = MARGO_REGISTER_PROVIDER(mid, "bake_eager_read_rpc",
             bake_eager_read_in_t, bake_eager_read_out_t, 
-            bake_eager_read_ult, mplex_id, abt_pool);
-    margo_register_data_mplex(mid, rpc_id, mplex_id, (void*)tmp_svr_ctx, NULL);
-    rpc_id = MARGO_REGISTER_MPLEX(mid, "bake_persist_rpc",
+            bake_eager_read_ult, provider_id, abt_pool);
+    margo_register_data(mid, rpc_id, (void*)tmp_svr_ctx, NULL);
+    rpc_id = MARGO_REGISTER_PROVIDER(mid, "bake_persist_rpc",
             bake_persist_in_t, bake_persist_out_t, 
-            bake_persist_ult, mplex_id, abt_pool);
-    margo_register_data_mplex(mid, rpc_id, mplex_id, (void*)tmp_svr_ctx, NULL);
-    rpc_id = MARGO_REGISTER_MPLEX(mid, "bake_create_write_persist_rpc",
+            bake_persist_ult, provider_id, abt_pool);
+    margo_register_data(mid, rpc_id, (void*)tmp_svr_ctx, NULL);
+    rpc_id = MARGO_REGISTER_PROVIDER(mid, "bake_create_write_persist_rpc",
             bake_create_write_persist_in_t, bake_create_write_persist_out_t,
-            bake_create_write_persist_ult, mplex_id, abt_pool);
-    margo_register_data_mplex(mid, rpc_id, mplex_id, (void*)tmp_svr_ctx, NULL);
-    rpc_id = MARGO_REGISTER_MPLEX(mid, "bake_get_size_rpc",
+            bake_create_write_persist_ult, provider_id, abt_pool);
+    margo_register_data(mid, rpc_id, (void*)tmp_svr_ctx, NULL);
+    rpc_id = MARGO_REGISTER_PROVIDER(mid, "bake_get_size_rpc",
             bake_get_size_in_t, bake_get_size_out_t, 
-            bake_get_size_ult, mplex_id, abt_pool);
-    margo_register_data_mplex(mid, rpc_id, mplex_id, (void*)tmp_svr_ctx, NULL);
-    rpc_id = MARGO_REGISTER_MPLEX(mid, "bake_read_rpc",
+            bake_get_size_ult, provider_id, abt_pool);
+    margo_register_data(mid, rpc_id, (void*)tmp_svr_ctx, NULL);
+    rpc_id = MARGO_REGISTER_PROVIDER(mid, "bake_read_rpc",
             bake_read_in_t, bake_read_out_t, 
-            bake_read_ult, mplex_id, abt_pool);
-    margo_register_data_mplex(mid, rpc_id, mplex_id, (void*)tmp_svr_ctx, NULL);
-    rpc_id = MARGO_REGISTER_MPLEX(mid, "bake_probe_rpc",
+            bake_read_ult, provider_id, abt_pool);
+    margo_register_data(mid, rpc_id, (void*)tmp_svr_ctx, NULL);
+    rpc_id = MARGO_REGISTER_PROVIDER(mid, "bake_probe_rpc",
             bake_probe_in_t, bake_probe_out_t, bake_probe_ult, 
-            mplex_id, abt_pool);
-    margo_register_data_mplex(mid, rpc_id, mplex_id, (void*)tmp_svr_ctx, NULL);
-    rpc_id = MARGO_REGISTER_MPLEX(mid, "bake_noop_rpc",
-            void, void, bake_noop_ult, mplex_id, abt_pool);
-    margo_register_data_mplex(mid, rpc_id, mplex_id, (void*)tmp_svr_ctx, NULL);
+            provider_id, abt_pool);
+    margo_register_data(mid, rpc_id, (void*)tmp_svr_ctx, NULL);
+    rpc_id = MARGO_REGISTER_PROVIDER(mid, "bake_noop_rpc",
+            void, void, bake_noop_ult, provider_id, abt_pool);
+    margo_register_data(mid, rpc_id, (void*)tmp_svr_ctx, NULL);
 
     /* install the bake server finalize callback */
     margo_push_finalize_callback(mid, &bake_server_finalize_cb, tmp_svr_ctx);
@@ -263,7 +263,7 @@ static void bake_create_ult(hg_handle_t handle)
     assert(mid);
     const struct hg_info* info = margo_get_info(handle);
     bake_provider_t svr_ctx = 
-        margo_registered_data_mplex(mid, info->id, info->target_id);
+        margo_registered_data(mid, info->id);
     if(!svr_ctx) {
         fprintf(stderr, "Error: BAKE create could not find provider\n"); 
         goto respond_with_error;
@@ -323,8 +323,7 @@ static void bake_write_ult(hg_handle_t handle)
     mid = margo_hg_handle_get_instance(handle);
     assert(mid);
     hgi = margo_get_info(handle);
-    bake_provider_t svr_ctx = 
-        margo_registered_data_mplex(mid, hgi->id, hgi->target_id);
+    bake_provider_t svr_ctx = margo_registered_data(mid, hgi->id);
     if(!svr_ctx) {
         out.ret = -1;
         margo_respond(handle, &out);
@@ -427,8 +426,7 @@ static void bake_eager_write_ult(hg_handle_t handle)
     margo_instance_id mid = margo_hg_handle_get_instance(handle);
     assert(mid);
     const struct hg_info* info = margo_get_info(handle);
-    bake_provider_t svr_ctx = 
-        margo_registered_data_mplex(mid, info->id, info->target_id);
+    bake_provider_t svr_ctx = margo_registered_data(mid, info->id);
     if(!svr_ctx) {
         out.ret = -1;
         margo_respond(handle, &out);
@@ -483,8 +481,7 @@ static void bake_persist_ult(hg_handle_t handle)
     margo_instance_id mid = margo_hg_handle_get_instance(handle);
     assert(mid);
     const struct hg_info* info = margo_get_info(handle);
-    bake_provider_t svr_ctx = 
-        margo_registered_data_mplex(mid, info->id, info->target_id);
+    bake_provider_t svr_ctx = margo_registered_data(mid, info->id);
     if(!svr_ctx) {
         out.ret = -1;
         margo_respond(handle, &out);
@@ -545,8 +542,7 @@ static void bake_create_write_persist_ult(hg_handle_t handle)
     mid = margo_hg_handle_get_instance(handle);
     assert(mid);
     hgi = margo_get_info(handle);
-    bake_provider_t svr_ctx = 
-        margo_registered_data_mplex(mid, hgi->id, hgi->target_id);
+    bake_provider_t svr_ctx = margo_registered_data(mid, hgi->id);
     if(!svr_ctx) {
         fprintf(stderr, "Error: BAKE create_write_persist could not find provider\n");
         out.ret = -1;
@@ -676,8 +672,7 @@ static void bake_get_size_ult(hg_handle_t handle)
     margo_instance_id mid = margo_hg_handle_get_instance(handle);
     assert(mid);
     const struct hg_info* hgi = margo_get_info(handle);
-    bake_provider_t svr_ctx = 
-        margo_registered_data_mplex(mid, hgi->id, hgi->target_id);
+    bake_provider_t svr_ctx = margo_registered_data(mid, hgi->id);
     if(!svr_ctx) {
         out.ret = -1;
         margo_respond(handle, &out);
@@ -713,8 +708,7 @@ static void bake_noop_ult(hg_handle_t handle)
     margo_instance_id mid = margo_hg_handle_get_instance(handle);
     assert(mid);
     const struct hg_info* hgi = margo_get_info(handle);
-    bake_provider_t svr_ctx = 
-        margo_registered_data_mplex(mid, hgi->id, hgi->target_id);
+    bake_provider_t svr_ctx = margo_registered_data(mid, hgi->id);
 
     margo_respond(handle, NULL);
     margo_destroy(handle);
@@ -742,7 +736,7 @@ static void bake_read_ult(hg_handle_t handle)
     assert(mid);
     hgi = margo_get_info(handle);
     bake_provider_t svr_ctx = 
-        margo_registered_data_mplex(mid, hgi->id, hgi->target_id);
+        margo_registered_data(mid, hgi->id);
     if(!svr_ctx) {
         out.ret = -1;
         margo_respond(handle, &out);
@@ -847,7 +841,7 @@ static void bake_eager_read_ult(hg_handle_t handle)
     assert(mid);
     const struct hg_info* hgi = margo_get_info(handle);
     bake_provider_t svr_ctx = 
-        margo_registered_data_mplex(mid, hgi->id, hgi->target_id);
+        margo_registered_data(mid, hgi->id);
     if(!svr_ctx) {
         out.ret = -1;
         margo_respond(handle, &out);
@@ -899,7 +893,7 @@ static void bake_probe_ult(hg_handle_t handle)
     assert(mid);
     const struct hg_info* hgi = margo_get_info(handle);
     bake_provider_t svr_ctx = 
-        margo_registered_data_mplex(mid, hgi->id, hgi->target_id);
+        margo_registered_data(mid, hgi->id);
     if(!svr_ctx) {
         out.ret = -1;
         margo_respond(handle, &out);

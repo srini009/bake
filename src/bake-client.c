@@ -39,7 +39,7 @@ struct bake_client
 struct bake_provider_handle {
     struct bake_client* client;
     hg_addr_t           addr;
-    uint8_t             mplex_id;
+    uint8_t             provider_id;
     uint64_t            refcount;
     uint64_t            eager_limit;
 };
@@ -152,14 +152,7 @@ int bake_probe(
 
     if(hret != HG_SUCCESS) return -1;
 
-    hret = margo_set_target_id(handle, provider->mplex_id);
-    
-    if(hret != HG_SUCCESS) {
-        margo_destroy(handle);
-        return -1;
-    }
-
-    hret = margo_forward(handle, &in);
+    hret = margo_provider_forward(provider->provider_id, handle, &in);
     if(hret != HG_SUCCESS) {
         margo_destroy(handle);
         return -1;
@@ -194,7 +187,7 @@ int bake_probe(
 int bake_provider_handle_create(
         bake_client_t client,
         hg_addr_t addr,
-        uint8_t mplex_id,
+        uint8_t provider_id,
         bake_provider_handle_t* handle)
 {
     if(client == BAKE_CLIENT_NULL) return -1;
@@ -211,7 +204,7 @@ int bake_provider_handle_create(
     }
     
     provider->client   = client;
-    provider->mplex_id = mplex_id;
+    provider->provider_id = provider_id;
     provider->refcount = 1;
     provider->eager_limit = BAKE_DEFAULT_EAGER_LIMIT;
 
@@ -279,12 +272,11 @@ static int bake_eager_write(
   
     hret = margo_create(provider->client->mid, provider->addr, 
                 provider->client->bake_eager_write_id, &handle);
-    margo_set_target_id(handle, provider->mplex_id);
 
     if(hret != HG_SUCCESS)
         return(-1);
 
-    hret = margo_forward(handle, &in);
+    hret = margo_provider_forward(provider->provider_id, handle, &in);
     if(hret != HG_SUCCESS)
     {
         margo_destroy(handle);
@@ -335,7 +327,6 @@ int bake_write(
    
     hret = margo_create(provider->client->mid, provider->addr, 
         provider->client->bake_write_id, &handle);
-    margo_set_target_id(handle, provider->mplex_id);
 
     if(hret != HG_SUCCESS)
     {
@@ -343,7 +334,7 @@ int bake_write(
         return(-1);
     }
 
-    hret = margo_forward(handle, &in);
+    hret = margo_provider_forward(provider->provider_id, handle, &in);
     if(hret != HG_SUCCESS)
     {
         margo_bulk_free(in.bulk_handle);
@@ -391,12 +382,11 @@ int bake_proxy_write(
 
     hret = margo_create(provider->client->mid, provider->addr,
         provider->client->bake_write_id, &handle);
-    margo_set_target_id(handle, provider->mplex_id);
 
     if(hret != HG_SUCCESS)
         return(-1);
 
-    hret = margo_forward(handle, &in);
+    hret = margo_provider_forward(provider->provider_id, handle, &in);
     if(hret != HG_SUCCESS)
     {   
         margo_destroy(handle);
@@ -439,9 +429,7 @@ int bake_create(
         return(-1);
     }
 
-    margo_set_target_id(handle, provider->mplex_id);
-
-    hret = margo_forward(handle, &in);
+    hret = margo_provider_forward(provider->provider_id, handle, &in);
     if(hret != HG_SUCCESS)
     {
         margo_destroy(handle);
@@ -479,12 +467,11 @@ int bake_persist(
 
     hret = margo_create(provider->client->mid, provider->addr,
             provider->client->bake_persist_id, &handle);
-    margo_set_target_id(handle, provider->mplex_id);
 
     if(hret != HG_SUCCESS)
         return(-1);
 
-    hret = margo_forward(handle, &in);
+    hret = margo_provider_forward(provider->provider_id, handle, &in);
     if(hret != HG_SUCCESS)
     {
         margo_destroy(handle);
@@ -543,9 +530,7 @@ int bake_create_write_persist(
         return(-1);
     }
 
-    margo_set_target_id(handle, provider->mplex_id);
-
-    hret = margo_forward(handle, &in);
+    hret = margo_provider_forward(provider->provider_id, handle, &in);
     if(hret != HG_SUCCESS)
     {
         margo_bulk_free(in.bulk_handle);
@@ -598,12 +583,11 @@ int bake_create_write_persist_proxy(
 
     hret = margo_create(provider->client->mid, provider->addr,
             provider->client->bake_create_write_persist_id, &handle);
-    margo_set_target_id(handle, provider->mplex_id);
 
     if(hret != HG_SUCCESS)
         return(-1);
 
-    hret = margo_forward(handle, &in);
+    hret = margo_provider_forward(provider->provider_id, handle, &in);
     if(hret != HG_SUCCESS)
     {
         margo_destroy(handle);
@@ -641,12 +625,11 @@ int bake_get_size(
 
     hret = margo_create(provider->client->mid, provider->addr,
         provider->client->bake_get_size_id, &handle);
-    margo_set_target_id(handle, provider->mplex_id);
 
     if(hret != HG_SUCCESS)
         return(-1);
 
-    hret = margo_forward(handle, &in);
+    hret = margo_provider_forward(provider->provider_id, handle, &in);
     if(hret != HG_SUCCESS)
     {
         margo_destroy(handle);
@@ -675,12 +658,11 @@ int bake_noop(bake_provider_handle_t provider)
 
     hret = margo_create(provider->client->mid, provider->addr,
         provider->client->bake_noop_id, &handle);
-    margo_set_target_id(handle, provider->mplex_id);
 
     if(hret != HG_SUCCESS)
         return(-1);
 
-    hret = margo_forward(handle, NULL);
+    hret = margo_provider_forward(provider->provider_id, handle, NULL);
     if(hret != HG_SUCCESS)
     {
         margo_destroy(handle);
@@ -710,12 +692,11 @@ static int bake_eager_read(
 
     hret = margo_create(provider->client->mid, provider->addr,
         provider->client->bake_eager_read_id, &handle);
-    margo_set_target_id(handle, provider->mplex_id);
 
     if(hret != HG_SUCCESS)
         return(-1);
   
-    hret = margo_forward(handle, &in);
+    hret = margo_provider_forward(provider->provider_id, handle, &in);
     if(hret != HG_SUCCESS)
     {
         margo_destroy(handle);
@@ -767,7 +748,6 @@ int bake_read(
    
     hret = margo_create(provider->client->mid, provider->addr,
             provider->client->bake_read_id, &handle);
-    margo_set_target_id(handle, provider->mplex_id);
 
     if(hret != HG_SUCCESS)
     {
@@ -775,7 +755,7 @@ int bake_read(
         return(-1);
     }
 
-    hret = margo_forward(handle, &in);
+    hret = margo_provider_forward(provider->provider_id, handle, &in);
     if(hret != HG_SUCCESS)
     {
         margo_bulk_free(in.bulk_handle);
@@ -823,12 +803,11 @@ int bake_proxy_read(
 
     hret = margo_create(provider->client->mid, provider->addr,
             provider->client->bake_read_id, &handle);
-    margo_set_target_id(handle, provider->mplex_id);
 
     if(hret != HG_SUCCESS)
         return(-1);
 
-    hret = margo_forward(handle, &in);
+    hret = margo_provider_forward(provider->provider_id, handle, &in);
     if(hret != HG_SUCCESS)
     {
         margo_destroy(handle);
