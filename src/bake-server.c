@@ -77,7 +77,7 @@ int bake_makepool(
 
 int bake_provider_register(
         margo_instance_id mid,
-        uint8_t provider_id,
+        uint16_t provider_id,
         ABT_pool abt_pool,
         bake_provider_t* provider)
 {

@@ -39,7 +39,7 @@ struct bake_client
 struct bake_provider_handle {
     struct bake_client* client;
     hg_addr_t           addr;
-    uint8_t             provider_id;
+    uint16_t            provider_id;
     uint64_t            refcount;
     uint64_t            eager_limit;
 };
@@ -187,7 +187,7 @@ int bake_probe(
 int bake_provider_handle_create(
         bake_client_t client,
         hg_addr_t addr,
-        uint8_t provider_id,
+        uint16_t provider_id,
         bake_provider_handle_t* handle)
 {
     if(client == BAKE_CLIENT_NULL) return -1;
