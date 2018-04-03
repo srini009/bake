@@ -16,7 +16,7 @@ extern "C" {
 #endif
 
 #define BAKE_ABT_POOL_DEFAULT ABT_POOL_NULL
-#define BAKE_MPLEX_ID_DEFAULT 0
+#define BAKE_PROVIDER_ID_DEFAULT 0
 #define BAKE_PROVIDER_IGNORE NULL
 
 typedef struct bake_server_context_t* bake_provider_t;
@@ -41,7 +41,7 @@ int bake_makepool(
  * Initializes a BAKE provider.
  *
  * @param[in] mid Margo instance identifier
- * @param[in] mplex_id Multiplex id
+ * @param[in] provider_id provider id
  * @param[in] pool Pool on which to run the RPC handlers
  * @param[in] target_name path to PMEM backend file
  * @param[out] provider resulting provider
@@ -49,7 +49,7 @@ int bake_makepool(
  */
 int bake_provider_register(
         margo_instance_id mid,
-        uint8_t mplex_id,
+        uint16_t provider_id,
         ABT_pool pool,
         bake_provider_t* provider);
 

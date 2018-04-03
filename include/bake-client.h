@@ -51,7 +51,7 @@ int bake_client_finalize(bake_client_t client);
  *
  * @param client client managing the provider handle
  * @param addr address of the provider
- * @param mplex_id multiplex id of the provider
+ * @param provider_id id of the provider
  * @param handle resulting handle
  *
  * @return 0 on success, -1 on failure
@@ -59,7 +59,7 @@ int bake_client_finalize(bake_client_t client);
 int bake_provider_handle_create(
         bake_client_t client,
         hg_addr_t addr,
-        uint8_t mplex_id,
+        uint16_t provider_id,
         bake_provider_handle_t* handle);
 
 /**
