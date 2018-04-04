@@ -32,6 +32,7 @@ struct bake_client
     hg_id_t bake_get_size_id;
     hg_id_t bake_read_id;
     hg_id_t bake_noop_id;
+    hg_id_t bake_remove_id;
 
     uint64_t num_provider_handles;
 };
@@ -65,6 +66,7 @@ static int bake_client_register(bake_client_t client, margo_instance_id mid)
         margo_registered_name(mid, "bake_get_size_rpc",             &client->bake_get_size_id,             &flag);
         margo_registered_name(mid, "bake_read_rpc",                 &client->bake_read_id,                 &flag);
         margo_registered_name(mid, "bake_noop_rpc",                 &client->bake_noop_id,                 &flag);
+        margo_registered_name(mid, "bake_remove_rpc",               &client->bake_remove_id,               &flag);
 
     } else { /* RPCs not already registered */
 
@@ -98,6 +100,9 @@ static int bake_client_register(bake_client_t client, margo_instance_id mid)
         client->bake_noop_id = 
             MARGO_REGISTER(mid, "bake_noop_rpc",
                     void, void, NULL);
+        client->bake_remove_id =
+            MARGO_REGISTER(mid, "bake_remove_rpc",
+                    bake_remove_in_t, bake_remove_out_t, NULL);
     }
 
     return(0);
@@ -828,3 +833,41 @@ int bake_proxy_read(
     return(ret);
 }
 
+int bake_remove(
+    bake_provider_handle_t provider,
+    bake_region_id_t rid)
+{
+    hg_return_t hret;
+    hg_handle_t handle;
+    bake_remove_in_t in;
+    bake_remove_out_t out;
+    int ret;
+
+    in.rid = rid;
+
+    hret = margo_create(provider->client->mid, provider->addr,
+            provider->client->bake_remove_id, &handle);
+    margo_set_target_id(handle, provider->mplex_id);
+
+    if(hret != HG_SUCCESS)
+        return(-1);
+
+    hret = margo_forward(handle, &in);
+    if(hret != HG_SUCCESS)
+    {
+        margo_destroy(handle);
+        return(-1);
+    }
+
+    hret = margo_get_output(handle, &out);
+    if(hret != HG_SUCCESS)
+    {
+        margo_destroy(handle);
+        return(-1);
+    }
+
+    ret = out.ret;
+
+    margo_destroy(handle);
+    return(ret);
+}

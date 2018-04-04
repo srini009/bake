@@ -122,6 +122,12 @@ DECLARE_MARGO_RPC_HANDLER(bake_probe_ult)
 /* BAKE noop */
 DECLARE_MARGO_RPC_HANDLER(bake_noop_ult)
 
+/* BAKE remove */
+MERCURY_GEN_PROC(bake_remove_in_t,
+    ((bake_region_id_t)(rid)))
+MERCURY_GEN_PROC(bake_remove_out_t,
+    ((int32_t)(ret)))
+DECLARE_MARGO_RPC_HANDLER(bake_remove_ult)
 
 static inline hg_return_t hg_proc_bake_region_id_t(hg_proc_t proc, bake_region_id_t *rid)
 {

@@ -305,7 +305,8 @@ int bake_proxy_read(
  * @returns 0 on success, -1 on failure 
  */
 int bake_shutdown_service(
-        bake_client_t client, hg_addr_t addr);
+        bake_client_t client,
+        hg_addr_t addr);
 
 /**
  * Issues a BAKE no-op operation.
@@ -314,6 +315,13 @@ int bake_shutdown_service(
  * @returns 0 on success, -1 on failure
  */
 int bake_noop(bake_provider_handle_t provider);
+
+/**
+ * Removes a previously persisted BAKE region and frees its associated memory.
+ */
+int bake_remove(
+        bake_provider_handle_t provider,
+        bake_region_id_t rid);
 
 #ifdef __cplusplus
 }
