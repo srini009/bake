@@ -3,19 +3,22 @@ TESTS_ENVIRONMENT += \
  MKTEMP="$(MKTEMP)"
 
 check_PROGRAMS += \
- tests/create-write-persist-test
+ tests/create-write-persist-test \
+ tests/create-write-persist-remove-test
 
 TESTS += \
  tests/basic.sh \
  tests/copy-to-and-from.sh \
  tests/copy-to-and-from-multi-providers.sh \
  tests/copy-to-and-from-multi-targets.sh \
- tests/create-write-persist.sh
+ tests/create-write-persist.sh \
+ tests/create-write-persist-remove.sh
 
 EXTRA_DIST += \
  tests/basic.sh \
  tests/copy-to-and-from.sh \
  tests/copy-to-and-from-multi-providers.sh \
  tests/copy-to-and-from-multi-targets.sh \
- tests/create-write-persist.sh
+ tests/create-write-persist.sh \
+ tests/create-write-persist-remove.sh
 
