@@ -847,12 +847,11 @@ int bake_remove(
 
     hret = margo_create(provider->client->mid, provider->addr,
             provider->client->bake_remove_id, &handle);
-    margo_set_target_id(handle, provider->mplex_id);
 
     if(hret != HG_SUCCESS)
         return(-1);
 
-    hret = margo_forward(handle, &in);
+    hret = margo_provider_forward(provider->provider_id, handle, &in);
     if(hret != HG_SUCCESS)
     {
         margo_destroy(handle);
@@ -868,6 +867,7 @@ int bake_remove(
 
     ret = out.ret;
 
+    margo_free_output(handle, &out);
     margo_destroy(handle);
     return(ret);
 }

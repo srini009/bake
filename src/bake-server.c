@@ -143,8 +143,7 @@ int bake_provider_register(
     rpc_id = MARGO_REGISTER_PROVIDER(mid, "bake_remove_rpc",
             bake_remove_in_t, bake_remove_out_t, bake_remove_ult,
             provider_id, abt_pool);
-    margo_register_data(mid, rpc_id, mplex_id, (void*)tmp_svr_ctx, NULL);
-
+    margo_register_data(mid, rpc_id, (void*)tmp_svr_ctx, NULL);
 
     /* install the bake server finalize callback */
     margo_push_finalize_callback(mid, &bake_server_finalize_cb, tmp_svr_ctx);
@@ -933,9 +932,8 @@ static void bake_remove_ult(hg_handle_t handle)
 
     margo_instance_id mid = margo_hg_handle_get_instance(handle);
     assert(mid);
-    const struct hg_info* hgi = margo_get_info(handle);
-    bake_provider_t svr_ctx = 
-        margo_registered_data_mplex(mid, hgi->id, hgi->target_id);
+    const struct hg_info* info = margo_get_info(handle);
+    bake_provider_t svr_ctx = margo_registered_data(mid, info->id);
     if(!svr_ctx) {
         out.ret = -1;
         margo_respond(handle, &out);
