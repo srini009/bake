@@ -235,7 +235,7 @@ static void proxy_write_ult(hg_handle_t handle)
          */
         ret = bake_create_write_persist_proxy(
             g_proxy_svr_ctx->svr_bph, g_proxy_svr_ctx->svr_bti,
-            in.bulk_size, 0, in.bulk_handle, in.bulk_offset, in.bulk_addr,
+            in.bulk_handle, in.bulk_offset, in.bulk_addr,
             in.bulk_size, &(g_proxy_svr_ctx->the_rid));
         assert(ret == 0);
     }

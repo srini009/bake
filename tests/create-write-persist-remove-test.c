@@ -115,7 +115,7 @@ int main(int argc, char *argv[])
     strcpy(buf, test_str);
     buf_size = strlen(test_str) + 1;
 
-    ret = bake_create_write_persist(bph, bti, buf_size, 0, buf, buf_size, &the_rid);
+    ret = bake_create_write_persist(bph, bti, buf, buf_size, &the_rid);
     if(ret != 0)
     {
         fprintf(stderr, "Error: bake_create_write_persist()\n");

@@ -581,9 +581,9 @@ static void bake_create_write_persist_ult(hg_handle_t handle)
     }
 
     prid = (pmemobj_region_id_t*)out.rid.data;
-    prid->size = in.region_size;
+    prid->size = in.bulk_size;
     ret = pmemobj_alloc(entry->pmem_pool, &prid->oid,
-            in.region_size, 0, NULL, NULL);
+            in.bulk_size, 0, NULL, NULL);
     if(ret != 0)
     {
         out.ret = -1;

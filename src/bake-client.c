@@ -500,8 +500,6 @@ int bake_persist(
 int bake_create_write_persist(
     bake_provider_handle_t provider,
     bake_target_id_t bti,
-    uint64_t region_size,
-    uint64_t region_offset,
     void const *buf,
     uint64_t buf_size,
     bake_region_id_t *rid)
@@ -515,8 +513,6 @@ int bake_create_write_persist(
     /* XXX eager path? */
 
     in.bti = bti;
-    in.region_size = region_size;
-    in.region_offset = region_offset;
     in.bulk_offset = 0;
     in.bulk_size = buf_size;
     in.remote_addr_str = NULL; /* set remote_addr to NULL to disable proxy write */
@@ -564,8 +560,6 @@ int bake_create_write_persist(
 int bake_create_write_persist_proxy(
     bake_provider_handle_t provider,
     bake_target_id_t bti,
-    uint64_t region_size,
-    uint64_t region_offset,
     hg_bulk_t remote_bulk,
     uint64_t remote_offset,
     const char* remote_addr,
@@ -579,8 +573,6 @@ int bake_create_write_persist_proxy(
     int ret;
 
     in.bti = bti;
-    in.region_size = region_size;
-    in.region_offset = region_offset;
     in.bulk_handle = remote_bulk;
     in.bulk_offset = remote_offset;
     in.bulk_size = size;
