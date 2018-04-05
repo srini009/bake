@@ -356,9 +356,10 @@ static void bake_write_ult(hg_handle_t handle)
         margo_destroy(handle);
         return;
     }
+    buffer = &buffer[in.region_offset];
 
     /* create bulk handle for local side of transfer */
-    hret = margo_bulk_create(mid, 1, (void**)(&buffer), &in.bulk_size, 
+    hret = margo_bulk_create(mid, 1, (void**)(&buffer), &in.bulk_size,
             HG_BULK_WRITE_ONLY, &bulk_handle);
     if(hret != HG_SUCCESS)
     {
@@ -459,6 +460,7 @@ static void bake_eager_write_ult(hg_handle_t handle)
         margo_destroy(handle);
         return;
     }
+    buffer = &buffer[in.region_offset];
 
     memcpy(buffer, in.buffer, in.size);
 
@@ -769,9 +771,10 @@ static void bake_read_ult(hg_handle_t handle)
         margo_destroy(handle);
         return;
     }
+    buffer = &buffer[in.region_offset];
 
     /* create bulk handle for local side of transfer */
-    hret = margo_bulk_create(mid, 1, (void**)(&buffer), &in.bulk_size, 
+    hret = margo_bulk_create(mid, 1, (void**)(&buffer), &in.bulk_size,
             HG_BULK_READ_ONLY, &bulk_handle);
     if(hret != HG_SUCCESS)
     {
@@ -874,6 +877,7 @@ static void bake_eager_read_ult(hg_handle_t handle)
         margo_destroy(handle);
         return;
     }
+    buffer = &buffer[in.region_offset];
 
     out.ret = 0;
     out.buffer = buffer;
