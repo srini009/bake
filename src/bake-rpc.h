@@ -82,6 +82,14 @@ MERCURY_GEN_PROC(bake_get_size_out_t,
     ((uint64_t)(size)))
 DECLARE_MARGO_RPC_HANDLER(bake_get_size_ult)
 
+/* BAKE get data */
+MERCURY_GEN_PROC(bake_get_data_in_t,
+    ((bake_region_id_t)(rid)))
+MERCURY_GEN_PROC(bake_get_data_out_t,
+    ((int32_t)(ret))\
+    ((uint64_t)(ptr)))
+DECLARE_MARGO_RPC_HANDLER(bake_get_data_ult)
+
 /* BAKE read */
 MERCURY_GEN_PROC(bake_read_in_t,
     ((bake_region_id_t)(rid))\

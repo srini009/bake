@@ -30,6 +30,7 @@ struct bake_client
     hg_id_t bake_persist_id;
     hg_id_t bake_create_write_persist_id;
     hg_id_t bake_get_size_id;
+    hg_id_t bake_get_data_id;
     hg_id_t bake_read_id;
     hg_id_t bake_noop_id;
     hg_id_t bake_remove_id;
@@ -64,6 +65,7 @@ static int bake_client_register(bake_client_t client, margo_instance_id mid)
         margo_registered_name(mid, "bake_persist_rpc",              &client->bake_persist_id,              &flag);
         margo_registered_name(mid, "bake_create_write_persist_rpc", &client->bake_create_write_persist_id, &flag);
         margo_registered_name(mid, "bake_get_size_rpc",             &client->bake_get_size_id,             &flag);
+        margo_registered_name(mid, "bake_get_data_rpc",             &client->bake_get_data_id,             &flag);
         margo_registered_name(mid, "bake_read_rpc",                 &client->bake_read_id,                 &flag);
         margo_registered_name(mid, "bake_noop_rpc",                 &client->bake_noop_id,                 &flag);
         margo_registered_name(mid, "bake_remove_rpc",               &client->bake_remove_id,               &flag);
@@ -94,6 +96,9 @@ static int bake_client_register(bake_client_t client, margo_instance_id mid)
         client->bake_get_size_id = 
             MARGO_REGISTER(mid, "bake_get_size_rpc",
                     bake_get_size_in_t, bake_get_size_out_t, NULL);
+        client->bake_get_data_id =
+            MARGO_REGISTER(mid, "bake_get_data_rpc",
+                    bake_get_data_in_t, bake_get_data_out_t, NULL);
         client->bake_read_id = 
             MARGO_REGISTER(mid, "bake_read_rpc",
                     bake_read_in_t, bake_read_out_t, NULL);
@@ -642,6 +647,69 @@ int bake_get_size(
 
     ret = out.ret;
     *region_size = out.size;
+
+    margo_free_output(handle, &out);
+    margo_destroy(handle);
+    return(ret);
+}
+
+int bake_get_data(
+    bake_provider_handle_t provider,
+    bake_region_id_t rid,
+    void** ptr)
+{
+    hg_return_t hret;
+    hg_handle_t handle;
+    bake_get_data_in_t in;
+    bake_get_data_out_t out;
+    int ret;
+
+    // make sure the target provider is on the same address space
+    hg_addr_t self_addr;
+    if(HG_SUCCESS != margo_addr_self(provider->client->mid, &self_addr)) return -1;
+    hg_addr_t trgt_addr = provider->addr;
+    hg_size_t addr_size = 128;
+    char self_addr_str[128];
+    char trgt_addr_str[128];
+
+    if(HG_SUCCESS != margo_addr_to_string(provider->client->mid, self_addr_str, &addr_size, self_addr)) {
+        margo_addr_free(provider->client->mid, self_addr);
+        return -1;
+    }
+    if(HG_SUCCESS != margo_addr_to_string(provider->client->mid, trgt_addr_str, &addr_size, trgt_addr)) {
+        margo_addr_free(provider->client->mid, self_addr);
+        return -1;
+    }
+    if(strcmp(self_addr_str, trgt_addr_str) != 0) {
+        margo_addr_free(provider->client->mid, self_addr);
+        return -1;
+    }
+    margo_addr_free(provider->client->mid, self_addr);
+
+    in.rid = rid;
+
+    hret = margo_create(provider->client->mid, provider->addr,
+        provider->client->bake_get_data_id, &handle);
+
+    if(hret != HG_SUCCESS)
+        return(-1);
+
+    hret = margo_provider_forward(provider->provider_id, handle, &in);
+    if(hret != HG_SUCCESS)
+    {
+        margo_destroy(handle);
+        return(-1);
+    }
+
+    hret = margo_get_output(handle, &out);
+    if(hret != HG_SUCCESS)
+    {
+        margo_destroy(handle);
+        return(-1);
+    }
+
+    ret = out.ret;
+    *ptr = (void*)out.ptr;
 
     margo_free_output(handle, &out);
     margo_destroy(handle);
