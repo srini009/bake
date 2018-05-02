@@ -255,6 +255,31 @@ int bake_get_size(
         uint64_t *size);
 
 /**
+ * Gets the raw pointer of an existing BAKE region.
+ * This pointer is valid in the address space of the
+ * targeted BAKE provider. This function is meant to
+ * be used when the client is co-located with the
+ * BAKE provider and lives in the same address space
+ * (e.g. active storage scenarios where we want to
+ * access a piece of data without making a copy).
+ * This function will return an error if the caller
+ * is not running at the same address as the provider.
+ *
+ * Note that if the data pointed to is modified by the
+ * client, the client will need to call bake_persist
+ * to make the provider persist the changes.
+ *
+ * @param [in] provider provider handle
+ * @param [in] rid identifier for region
+ * @param [out] ptr pointer to the address of the data
+ * @returns 0 on success, -1 on failure
+ */
+int bake_get_data(
+        bake_provider_handle_t provider,
+        bake_region_id_t rid,
+        void** ptr);
+
+/**
  * Reads from a BAKE region that was previously persisted with bake_persist().
  *
  * NOTE: for now at least, this call does not support "short" reads.  It

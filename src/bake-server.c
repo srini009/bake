@@ -129,6 +129,10 @@ int bake_provider_register(
             bake_get_size_in_t, bake_get_size_out_t, 
             bake_get_size_ult, provider_id, abt_pool);
     margo_register_data(mid, rpc_id, (void*)tmp_svr_ctx, NULL);
+    rpc_id = MARGO_REGISTER_PROVIDER(mid, "bake_get_data_rpc",
+            bake_get_data_in_t, bake_get_data_out_t, 
+            bake_get_data_ult, provider_id, abt_pool);
+    margo_register_data(mid, rpc_id, (void*)tmp_svr_ctx, NULL);
     rpc_id = MARGO_REGISTER_PROVIDER(mid, "bake_read_rpc",
             bake_read_in_t, bake_read_out_t, 
             bake_read_ult, provider_id, abt_pool);
@@ -701,6 +705,59 @@ static void bake_get_size_ult(hg_handle_t handle)
     return;
 }
 DEFINE_MARGO_RPC_HANDLER(bake_get_size_ult)
+
+    /* Get the raw pointer of a region */
+static void bake_get_data_ult(hg_handle_t handle)
+{
+    bake_get_data_out_t out;
+    bake_get_data_in_t in;
+    hg_return_t hret;
+    pmemobj_region_id_t* prid;
+
+    memset(&out, 0, sizeof(out));
+
+    margo_instance_id mid = margo_hg_handle_get_instance(handle);
+    assert(mid);
+    const struct hg_info* hgi = margo_get_info(handle);
+    bake_provider_t svr_ctx = margo_registered_data(mid, hgi->id);
+    if(!svr_ctx) {
+        out.ret = -1;
+        margo_respond(handle, &out);
+        margo_destroy(handle);
+        return;
+    }
+
+    hret = margo_get_input(handle, &in);
+    if(hret != HG_SUCCESS)
+    {
+        out.ret = -1;
+        margo_respond(handle, &out);
+        margo_destroy(handle);
+        return;
+    }
+
+    prid = (pmemobj_region_id_t*)in.rid.data;
+
+    /* find memory address for target object */
+    char* buffer = pmemobj_direct(prid->oid);
+    if(!buffer)
+    {
+        out.ret = -1;
+        margo_free_input(handle, &in);
+        margo_respond(handle, &out);
+        margo_destroy(handle);
+        return;
+    }
+
+    out.ptr = (uint64_t)buffer;
+    out.ret = 0;
+
+    margo_free_input(handle, &in);
+    margo_respond(handle, &out);
+    margo_destroy(handle);
+    return;
+}
+DEFINE_MARGO_RPC_HANDLER(bake_get_data_ult)
 
     /* service a remote RPC for a BAKE no-op */
 static void bake_noop_ult(hg_handle_t handle)
