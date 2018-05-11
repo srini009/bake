@@ -99,6 +99,7 @@ MERCURY_GEN_PROC(bake_read_in_t,
     ((uint64_t)(bulk_size))\
     ((hg_string_t)(remote_addr_str)))
 MERCURY_GEN_PROC(bake_read_out_t,
+    ((hg_size_t)(size))\
     ((int32_t)(ret)))
 DECLARE_MARGO_RPC_HANDLER(bake_read_ult)
 

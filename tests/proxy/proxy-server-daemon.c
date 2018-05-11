@@ -285,8 +285,9 @@ static void proxy_read_ult(hg_handle_t handle)
     assert(hret == HG_SUCCESS);
 
     /* perform proxy write on behalf of client */
+    uint64_t bytes_read;
     ret = bake_proxy_read(g_proxy_svr_ctx->svr_bph, g_proxy_svr_ctx->the_rid,
-        0, in.bulk_handle, in.bulk_offset, in.bulk_addr, in.bulk_size);
+        0, in.bulk_handle, in.bulk_offset, in.bulk_addr, in.bulk_size, &bytes_read);
     assert(ret == 0);
 
     /* set return value */

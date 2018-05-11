@@ -282,6 +282,7 @@ int bake_get_data(
  * @param [in] region_offset offset into the target region to read from
  * @param [in] buf local memory buffer read into
  * @param [in] buf_size size of local memory buffer to read into
+ * @param [out] bytes_read number of bytes effectively read into the buffer
  * @returns 0 on success, -1 on failure
  */
 int bake_read(
@@ -289,7 +290,8 @@ int bake_read(
         bake_region_id_t rid,
         uint64_t region_offset,
         void *buf,
-        uint64_t buf_size);
+        uint64_t buf_size,
+        uint64_t* bytes_read);
 
 /**
  * Reads data from a previously persisted BAKE region like bake_read(),
@@ -302,6 +304,7 @@ int bake_read(
  * @param [in] remote_offset offset in the remote bulk handle to read to
  * @param [in] remote_addr address string of the remote target to read to
  * @param [in] size size to read to remote bulk handle
+ * @param [out] bytes_read number of bytes effectively read
  * @returns 0 on success, -1 on failure
  */
 int bake_proxy_read(
@@ -311,7 +314,8 @@ int bake_proxy_read(
         hg_bulk_t remote_bulk,
         uint64_t remote_offset,
         const char* remote_addr,
-        uint64_t size);
+        uint64_t size,
+        uint64_t* bytes_read);
 
 /**
  * Shuts down a remote BAKE service (given an address).

@@ -157,12 +157,14 @@ int main(int argc, char **argv)
     }
 
     /* transfer data */
+    uint64_t bytes_read;
     ret = bake_read(
         bph,
         rid,
         0,
         local_region,
-        check_size);
+        check_size,
+        &bytes_read);
     if(ret != 0)
     {
         munmap(local_region, check_size);

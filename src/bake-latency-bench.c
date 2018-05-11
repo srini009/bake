@@ -192,12 +192,14 @@ static void bench_routine_read(bake_provider_handle_t bph, int iterations, doubl
     {
         tm1 = Wtime();
         /* transfer data (reads) */
+        uint64_t bytes_read;
         ret = bake_read(
             bph,
             rid,
             region_offset,
             buffer,
-            size);
+            size,
+            &bytes_read);
         tm2 = Wtime();
         assert(ret == 0);
         region_offset += size;

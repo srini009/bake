@@ -132,7 +132,8 @@ int main(int argc, char *argv[])
     /* reset the buffer and read it back via BAKE */
     memset(buf, 0, ALLOC_BUF_SIZE);
 
-    ret = bake_read(bph, the_rid, 0, buf, buf_size);
+    uint64_t bytes_read;
+    ret = bake_read(bph, the_rid, 0, buf, buf_size, &bytes_read);
     if(ret != 0)
     {
         fprintf(stderr, "Error: bake_read()\n");

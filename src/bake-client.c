@@ -743,7 +743,8 @@ static int bake_eager_read(
     bake_region_id_t rid,
     uint64_t region_offset,
     void *buf,
-    uint64_t buf_size)
+    uint64_t buf_size,
+    uint64_t* bytes_read)
 {
     hg_return_t hret;
     hg_handle_t handle;
@@ -778,6 +779,7 @@ static int bake_eager_read(
     ret = out.ret;
     if(ret == 0)
         memcpy(buf, out.buffer, out.size);
+    *bytes_read = out.size;
 
     margo_free_output(handle, &out);
     margo_destroy(handle);
@@ -789,7 +791,8 @@ int bake_read(
     bake_region_id_t rid,
     uint64_t region_offset,
     void *buf,
-    uint64_t buf_size)
+    uint64_t buf_size,
+    uint64_t* bytes_read)
 {
     hg_return_t hret;
     hg_handle_t handle;
@@ -798,7 +801,7 @@ int bake_read(
     int ret;
 
     if(buf_size <= provider->eager_limit)
-        return(bake_eager_read(provider, rid, region_offset, buf, buf_size));
+        return(bake_eager_read(provider, rid, region_offset, buf, buf_size, bytes_read));
 
     in.rid = rid;
     in.region_offset = region_offset;
@@ -837,6 +840,7 @@ int bake_read(
     }
     
     ret = out.ret;
+    *bytes_read = out.size;
 
     margo_free_output(handle, &out);
     margo_bulk_free(in.bulk_handle);
@@ -851,7 +855,8 @@ int bake_proxy_read(
     hg_bulk_t remote_bulk,
     uint64_t remote_offset,
     const char* remote_addr,
-    uint64_t size)
+    uint64_t size,
+    uint64_t* bytes_read)
 {
     hg_return_t hret;
     hg_handle_t handle;
@@ -863,7 +868,7 @@ int bake_proxy_read(
     in.region_offset = region_offset;
     in.bulk_handle = remote_bulk;
     in.bulk_offset = remote_offset;
-    in.bulk_size = size; 
+    in.bulk_size = size;
     in.remote_addr_str = (char*)remote_addr;
 
     hret = margo_create(provider->client->mid, provider->addr,
@@ -887,6 +892,7 @@ int bake_proxy_read(
     }
 
     ret = out.ret;
+    *bytes_read = out.size;
 
     margo_free_output(handle, &out);
     margo_destroy(handle);

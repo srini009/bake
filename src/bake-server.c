@@ -877,6 +877,7 @@ static void bake_read_ult(hg_handle_t handle)
     }
 
     out.ret = 0;
+    out.size = in.bulk_size; // TODO change that to the actual size read
 
     if(in.remote_addr_str)
         margo_addr_free(mid, src_addr);
