@@ -1263,6 +1263,8 @@ static void bake_migrate_ult(hg_handle_t handle)
         margo_destroy(cwp_handle);
     } /* end of create-write-persist block */
 
+    margo_addr_free(mid, dest_addr);
+
     if(in.remove_src) {
         pmemobj_free(&prid->oid);
     }
