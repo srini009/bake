@@ -140,7 +140,6 @@ int bake_provider_register(
             bake_create_write_persist_in_t, bake_create_write_persist_out_t,
             bake_create_write_persist_ult, provider_id, abt_pool);
     margo_register_data(mid, rpc_id, (void*)tmp_svr_ctx, NULL);
-    tmp_svr_ctx->bake_create_write_persist_id = rpc_id;
     rpc_id = MARGO_REGISTER_PROVIDER(mid, "bake_get_size_rpc",
             bake_get_size_in_t, bake_get_size_out_t, 
             bake_get_size_ult, provider_id, abt_pool);
@@ -168,6 +167,17 @@ int bake_provider_register(
             bake_migrate_in_t, bake_migrate_out_t, bake_migrate_ult,
             provider_id, abt_pool);
     margo_register_data(mid, rpc_id, (void*)tmp_svr_ctx, NULL);
+
+    /* get a client-side version of the bake_create_write_persist RPC */
+    hg_bool_t flag;
+    margo_registered_name(mid, "bake_create_write_persist_rpc", &rpc_id, &flag);
+    if(flag) {
+        tmp_svr_ctx->bake_create_write_persist_id = rpc_id;
+    } else {
+        tmp_svr_ctx->bake_create_write_persist_id =
+        MARGO_REGISTER(mid, "bake_create_write_persist_rpc",
+                bake_create_write_persist_in_t, bake_create_write_persist_out_t, NULL);
+    }
 
     /* install the bake server finalize callback */
     margo_push_finalize_callback(mid, &bake_server_finalize_cb, tmp_svr_ctx);
@@ -1223,7 +1233,7 @@ static void bake_migrate_ult(hg_handle_t handle)
             return;
         }
 
-        hret = margo_get_output(handle, &cwp_out);
+        hret = margo_get_output(cwp_handle, &cwp_out);
         if(hret != HG_SUCCESS)
         {
             out.ret = BAKE_ERR_MERCURY;
