@@ -12,6 +12,21 @@
 #include "uthash.h"
 #include "bake-rpc.h"
 
+DECLARE_MARGO_RPC_HANDLER(bake_shutdown_ult)
+DECLARE_MARGO_RPC_HANDLER(bake_create_ult)
+DECLARE_MARGO_RPC_HANDLER(bake_write_ult)
+DECLARE_MARGO_RPC_HANDLER(bake_eager_write_ult)
+DECLARE_MARGO_RPC_HANDLER(bake_persist_ult)
+DECLARE_MARGO_RPC_HANDLER(bake_create_write_persist_ult)
+DECLARE_MARGO_RPC_HANDLER(bake_get_size_ult)
+DECLARE_MARGO_RPC_HANDLER(bake_get_data_ult)
+DECLARE_MARGO_RPC_HANDLER(bake_read_ult)
+DECLARE_MARGO_RPC_HANDLER(bake_eager_read_ult)
+DECLARE_MARGO_RPC_HANDLER(bake_probe_ult)
+DECLARE_MARGO_RPC_HANDLER(bake_noop_ult)
+DECLARE_MARGO_RPC_HANDLER(bake_remove_ult)
+DECLARE_MARGO_RPC_HANDLER(bake_migrate_ult)
+
 /* definition of BAKE root data structure (just a uuid for now) */
 typedef struct
 {   
@@ -41,6 +56,7 @@ typedef struct bake_server_context_t
 {
     uint64_t num_targets;
     bake_pmem_entry_t* targets;
+    hg_id_t bake_create_write_persist_id;
 } bake_server_context_t;
 
 static void bake_server_finalize_cb(void *data);
@@ -124,6 +140,7 @@ int bake_provider_register(
             bake_create_write_persist_in_t, bake_create_write_persist_out_t,
             bake_create_write_persist_ult, provider_id, abt_pool);
     margo_register_data(mid, rpc_id, (void*)tmp_svr_ctx, NULL);
+    tmp_svr_ctx->bake_create_write_persist_id = rpc_id;
     rpc_id = MARGO_REGISTER_PROVIDER(mid, "bake_get_size_rpc",
             bake_get_size_in_t, bake_get_size_out_t, 
             bake_get_size_ult, provider_id, abt_pool);
@@ -145,6 +162,10 @@ int bake_provider_register(
     margo_register_data(mid, rpc_id, (void*)tmp_svr_ctx, NULL);
     rpc_id = MARGO_REGISTER_PROVIDER(mid, "bake_remove_rpc",
             bake_remove_in_t, bake_remove_out_t, bake_remove_ult,
+            provider_id, abt_pool);
+    margo_register_data(mid, rpc_id, (void*)tmp_svr_ctx, NULL);
+    rpc_id = MARGO_REGISTER_PROVIDER(mid, "bake_migrate_rpc",
+            bake_migrate_in_t, bake_migrate_out_t, bake_migrate_ult,
             provider_id, abt_pool);
     margo_register_data(mid, rpc_id, (void*)tmp_svr_ctx, NULL);
 
@@ -1102,6 +1123,149 @@ static void bake_remove_ult(hg_handle_t handle)
     return;
 }
 DEFINE_MARGO_RPC_HANDLER(bake_remove_ult)
+
+static void bake_migrate_ult(hg_handle_t handle)
+{
+    bake_migrate_in_t in;
+    bake_migrate_out_t out;
+    hg_return_t hret;
+    pmemobj_region_id_t* prid;
+
+    memset(&out, 0, sizeof(out));
+
+    margo_instance_id mid = margo_hg_handle_get_instance(handle);
+    assert(mid);
+    const struct hg_info* info = margo_get_info(handle);
+    bake_provider_t svr_ctx = margo_registered_data(mid, info->id);
+    if(!svr_ctx) {
+        out.ret = BAKE_ERR_UNKNOWN_PROVIDER;
+        margo_respond(handle, &out);
+        margo_destroy(handle);
+        return;
+    }
+
+    hret = margo_get_input(handle, &in);
+    if(hret != HG_SUCCESS)
+    {
+        out.ret = BAKE_ERR_MERCURY;
+        margo_respond(handle, &out);
+        margo_destroy(handle);
+        return;
+    }
+
+    prid = (pmemobj_region_id_t*)in.source_rid.data;
+
+    /* find memory address for target object */
+    region_content_t* region = pmemobj_direct(prid->oid);
+    if(!region)
+    {
+        out.ret = BAKE_ERR_UNKNOWN_REGION;
+        margo_free_input(handle, &in);
+        margo_respond(handle, &out);
+        margo_destroy(handle);
+        return;
+    }
+    /* get the size of the region */
+    size_t region_size = region->size;
+    char* region_data  = region->data;
+
+    /* lookup the address of the destination provider */
+    hg_addr_t dest_addr;
+    hret = margo_addr_lookup(mid, in.dest_addr, &dest_addr);
+    if(hret != HG_SUCCESS) {
+        out.ret = BAKE_ERR_MERCURY;
+        margo_free_input(handle, &in);
+        margo_respond(handle, &out);
+        margo_destroy(handle);
+        return;
+    }
+
+    { /* in this block we issue a create_write_persist to the destination */
+        hg_handle_t cwp_handle;
+        bake_create_write_persist_in_t cwp_in;
+        bake_create_write_persist_out_t cwp_out;
+
+        cwp_in.bti = in.dest_target_id;
+        cwp_in.bulk_offset = 0;
+        cwp_in.bulk_size = region_size;
+        cwp_in.remote_addr_str = NULL;
+
+        hret = margo_bulk_create(mid, 1, (void**)(&region_data), &region_size,
+                HG_BULK_READ_ONLY, &cwp_in.bulk_handle);
+        if(hret != HG_SUCCESS) {
+            out.ret = BAKE_ERR_MERCURY;
+            margo_free_input(handle, &in);
+            margo_respond(handle, &out);
+            margo_destroy(handle);
+            return;
+        }
+
+        hret = margo_create(mid, dest_addr,
+                            svr_ctx->bake_create_write_persist_id, &cwp_handle);
+        if(hret != HG_SUCCESS) {
+            out.ret = BAKE_ERR_MERCURY;
+            margo_bulk_free(cwp_in.bulk_handle);
+            margo_free_input(handle, &in);
+            margo_respond(handle, &out);
+            margo_destroy(handle);
+            return;
+        }
+
+        hret = margo_provider_forward(in.dest_provider_id, cwp_handle, &cwp_in);
+        if(hret != HG_SUCCESS)
+        {
+            out.ret = BAKE_ERR_MERCURY;
+            margo_bulk_free(cwp_in.bulk_handle);
+            margo_destroy(cwp_handle);
+            margo_free_input(handle, &in);
+            margo_respond(handle, &out);
+            margo_destroy(handle);  
+            return;
+        }
+
+        hret = margo_get_output(handle, &cwp_out);
+        if(hret != HG_SUCCESS)
+        {
+            out.ret = BAKE_ERR_MERCURY;
+            margo_bulk_free(cwp_in.bulk_handle);
+            margo_destroy(cwp_handle);
+            margo_free_input(handle, &in);
+            margo_respond(handle, &out);
+            margo_destroy(handle);
+            return;
+        }
+
+        if(cwp_out.ret != BAKE_SUCCESS)
+        {
+            out.ret = cwp_out.ret;
+            margo_bulk_free(cwp_in.bulk_handle);
+            margo_destroy(cwp_handle);
+            margo_free_input(handle, &in);
+            margo_respond(handle, &out);
+            margo_destroy(handle);
+            return;
+        }
+
+        out.dest_rid = cwp_out.rid;
+
+        margo_free_output(cwp_handle, &cwp_out);
+        margo_bulk_free(cwp_in.bulk_handle);
+        margo_destroy(cwp_handle);
+    } /* end of create-write-persist block */
+
+    if(in.remove_src) {
+        pmemobj_free(&prid->oid);
+    }
+    
+    out.ret = BAKE_SUCCESS;
+
+    margo_free_input(handle, &in);
+    margo_respond(handle, &out);
+    margo_destroy(handle);
+
+    return;
+}
+DEFINE_MARGO_RPC_HANDLER(bake_migrate_ult)
 
 static void bake_server_finalize_cb(void *data)
 {

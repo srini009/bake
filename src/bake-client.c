@@ -34,6 +34,7 @@ struct bake_client
     hg_id_t bake_read_id;
     hg_id_t bake_noop_id;
     hg_id_t bake_remove_id;
+    hg_id_t bake_migrate_id;
 
     uint64_t num_provider_handles;
 };
@@ -69,6 +70,7 @@ static int bake_client_register(bake_client_t client, margo_instance_id mid)
         margo_registered_name(mid, "bake_read_rpc",                 &client->bake_read_id,                 &flag);
         margo_registered_name(mid, "bake_noop_rpc",                 &client->bake_noop_id,                 &flag);
         margo_registered_name(mid, "bake_remove_rpc",               &client->bake_remove_id,               &flag);
+        margo_registered_name(mid, "bake_migrate_rpc",              &client->bake_migrate_id,              &flag);
 
     } else { /* RPCs not already registered */
 
@@ -108,6 +110,9 @@ static int bake_client_register(bake_client_t client, margo_instance_id mid)
         client->bake_remove_id =
             MARGO_REGISTER(mid, "bake_remove_rpc",
                     bake_remove_in_t, bake_remove_out_t, NULL);
+        client->bake_migrate_id =
+            MARGO_REGISTER(mid, "bake_migrate_rpc",
+                    bake_migrate_in_t, bake_migrate_out_t, NULL);
     }
 
     return BAKE_SUCCESS;
@@ -710,6 +715,56 @@ int bake_get_data(
 
     ret = out.ret;
     *ptr = (void*)out.ptr;
+
+    margo_free_output(handle, &out);
+    margo_destroy(handle);
+    return(ret);
+}
+
+int bake_migrate(
+        bake_provider_handle_t source,
+        bake_region_id_t source_rid,
+        int remove_source,
+        const char* dest_addr,
+        uint16_t dest_provider_id,
+        bake_target_id_t dest_target_id,
+        bake_region_id_t* dest_rid)
+{
+    hg_return_t hret;
+    hg_handle_t handle;
+    bake_migrate_in_t in;
+    bake_migrate_out_t out;
+    int ret;
+
+    in.source_rid       = source_rid;
+    in.remove_src       = remove_source;
+    in.dest_addr        = dest_addr;
+    in.dest_provider_id = dest_provider_id;
+    in.dest_target_id   = dest_target_id;
+
+    hret = margo_create(source->client->mid, source->addr,
+            source->client->bake_migrate_id, &handle);
+
+    if(hret != HG_SUCCESS)
+        return BAKE_ERR_MERCURY;
+
+    hret = margo_provider_forward(source->provider_id, handle, &in);
+    if(hret != HG_SUCCESS)
+    {
+        margo_destroy(handle);
+        return BAKE_ERR_MERCURY;
+    }
+
+    hret = margo_get_output(handle, &out);
+    if(hret != HG_SUCCESS)
+    {
+        margo_destroy(handle);
+        return BAKE_ERR_MERCURY;
+    }
+
+    ret = out.ret;
+    if(ret == BAKE_SUCCESS)
+        *dest_rid = out.dest_rid;
 
     margo_free_output(handle, &out);
     margo_destroy(handle);

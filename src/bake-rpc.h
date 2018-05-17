@@ -16,8 +16,6 @@
 static inline hg_return_t hg_proc_bake_target_id_t(hg_proc_t proc, bake_target_id_t *bti);
 static inline hg_return_t hg_proc_bake_region_id_t(hg_proc_t proc, bake_region_id_t *rid);
 static inline hg_return_t hg_proc_bake_probe_out_t(hg_proc_t proc, void* out);
-/* BAKE shutdown */
-DECLARE_MARGO_RPC_HANDLER(bake_shutdown_ult)
 
 /* BAKE create */
 MERCURY_GEN_PROC(bake_create_in_t,
@@ -26,7 +24,6 @@ MERCURY_GEN_PROC(bake_create_in_t,
 MERCURY_GEN_PROC(bake_create_out_t,
     ((int32_t)(ret))\
     ((bake_region_id_t)(rid)))
-DECLARE_MARGO_RPC_HANDLER(bake_create_ult)
 
 /* BAKE write */
 MERCURY_GEN_PROC(bake_write_in_t,
@@ -38,7 +35,6 @@ MERCURY_GEN_PROC(bake_write_in_t,
     ((hg_string_t)(remote_addr_str)))
 MERCURY_GEN_PROC(bake_write_out_t,
     ((int32_t)(ret)))
-DECLARE_MARGO_RPC_HANDLER(bake_write_ult)
 
 /* BAKE eager write */
 typedef struct 
@@ -51,14 +47,12 @@ typedef struct
 static inline hg_return_t hg_proc_bake_eager_write_in_t(hg_proc_t proc, void *v_out_p);
 MERCURY_GEN_PROC(bake_eager_write_out_t,
     ((int32_t)(ret)))
-DECLARE_MARGO_RPC_HANDLER(bake_eager_write_ult)
 
 /* BAKE persist */
 MERCURY_GEN_PROC(bake_persist_in_t,
     ((bake_region_id_t)(rid)))
 MERCURY_GEN_PROC(bake_persist_out_t,
     ((int32_t)(ret)))
-DECLARE_MARGO_RPC_HANDLER(bake_persist_ult)
 
 /* BAKE create/write/persist */
 MERCURY_GEN_PROC(bake_create_write_persist_in_t,
@@ -72,7 +66,6 @@ MERCURY_GEN_PROC(bake_create_write_persist_in_t,
 MERCURY_GEN_PROC(bake_create_write_persist_out_t,
     ((int32_t)(ret))\
     ((bake_region_id_t)(rid)))
-DECLARE_MARGO_RPC_HANDLER(bake_create_write_persist_ult)
 
 /* BAKE get size */
 MERCURY_GEN_PROC(bake_get_size_in_t,
@@ -80,7 +73,6 @@ MERCURY_GEN_PROC(bake_get_size_in_t,
 MERCURY_GEN_PROC(bake_get_size_out_t,
     ((int32_t)(ret))\
     ((uint64_t)(size)))
-DECLARE_MARGO_RPC_HANDLER(bake_get_size_ult)
 
 /* BAKE get data */
 MERCURY_GEN_PROC(bake_get_data_in_t,
@@ -88,7 +80,6 @@ MERCURY_GEN_PROC(bake_get_data_in_t,
 MERCURY_GEN_PROC(bake_get_data_out_t,
     ((int32_t)(ret))\
     ((uint64_t)(ptr)))
-DECLARE_MARGO_RPC_HANDLER(bake_get_data_ult)
 
 /* BAKE read */
 MERCURY_GEN_PROC(bake_read_in_t,
@@ -101,7 +92,6 @@ MERCURY_GEN_PROC(bake_read_in_t,
 MERCURY_GEN_PROC(bake_read_out_t,
     ((hg_size_t)(size))\
     ((int32_t)(ret)))
-DECLARE_MARGO_RPC_HANDLER(bake_read_ult)
 
 /* BAKE eager read */
 MERCURY_GEN_PROC(bake_eager_read_in_t,
@@ -115,7 +105,6 @@ typedef struct
     char * buffer;
 } bake_eager_read_out_t;
 static inline hg_return_t hg_proc_bake_eager_read_out_t(hg_proc_t proc, void *v_out_p);
-DECLARE_MARGO_RPC_HANDLER(bake_eager_read_ult)
 
 /* BAKE probe */
 MERCURY_GEN_PROC(bake_probe_in_t,
@@ -126,17 +115,23 @@ typedef struct
     uint64_t num_targets;
     bake_target_id_t* targets;
 } bake_probe_out_t;
-DECLARE_MARGO_RPC_HANDLER(bake_probe_ult)
-
-/* BAKE noop */
-DECLARE_MARGO_RPC_HANDLER(bake_noop_ult)
 
 /* BAKE remove */
 MERCURY_GEN_PROC(bake_remove_in_t,
     ((bake_region_id_t)(rid)))
 MERCURY_GEN_PROC(bake_remove_out_t,
     ((int32_t)(ret)))
-DECLARE_MARGO_RPC_HANDLER(bake_remove_ult)
+
+/* BAKE migrate */
+MERCURY_GEN_PROC(bake_migrate_in_t,
+    ((bake_region_id_t)(source_rid))\
+    ((int32_t)(remove_src))\
+    ((hg_const_string_t)(dest_addr))\
+    ((uint16_t)(dest_provider_id))\
+    ((bake_target_id_t)(dest_target_id)))
+MERCURY_GEN_PROC(bake_migrate_out_t,
+    ((int32_t)(ret))\
+    ((bake_region_id_t)(dest_rid)))
 
 static inline hg_return_t hg_proc_bake_region_id_t(hg_proc_t proc, bake_region_id_t *rid)
 {
