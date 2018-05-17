@@ -20,7 +20,7 @@ typedef struct {
 /**
  * Persistent, opaque identifier for a region within a BAKE target.
  */
-#define BAKE_REGION_ID_DATA_SIZE 24
+#define BAKE_REGION_ID_DATA_SIZE 16
 typedef struct {
     uint32_t type;
     char data[BAKE_REGION_ID_DATA_SIZE];
@@ -35,6 +35,7 @@ typedef struct {
 #define BAKE_ERR_UNKNOWN_TARGET     (-6) /* Target refered to by id is not known to provider */
 #define BAKE_ERR_UNKNOWN_PROVIDER   (-7) /* Provider id could not be matched with a provider */
 #define BAKE_ERR_UNKNOWN_REGION     (-8) /* Region id could not be found */
+#define BAKE_ERR_OUT_OF_BOUNDS      (-9) /* Attempting an out of bound access */
 
 #ifdef __cplusplus
 }

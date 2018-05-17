@@ -22,8 +22,12 @@ typedef struct
 typedef struct
 {
     PMEMoid oid;
-    uint64_t size;
 } pmemobj_region_id_t;
+
+typedef struct {
+    uint64_t size;
+    char data[1];
+} region_content_t;
 
 typedef struct
 {
@@ -291,15 +295,26 @@ static void bake_create_ult(hg_handle_t handle)
     memset(&out, 0, sizeof(out));
 
     prid = (pmemobj_region_id_t*)out.rid.data;
-    prid->size = in.region_size;
 
+    size_t content_size = in.region_size + sizeof(uint64_t);
     int ret = pmemobj_alloc(entry->pmem_pool, &prid->oid,
-            in.region_size, 0, NULL, NULL);
-    if(ret != 0)
+            content_size, 0, NULL, NULL);
+    if(ret != 0) {
         out.ret = BAKE_ERR_PMEM;
+        goto respond_with_error;
+    }
 
-    margo_respond(handle, &out);
+    region_content_t* region = (region_content_t*)pmemobj_direct(prid->oid);
+    if(!region) {
+        out.ret = BAKE_ERR_PMEM;
+        goto respond_with_error;
+    }
+    region->size = in.region_size;
+    PMEMobjpool* pmem_pool = pmemobj_pool_by_oid(prid->oid);
+    pmemobj_persist(pmem_pool, &(region->size), sizeof(region->size));
+
     out.ret = BAKE_SUCCESS;
+    margo_respond(handle, &out);
 
 finish:
     margo_free_input(handle, &in);
@@ -350,8 +365,9 @@ static void bake_write_ult(hg_handle_t handle)
     prid = (pmemobj_region_id_t*)in.rid.data;
 
     /* find memory address for target object */
-    buffer = pmemobj_direct(prid->oid);
-    if(!buffer)
+    region_content_t* region = pmemobj_direct(prid->oid);
+
+    if(!region)
     {
         out.ret = BAKE_ERR_UNKNOWN_REGION;
         margo_free_input(handle, &in);
@@ -359,9 +375,16 @@ static void bake_write_ult(hg_handle_t handle)
         margo_destroy(handle);
         return;
     }
-    // TODO check that this access is not out of bound and
-    // compute the size that we are actually allowed to read.
-    buffer = &buffer[in.region_offset];
+
+    if(in.region_offset + in.bulk_size > region->size) {
+        out.ret = BAKE_ERR_OUT_OF_BOUNDS;
+        margo_free_input(handle, &in);
+        margo_respond(handle, &out);
+        margo_destroy(handle);
+        return;
+    }
+
+    buffer = region->data + in.region_offset;
 
     /* create bulk handle for local side of transfer */
     hret = margo_bulk_create(mid, 1, (void**)(&buffer), &in.bulk_size,
@@ -456,8 +479,8 @@ static void bake_eager_write_ult(hg_handle_t handle)
     prid = (pmemobj_region_id_t*)in.rid.data;
 
     /* find memory address for target object */
-    buffer = pmemobj_direct(prid->oid);
-    if(!buffer)
+    region_content_t* region = pmemobj_direct(prid->oid);
+    if(!region)
     {
         out.ret = BAKE_ERR_PMEM;
         margo_free_input(handle, &in);
@@ -465,8 +488,16 @@ static void bake_eager_write_ult(hg_handle_t handle)
         margo_destroy(handle);
         return;
     }
-    // TODO check that we are allowed to access that
-    buffer = &buffer[in.region_offset];
+
+    if(in.size + in.region_offset > region->size) {
+        out.ret = BAKE_ERR_OUT_OF_BOUNDS;
+        margo_free_input(handle, &in);
+        margo_respond(handle, &out);
+        margo_destroy(handle);
+        return;
+    }
+
+    buffer = region->data + in.region_offset;
 
     memcpy(buffer, in.buffer, in.size);
 
@@ -513,8 +544,8 @@ static void bake_persist_ult(hg_handle_t handle)
     prid = (pmemobj_region_id_t*)in.rid.data;
 
     /* find memory address for target object */
-    buffer = pmemobj_direct(prid->oid);
-    if(!buffer)
+    region_content_t* region = pmemobj_direct(prid->oid);
+    if(!region)
     {
         out.ret = BAKE_ERR_PMEM;
         margo_free_input(handle, &in);
@@ -522,10 +553,11 @@ static void bake_persist_ult(hg_handle_t handle)
         margo_destroy(handle);
         return;
     }
+    buffer = region->data;
 
     /* TODO: should this have an abt shim in case it blocks? */
     PMEMobjpool* pmem_pool = pmemobj_pool_by_oid(prid->oid);
-    pmemobj_persist(pmem_pool, buffer, prid->size);
+    pmemobj_persist(pmem_pool, buffer, region->size);
 
     out.ret = BAKE_SUCCESS;
 
@@ -584,10 +616,13 @@ static void bake_create_write_persist_ult(hg_handle_t handle)
         return;
     }
 
+    size_t content_size = in.bulk_size + sizeof(uint64_t);
     prid = (pmemobj_region_id_t*)out.rid.data;
+#if 0
     prid->size = in.bulk_size;
+#endif
     ret = pmemobj_alloc(entry->pmem_pool, &prid->oid,
-            in.bulk_size, 0, NULL, NULL);
+            content_size, 0, NULL, NULL);
     if(ret != 0)
     {
         out.ret = BAKE_ERR_PMEM;
@@ -598,8 +633,8 @@ static void bake_create_write_persist_ult(hg_handle_t handle)
     }
 
     /* find memory address for target object */
-    buffer = pmemobj_direct(prid->oid);
-    if(!buffer)
+    region_content_t* region = pmemobj_direct(prid->oid);
+    if(!region)
     {
         out.ret = BAKE_ERR_PMEM;
         margo_free_input(handle, &in);
@@ -607,6 +642,8 @@ static void bake_create_write_persist_ult(hg_handle_t handle)
         margo_destroy(handle);
         return;
     }
+    region->size = in.bulk_size;
+    buffer = region->data;
 
     /* create bulk handle for local side of transfer */
     hret = margo_bulk_create(mid, 1, (void**)(&buffer), &in.bulk_size,
@@ -655,7 +692,7 @@ static void bake_create_write_persist_ult(hg_handle_t handle)
     }
 
     /* TODO: should this have an abt shim in case it blocks? */
-    pmemobj_persist(entry->pmem_pool, buffer, prid->size);
+    pmemobj_persist(entry->pmem_pool, region, content_size);
 
     out.ret = BAKE_SUCCESS;
 
@@ -701,8 +738,16 @@ static void bake_get_size_ult(hg_handle_t handle)
 
     prid = (pmemobj_region_id_t*)in.rid.data;
 
-    /* kind of cheating here; the size is encoded in the RID */
-    out.size = prid->size;
+    region_content_t* region = pmemobj_direct(prid->oid);
+    if(!region)
+    {
+        out.ret = BAKE_ERR_PMEM;
+        margo_free_input(handle, &in);
+        margo_respond(handle, &out);
+        margo_destroy(handle);
+        return;
+    }
+    out.size = region->size;
     out.ret = BAKE_SUCCESS;
 
     margo_free_input(handle, &in);
@@ -745,8 +790,8 @@ static void bake_get_data_ult(hg_handle_t handle)
     prid = (pmemobj_region_id_t*)in.rid.data;
 
     /* find memory address for target object */
-    char* buffer = pmemobj_direct(prid->oid);
-    if(!buffer)
+    region_content_t* region = pmemobj_direct(prid->oid);
+    if(!region)
     {
         out.ret = BAKE_ERR_UNKNOWN_REGION;
         margo_free_input(handle, &in);
@@ -755,7 +800,7 @@ static void bake_get_data_ult(hg_handle_t handle)
         return;
     }
 
-    out.ptr = (uint64_t)buffer;
+    out.ptr = (uint64_t)(region->data);
     out.ret = BAKE_SUCCESS;
 
     margo_free_input(handle, &in);
@@ -792,6 +837,7 @@ static void bake_read_ult(hg_handle_t handle)
     const struct hg_info *hgi;
     margo_instance_id mid;
     pmemobj_region_id_t* prid;
+    hg_size_t size_to_read;
 
     memset(&out, 0, sizeof(out));
 
@@ -819,8 +865,8 @@ static void bake_read_ult(hg_handle_t handle)
     prid = (pmemobj_region_id_t*)in.rid.data;
 
     /* find memory address for target object */
-    buffer = pmemobj_direct(prid->oid);
-    if(!buffer)
+    region_content_t* region = pmemobj_direct(prid->oid);
+    if(!region)
     {
         out.ret = BAKE_ERR_UNKNOWN_REGION;
         margo_free_input(handle, &in);
@@ -828,11 +874,26 @@ static void bake_read_ult(hg_handle_t handle)
         margo_destroy(handle);
         return;
     }
-    // TODO check that we are allowed to access that
-    buffer = &buffer[in.region_offset];
+
+    if(in.region_offset > region->size)
+    {
+        out.ret = BAKE_ERR_OUT_OF_BOUNDS;
+        margo_free_input(handle, &in);
+        margo_respond(handle, &out);
+        margo_destroy(handle);
+        return;
+    }
+
+    if(in.region_offset + in.bulk_size > region->size) {
+        size_to_read = region->size - in.region_offset;
+    } else {
+        size_to_read = in.bulk_size;
+    }
+
+    buffer = region->data + in.region_offset;
 
     /* create bulk handle for local side of transfer */
-    hret = margo_bulk_create(mid, 1, (void**)(&buffer), &in.bulk_size,
+    hret = margo_bulk_create(mid, 1, (void**)(&buffer), &size_to_read,
             HG_BULK_READ_ONLY, &bulk_handle);
     if(hret != HG_SUCCESS)
     {
@@ -864,7 +925,7 @@ static void bake_read_ult(hg_handle_t handle)
     }
 
     hret = margo_bulk_transfer(mid, HG_BULK_PUSH, src_addr, in.bulk_handle,
-            in.bulk_offset, bulk_handle, 0, in.bulk_size);
+            in.bulk_offset, bulk_handle, 0, size_to_read);
     if(hret != HG_SUCCESS)
     {
         out.ret = BAKE_ERR_MERCURY;
@@ -878,7 +939,7 @@ static void bake_read_ult(hg_handle_t handle)
     }
 
     out.ret = BAKE_SUCCESS;
-    out.size = in.bulk_size; // TODO change that to the actual size read
+    out.size = size_to_read;
 
     if(in.remote_addr_str)
         margo_addr_free(mid, src_addr);
@@ -898,7 +959,7 @@ static void bake_eager_read_ult(hg_handle_t handle)
     bake_eager_read_in_t in;
     hg_return_t hret;
     char* buffer;
-    hg_size_t size;
+    hg_size_t size_to_read;
     pmemobj_region_id_t* prid;
 
     memset(&out, 0, sizeof(out));
@@ -927,8 +988,8 @@ static void bake_eager_read_ult(hg_handle_t handle)
     prid = (pmemobj_region_id_t*)in.rid.data;
 
     /* find memory address for target object */
-    buffer = pmemobj_direct(prid->oid);
-    if(!buffer)
+    region_content_t* region = pmemobj_direct(prid->oid);
+    if(!region)
     {
         out.ret = BAKE_ERR_UNKNOWN_REGION;
         margo_free_input(handle, &in);
@@ -936,11 +997,27 @@ static void bake_eager_read_ult(hg_handle_t handle)
         margo_destroy(handle);
         return;
     }
-    buffer = &buffer[in.region_offset];
+
+    if(in.region_offset > region->size)
+    {
+        out.ret = BAKE_ERR_OUT_OF_BOUNDS;
+        margo_free_input(handle, &in);
+        margo_respond(handle, &out);
+        margo_destroy(handle);
+        return;
+    }
+
+    if(in.region_offset + in.size > region->size) {
+        size_to_read = region->size - in.region_offset;
+    } else {
+        size_to_read = in.size;
+    }
+
+    buffer = region->data + in.region_offset;
 
     out.ret = BAKE_SUCCESS;
     out.buffer = buffer;
-    out.size = in.size;
+    out.size = size_to_read;
 
     margo_free_input(handle, &in);
     margo_respond(handle, &out);
