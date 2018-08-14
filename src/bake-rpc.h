@@ -122,14 +122,14 @@ MERCURY_GEN_PROC(bake_remove_in_t,
 MERCURY_GEN_PROC(bake_remove_out_t,
     ((int32_t)(ret)))
 
-/* BAKE migrate */
-MERCURY_GEN_PROC(bake_migrate_in_t,
+/* BAKE migrate region */
+MERCURY_GEN_PROC(bake_migrate_region_in_t,
     ((bake_region_id_t)(source_rid))\
     ((int32_t)(remove_src))\
     ((hg_const_string_t)(dest_addr))\
     ((uint16_t)(dest_provider_id))\
     ((bake_target_id_t)(dest_target_id)))
-MERCURY_GEN_PROC(bake_migrate_out_t,
+MERCURY_GEN_PROC(bake_migrate_region_out_t,
     ((int32_t)(ret))\
     ((bake_region_id_t)(dest_rid)))
 

@@ -25,7 +25,7 @@ DECLARE_MARGO_RPC_HANDLER(bake_eager_read_ult)
 DECLARE_MARGO_RPC_HANDLER(bake_probe_ult)
 DECLARE_MARGO_RPC_HANDLER(bake_noop_ult)
 DECLARE_MARGO_RPC_HANDLER(bake_remove_ult)
-DECLARE_MARGO_RPC_HANDLER(bake_migrate_ult)
+DECLARE_MARGO_RPC_HANDLER(bake_migrate_region_ult)
 
 /* definition of BAKE root data structure (just a uuid for now) */
 typedef struct
@@ -163,8 +163,8 @@ int bake_provider_register(
             bake_remove_in_t, bake_remove_out_t, bake_remove_ult,
             provider_id, abt_pool);
     margo_register_data(mid, rpc_id, (void*)tmp_svr_ctx, NULL);
-    rpc_id = MARGO_REGISTER_PROVIDER(mid, "bake_migrate_rpc",
-            bake_migrate_in_t, bake_migrate_out_t, bake_migrate_ult,
+    rpc_id = MARGO_REGISTER_PROVIDER(mid, "bake_migrate_region_rpc",
+            bake_migrate_region_in_t, bake_migrate_region_out_t, bake_migrate_region_ult,
             provider_id, abt_pool);
     margo_register_data(mid, rpc_id, (void*)tmp_svr_ctx, NULL);
 
@@ -1134,10 +1134,10 @@ static void bake_remove_ult(hg_handle_t handle)
 }
 DEFINE_MARGO_RPC_HANDLER(bake_remove_ult)
 
-static void bake_migrate_ult(hg_handle_t handle)
+static void bake_migrate_region_ult(hg_handle_t handle)
 {
-    bake_migrate_in_t in;
-    bake_migrate_out_t out;
+    bake_migrate_region_in_t in;
+    bake_migrate_region_out_t out;
     hg_return_t hret;
     pmemobj_region_id_t* prid;
 
@@ -1277,7 +1277,7 @@ static void bake_migrate_ult(hg_handle_t handle)
 
     return;
 }
-DEFINE_MARGO_RPC_HANDLER(bake_migrate_ult)
+DEFINE_MARGO_RPC_HANDLER(bake_migrate_region_ult)
 
 static void bake_server_finalize_cb(void *data)
 {
