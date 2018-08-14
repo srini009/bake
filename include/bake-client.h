@@ -390,7 +390,8 @@ int bake_migrate_target(
         bake_target_id_t src_target_id,
         int remove_source,
         const char* dest_addr,
-        uint16_t dest_provider_id);
+        uint16_t dest_provider_id,
+        const char* dest_root);
 
 /**
  * Shuts down a remote BAKE service (given an address).
