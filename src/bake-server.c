@@ -1426,10 +1426,12 @@ typedef struct migration_cb_args {
 static void migration_fileset_cb(const char* filename, void* arg)
 {
     migration_cb_args* mig_args = (migration_cb_args*)arg;
-    char* fullname = strcat(mig_args->root, filename);
+    char fullname[1024];
+    fullname[0] = '\0';
+    strcat(fullname, mig_args->root);
+    strcat(fullname, filename);
     bake_target_id_t tid;
     bake_provider_add_storage_target(mig_args->provider, fullname, &tid);
-    free(fullname);
 }
 
 static void bake_target_migration_callback(remi_fileset_t fileset, void* uarg)
