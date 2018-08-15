@@ -36,6 +36,7 @@ typedef struct {
 #define BAKE_ERR_UNKNOWN_PROVIDER   (-7) /* Provider id could not be matched with a provider */
 #define BAKE_ERR_UNKNOWN_REGION     (-8) /* Region id could not be found */
 #define BAKE_ERR_OUT_OF_BOUNDS      (-9) /* Attempting an out of bound access */
+#define BAKE_ERR_REMI              (-10) /* Error related to REMI */
 
 #ifdef __cplusplus
 }

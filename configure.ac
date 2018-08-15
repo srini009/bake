@@ -80,6 +80,12 @@ LIBS="$UUID_LIBS $LIBS"
 CPPFLAGS="$UUID_CFLAGS $CPPFLAGS"
 CFLAGS="$UUID_CFLAGS $CFLAGS"
 
+PKG_CHECK_MODULES([REMI],[remi],[],
+   [AC_MSG_ERROR([Could not find working remi installation!])])
+LIBS="$REMI_LIBS $LIBS"
+CPPFLAGS="$REMI_CFLAGS $CPPFLAGS"
+CFLAGS="$REMI_CFLAGS $CFLAGS"
+
 AC_CONFIG_FILES([Makefile maint/bake-client.pc maint/bake-server.pc])
 AC_OUTPUT
  
