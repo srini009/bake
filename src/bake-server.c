@@ -106,15 +106,24 @@ int bake_provider_register(
         bake_provider_t* provider)
 {
     bake_server_context_t *tmp_svr_ctx;
-
-    /* check if a provider with the same multiplex id already exists */
+    int ret;
+    /* check if a provider with the same provider id already exists */
     {
         hg_id_t id;
         hg_bool_t flag;
         margo_provider_registered_name(mid, "bake_probe_rpc", provider_id, &id, &flag);
         if(flag == HG_TRUE) {
-            fprintf(stderr, "bake_provider_register(): a provider with the same id (%d) already exists\n", provider_id);
+            fprintf(stderr, "bake_provider_register(): a BAKE provider with the same id (%d) already exists\n", provider_id);
             return BAKE_ERR_MERCURY;
+        }
+    }
+    /* check if a REMI provider exists with the same provider id */
+    {
+        int flag;
+        remi_provider_registered(mid, provider_id, &flag, NULL, NULL);
+        if(flag) {
+            fprintf(stderr, "bake_provider_register(): a REMI provider with the same (%d) already exists\n", provider_id);
+            return BAKE_ERR_REMI;
         }
     }
 
@@ -193,12 +202,21 @@ int bake_provider_register(
     }
 
     /* register a REMI client */
-    remi_client_init(mid, &(tmp_svr_ctx->remi_client));
+    ret = remi_client_init(mid, &(tmp_svr_ctx->remi_client));
+    if(ret != REMI_SUCCESS) {
+        return BAKE_ERR_REMI;
+    }
 
     /* register a REMI provider */
-    remi_provider_register(mid, provider_id, abt_pool, &(tmp_svr_ctx->remi_provider));
-    remi_provider_register_migration_class(tmp_svr_ctx->remi_provider,
+    ret = remi_provider_register(mid, provider_id, abt_pool, &(tmp_svr_ctx->remi_provider));
+    if(ret != REMI_SUCCESS) {
+        return BAKE_ERR_REMI;
+    }
+    ret = remi_provider_register_migration_class(tmp_svr_ctx->remi_provider,
             "bake", bake_target_migration_callback, NULL, tmp_svr_ctx);
+    if(ret != REMI_SUCCESS) {
+        return BAKE_ERR_REMI;
+    }
 
     /* install the bake server finalize callback */
     margo_push_finalize_callback(mid, &bake_server_finalize_cb, tmp_svr_ctx);
