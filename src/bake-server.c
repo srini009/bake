@@ -68,7 +68,7 @@ typedef struct bake_server_context_t
 
 static void bake_server_finalize_cb(void *data);
 
-static void bake_target_migration_callback(remi_fileset_t fileset, void* provider);
+static int bake_target_post_migration_callback(remi_fileset_t fileset, void* provider);
 
 int bake_makepool(
         const char *pool_name,
@@ -213,7 +213,8 @@ int bake_provider_register(
         return BAKE_ERR_REMI;
     }
     ret = remi_provider_register_migration_class(tmp_svr_ctx->remi_provider,
-            "bake", bake_target_migration_callback, NULL, tmp_svr_ctx);
+            "bake", NULL,
+            bake_target_post_migration_callback, NULL, tmp_svr_ctx);
     if(ret != REMI_SUCCESS) {
         return BAKE_ERR_REMI;
     }
@@ -1399,7 +1400,8 @@ static void bake_migrate_target_ult(hg_handle_t handle)
         goto finish;
     }
     /* issue the migration */
-    ret = remi_fileset_migrate(remi_ph, local_fileset, in.dest_root, in.remove_src);
+    int status = 0;
+    ret = remi_fileset_migrate(remi_ph, local_fileset, in.dest_root, in.remove_src, &status);
     if(ret != REMI_SUCCESS) {
         out.ret = BAKE_ERR_REMI;
         goto finish;
@@ -1452,11 +1454,12 @@ static void migration_fileset_cb(const char* filename, void* arg)
     bake_provider_add_storage_target(mig_args->provider, fullname, &tid);
 }
 
-static void bake_target_migration_callback(remi_fileset_t fileset, void* uarg)
+static int bake_target_post_migration_callback(remi_fileset_t fileset, void* uarg)
 {
     migration_cb_args args;
     args.provider = (bake_server_context_t *)uarg;
     size_t root_size = 1024;
     remi_fileset_get_root(fileset, args.root, &root_size);
     remi_fileset_foreach_file(fileset, migration_fileset_cb, &args);
+    return 0;
 }
