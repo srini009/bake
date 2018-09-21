@@ -59,6 +59,9 @@ typedef struct
 
 typedef struct bake_server_context_t
 {
+    ABT_rwlock lock; // write-locked during migration, read-locked by all other
+    // operations. There should be something better to avoid locking everything
+    // but we are going with that for simplicity for now.
     uint64_t num_targets;
     bake_pmem_entry_t* targets;
     hg_id_t bake_create_write_persist_id;
@@ -132,6 +135,13 @@ int bake_provider_register(
     if(!tmp_svr_ctx)
         return BAKE_ERR_ALLOCATION;
 
+    /* Create rwlock */
+    ret = ABT_rwlock_create(&(tmp_svr_ctx->lock));
+    if(ret != ABT_SUCCESS) {
+        free(tmp_svr_ctx);
+        return BAKE_ERR_ARGOBOTS;
+    }
+
     /* register RPCs */
     hg_id_t rpc_id;
     rpc_id = MARGO_REGISTER_PROVIDER(mid, "bake_create_rpc",
@@ -204,18 +214,21 @@ int bake_provider_register(
     /* register a REMI client */
     ret = remi_client_init(mid, &(tmp_svr_ctx->remi_client));
     if(ret != REMI_SUCCESS) {
+        // XXX unregister RPCs, cleanup tmp_svr_ctx before returning
         return BAKE_ERR_REMI;
     }
 
     /* register a REMI provider */
     ret = remi_provider_register(mid, provider_id, abt_pool, &(tmp_svr_ctx->remi_provider));
     if(ret != REMI_SUCCESS) {
+        // XXX unregister RPCs, cleanup tmp_svr_ctx before returning
         return BAKE_ERR_REMI;
     }
     ret = remi_provider_register_migration_class(tmp_svr_ctx->remi_provider,
             "bake", NULL,
             bake_target_post_migration_callback, NULL, tmp_svr_ctx);
     if(ret != REMI_SUCCESS) {
+        // XXX unregister RPCs, cleanup tmp_svr_ctx before returning
         return BAKE_ERR_REMI;
     }
 
@@ -233,6 +246,7 @@ int bake_provider_add_storage_target(
         const char *target_name,
         bake_target_id_t* target_id)
 {
+    int ret = BAKE_SUCCESS;
     bake_pmem_entry_t* new_entry = calloc(1, sizeof(*new_entry));
     new_entry->root = NULL;
     new_entry->filename = NULL;
@@ -267,6 +281,8 @@ int bake_provider_add_storage_target(
         return BAKE_ERR_UNKNOWN_TARGET;
     }
 
+    /* write-lock the provider */
+    ABT_rwlock_wrlock(provider->lock);
     /* insert in the provider's hash */
     HASH_ADD(hh, provider->targets, target_id, sizeof(bake_target_id_t), new_entry);
     /* check that it was inserted */
@@ -278,12 +294,15 @@ int bake_provider_add_storage_target(
         free(new_entry->filename);
         free(new_entry->root);
         free(new_entry);
-        return BAKE_ERR_ALLOCATION;
+        ret = BAKE_ERR_ALLOCATION;
+    } else {
+        provider->num_targets += 1;
+        *target_id = key;
+        ret = BAKE_SUCCESS;
     }
-
-    provider->num_targets += 1;
-    *target_id = key;
-    return BAKE_SUCCESS;
+    /* unlock provider */
+    ABT_rwlock_unlock(provider->lock);
+    return ret;
 }
 
 static bake_pmem_entry_t* find_pmem_entry(
@@ -299,20 +318,28 @@ int bake_provider_remove_storage_target(
         bake_provider_t provider,
         bake_target_id_t target_id)
 {
+    int ret;
+    ABT_rwlock_wrlock(provider->lock);
     bake_pmem_entry_t* entry = NULL;
     HASH_FIND(hh, provider->targets, &target_id, sizeof(bake_target_id_t), entry);
-    if(!entry) return BAKE_ERR_UNKNOWN_TARGET;
-    pmemobj_close(entry->pmem_pool);
-    HASH_DEL(provider->targets, entry);
-    free(entry->filename);
-    free(entry->root);
-    free(entry);
-    return 0;
+    if(!entry) {
+        ret = BAKE_ERR_UNKNOWN_TARGET;
+    } else {
+        pmemobj_close(entry->pmem_pool);
+        HASH_DEL(provider->targets, entry);
+        free(entry->filename);
+        free(entry->root);
+        free(entry);
+        ret = BAKE_SUCCESS;
+    }
+    ABT_rwlock_unlock(provider->lock);
+    return ret;
 }
 
 int bake_provider_remove_all_storage_targets(
         bake_provider_t provider)
 {
+    ABT_rwlock_wrlock(provider->lock);
     bake_pmem_entry_t *p, *tmp;
     HASH_ITER(hh, provider->targets, p, tmp) {
         HASH_DEL(provider->targets, p);
@@ -322,6 +349,7 @@ int bake_provider_remove_all_storage_targets(
         free(p);
     }
     provider->num_targets = 0;
+    ABT_rwlock_unlock(provider->lock);
     return BAKE_SUCCESS;
 }
 
@@ -329,7 +357,9 @@ int bake_provider_count_storage_targets(
         bake_provider_t provider,
         uint64_t* num_targets)
 {
+    ABT_rwlock_rdlock(provider->lock);
     *num_targets = provider->num_targets;
+    ABT_rwlock_unlock(provider->lock);
     return BAKE_SUCCESS;
 }
 
@@ -337,12 +367,14 @@ int bake_provider_list_storage_targets(
         bake_provider_t provider,
         bake_target_id_t* targets)
 {
+    ABT_rwlock_rdlock(provider->lock);
     bake_pmem_entry_t *p, *tmp;
     uint64_t i = 0;
     HASH_ITER(hh, provider->targets, p, tmp) {
         targets[i] = p->target_id;
         i += 1;
     }
+    ABT_rwlock_unlock(provider->lock);
     return BAKE_SUCCESS;
 }
 
@@ -353,6 +385,7 @@ static void bake_create_ult(hg_handle_t handle)
     bake_create_in_t in;
     hg_return_t hret;
     pmemobj_region_id_t* prid;
+    ABT_rwlock lock = ABT_RWLOCK_NULL;
 
     margo_instance_id mid = margo_hg_handle_get_instance(handle);
     assert(mid);
@@ -361,20 +394,23 @@ static void bake_create_ult(hg_handle_t handle)
         margo_registered_data(mid, info->id);
     if(!svr_ctx) {
         out.ret = BAKE_ERR_UNKNOWN_PROVIDER;
-        goto respond_with_error;
+        goto finish;
     }
 
     hret = margo_get_input(handle, &in);
     if(hret != HG_SUCCESS) {
         out.ret = BAKE_ERR_MERCURY;
-        goto respond_with_error;
+        goto finish;
     }
+    /* lock provider */
+    lock = svr_ctx->lock;
+    ABT_rwlock_rdlock(lock);
 
     /* find the pmem pool */
     bake_pmem_entry_t* entry = find_pmem_entry(svr_ctx, in.bti);
     if(entry == NULL) {
         out.ret = BAKE_ERR_UNKNOWN_TARGET;
-        goto respond_with_error;
+        goto finish;
     }
 
     /* TODO: this check needs to be somewhere else */
@@ -389,29 +425,27 @@ static void bake_create_ult(hg_handle_t handle)
             content_size, 0, NULL, NULL);
     if(ret != 0) {
         out.ret = BAKE_ERR_PMEM;
-        goto respond_with_error;
+        goto finish;
     }
 
     region_content_t* region = (region_content_t*)pmemobj_direct(prid->oid);
     if(!region) {
         out.ret = BAKE_ERR_PMEM;
-        goto respond_with_error;
+        goto finish;
     }
     region->size = in.region_size;
     PMEMobjpool* pmem_pool = pmemobj_pool_by_oid(prid->oid);
     pmemobj_persist(pmem_pool, &(region->size), sizeof(region->size));
 
     out.ret = BAKE_SUCCESS;
-    margo_respond(handle, &out);
 
 finish:
+    if(lock != ABT_RWLOCK_NULL)
+        ABT_rwlock_unlock(lock);
+    margo_respond(handle, &out);
     margo_free_input(handle, &in);
     margo_destroy(handle);
     return;
-
-respond_with_error:
-    margo_respond(handle, &out);
-    goto finish;
 }
 DEFINE_MARGO_RPC_HANDLER(bake_create_ult)
 
@@ -420,6 +454,7 @@ static void bake_write_ult(hg_handle_t handle)
 {
     bake_write_out_t out;
     bake_write_in_t in;
+    in.bulk_handle = HG_BULK_NULL;
     hg_return_t hret;
     hg_addr_t src_addr = HG_ADDR_NULL;
     char* buffer;
@@ -427,6 +462,7 @@ static void bake_write_ult(hg_handle_t handle)
     const struct hg_info *hgi;
     margo_instance_id mid;
     pmemobj_region_id_t* prid;
+    ABT_rwlock lock = ABT_RWLOCK_NULL;
 
     memset(&out, 0, sizeof(out));
 
@@ -436,18 +472,17 @@ static void bake_write_ult(hg_handle_t handle)
     bake_provider_t svr_ctx = margo_registered_data(mid, hgi->id);
     if(!svr_ctx) {
         out.ret = BAKE_ERR_UNKNOWN_PROVIDER;
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
+        goto finish;
     }
+    /* read-lock the provider */
+    lock = svr_ctx->lock;
+    ABT_rwlock_rdlock(lock);
 
     hret = margo_get_input(handle, &in);
     if(hret != HG_SUCCESS)
     {
         out.ret = BAKE_ERR_MERCURY;
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
+        goto finish;
     }
 
     prid = (pmemobj_region_id_t*)in.rid.data;
@@ -458,18 +493,12 @@ static void bake_write_ult(hg_handle_t handle)
     if(!region)
     {
         out.ret = BAKE_ERR_UNKNOWN_REGION;
-        margo_free_input(handle, &in);
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
+        goto finish;
     }
 
     if(in.region_offset + in.bulk_size > region->size) {
         out.ret = BAKE_ERR_OUT_OF_BOUNDS;
-        margo_free_input(handle, &in);
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
+        goto finish;
     }
 
     buffer = region->data + in.region_offset;
@@ -480,10 +509,7 @@ static void bake_write_ult(hg_handle_t handle)
     if(hret != HG_SUCCESS)
     {
         out.ret = BAKE_ERR_MERCURY;
-        margo_free_input(handle, &in);
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
+        goto finish;
     }
 
     if(in.remote_addr_str)
@@ -493,11 +519,7 @@ static void bake_write_ult(hg_handle_t handle)
         if(hret != HG_SUCCESS)
         {
             out.ret = BAKE_ERR_MERCURY;
-            margo_bulk_free(bulk_handle);
-            margo_free_input(handle, &in);
-            margo_respond(handle, &out);
-            margo_destroy(handle);
-            return;
+            goto finish;
         }
     }
     else
@@ -511,22 +533,19 @@ static void bake_write_ult(hg_handle_t handle)
     if(hret != HG_SUCCESS)
     {
         out.ret = BAKE_ERR_MERCURY;
-        if(in.remote_addr_str)
-            margo_addr_free(mid, src_addr);
-        margo_bulk_free(bulk_handle);
-        margo_free_input(handle, &in);
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
+        goto finish;
     }
 
     out.ret = BAKE_SUCCESS;
 
+finish:
+    if(lock != ABT_RWLOCK_NULL)
+        ABT_rwlock_unlock(lock);
+    margo_respond(handle, &out);
     if(in.remote_addr_str)
         margo_addr_free(mid, src_addr);
     margo_bulk_free(bulk_handle);
     margo_free_input(handle, &in);
-    margo_respond(handle, &out);
     margo_destroy(handle);
     return;
 }
@@ -537,10 +556,13 @@ static void bake_eager_write_ult(hg_handle_t handle)
 {
     bake_eager_write_out_t out;
     bake_eager_write_in_t in;
+    in.buffer = NULL;
+    in.size = 0;
     hg_return_t hret;
-    char* buffer;
-    hg_bulk_t bulk_handle;
-    pmemobj_region_id_t* prid;
+    char* buffer = NULL;
+    hg_bulk_t bulk_handle = HG_BULK_NULL;
+    pmemobj_region_id_t* prid = NULL;
+    ABT_rwlock lock = ABT_RWLOCK_NULL;
 
     memset(&out, 0, sizeof(out));
 
@@ -550,39 +572,33 @@ static void bake_eager_write_ult(hg_handle_t handle)
     bake_provider_t svr_ctx = margo_registered_data(mid, info->id);
     if(!svr_ctx) {
         out.ret = BAKE_ERR_UNKNOWN_PROVIDER;
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
+        goto finish;
     }
 
     hret = margo_get_input(handle, &in);
     if(hret != HG_SUCCESS)
     {
         out.ret = BAKE_ERR_MERCURY;
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
+        goto finish;
     }
 
     prid = (pmemobj_region_id_t*)in.rid.data;
+
+    /* lock provider */
+    lock = svr_ctx->lock;
+    ABT_rwlock_rdlock(lock);
 
     /* find memory address for target object */
     region_content_t* region = pmemobj_direct(prid->oid);
     if(!region)
     {
         out.ret = BAKE_ERR_PMEM;
-        margo_free_input(handle, &in);
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
+        goto finish;
     }
 
     if(in.size + in.region_offset > region->size) {
         out.ret = BAKE_ERR_OUT_OF_BOUNDS;
-        margo_free_input(handle, &in);
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
+        goto finish;
     }
 
     buffer = region->data + in.region_offset;
@@ -591,8 +607,11 @@ static void bake_eager_write_ult(hg_handle_t handle)
 
     out.ret = BAKE_SUCCESS;
 
-    margo_free_input(handle, &in);
+finish:
+    if(lock != ABT_RWLOCK_NULL)
+        ABT_rwlock_unlock(lock);
     margo_respond(handle, &out);
+    margo_free_input(handle, &in);
     margo_destroy(handle);
     return;
 }
@@ -604,8 +623,9 @@ static void bake_persist_ult(hg_handle_t handle)
     bake_persist_out_t out;
     bake_persist_in_t in;
     hg_return_t hret;
-    char* buffer;
+    char* buffer = NULL;
     pmemobj_region_id_t* prid;
+    ABT_rwlock lock = ABT_RWLOCK_NULL;
 
     memset(&out, 0, sizeof(out));
 
@@ -615,31 +635,27 @@ static void bake_persist_ult(hg_handle_t handle)
     bake_provider_t svr_ctx = margo_registered_data(mid, info->id);
     if(!svr_ctx) {
         out.ret = BAKE_ERR_UNKNOWN_PROVIDER;
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
+        goto finish;
     }
 
     hret = margo_get_input(handle, &in);
     if(hret != HG_SUCCESS)
     {
         out.ret = BAKE_ERR_MERCURY;
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
+        goto finish;
     }
 
     prid = (pmemobj_region_id_t*)in.rid.data;
 
+    /* lock provider */
+    lock = svr_ctx->lock;
+    ABT_rwlock_rdlock(lock);
     /* find memory address for target object */
     region_content_t* region = pmemobj_direct(prid->oid);
     if(!region)
     {
         out.ret = BAKE_ERR_PMEM;
-        margo_free_input(handle, &in);
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
+        goto finish;
     }
     buffer = region->data;
 
@@ -649,8 +665,11 @@ static void bake_persist_ult(hg_handle_t handle)
 
     out.ret = BAKE_SUCCESS;
 
-    margo_free_input(handle, &in);
+finish:
+    if(lock != ABT_RWLOCK_NULL)
+        ABT_rwlock_unlock(lock);
     margo_respond(handle, &out);
+    margo_free_input(handle, &in);
     margo_destroy(handle);
     return;
 }
@@ -660,14 +679,17 @@ static void bake_create_write_persist_ult(hg_handle_t handle)
 {
     bake_create_write_persist_out_t out;
     bake_create_write_persist_in_t in;
-    hg_addr_t src_addr;
-    char* buffer;
-    hg_bulk_t bulk_handle;
-    const struct hg_info *hgi;
+    in.bulk_handle = HG_BULK_NULL;
+    in.remote_addr_str = NULL;
+    hg_addr_t src_addr = HG_ADDR_NULL;
+    char* buffer = NULL;
+    hg_bulk_t bulk_handle = HG_BULK_NULL;
+    const struct hg_info *hgi = NULL;
     margo_instance_id mid;
     hg_return_t hret;
     int ret;
     pmemobj_region_id_t* prid;
+    ABT_rwlock lock = ABT_RWLOCK_NULL;
 
     memset(&out, 0, sizeof(out));
 
@@ -677,9 +699,7 @@ static void bake_create_write_persist_ult(hg_handle_t handle)
     bake_provider_t svr_ctx = margo_registered_data(mid, hgi->id);
     if(!svr_ctx) {
         out.ret = BAKE_ERR_UNKNOWN_PROVIDER;
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
+        goto finish;
     }
 
     /* TODO: this check needs to be somewhere else */
@@ -689,35 +709,28 @@ static void bake_create_write_persist_ult(hg_handle_t handle)
     if(hret != HG_SUCCESS)
     {
         out.ret = BAKE_ERR_MERCURY;
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
+        goto finish;
     }
 
+    /* lock provider */
+    lock = svr_ctx->lock;
+    ABT_rwlock_rdlock(lock);
     /* find the pmem pool */
     bake_pmem_entry_t* entry = find_pmem_entry(svr_ctx, in.bti);
     if(entry == NULL) {
         out.ret = BAKE_ERR_UNKNOWN_TARGET;
-        margo_free_input(handle, &in);
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
+        goto finish;
     }
 
     size_t content_size = in.bulk_size + sizeof(uint64_t);
     prid = (pmemobj_region_id_t*)out.rid.data;
-#if 0
-    prid->size = in.bulk_size;
-#endif
+
     ret = pmemobj_alloc(entry->pmem_pool, &prid->oid,
             content_size, 0, NULL, NULL);
     if(ret != 0)
     {
         out.ret = BAKE_ERR_PMEM;
-        margo_free_input(handle, &in);
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
+        goto finish;
     }
 
     /* find memory address for target object */
@@ -725,10 +738,7 @@ static void bake_create_write_persist_ult(hg_handle_t handle)
     if(!region)
     {
         out.ret = BAKE_ERR_PMEM;
-        margo_free_input(handle, &in);
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
+        goto finish;
     }
     region->size = in.bulk_size;
     buffer = region->data;
@@ -739,10 +749,7 @@ static void bake_create_write_persist_ult(hg_handle_t handle)
     if(hret != HG_SUCCESS)
     {
         out.ret = BAKE_ERR_MERCURY;
-        margo_free_input(handle, &in);
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
+        goto finish;
     }
 
     if(in.remote_addr_str)
@@ -752,11 +759,7 @@ static void bake_create_write_persist_ult(hg_handle_t handle)
         if(hret != HG_SUCCESS)
         {
             out.ret = BAKE_ERR_MERCURY;
-            margo_bulk_free(bulk_handle);
-            margo_free_input(handle, &in);
-            margo_respond(handle, &out);
-            margo_destroy(handle);
-            return;
+            goto finish;
         }
     }
     else
@@ -764,19 +767,12 @@ static void bake_create_write_persist_ult(hg_handle_t handle)
         /* no proxy write, use the source of this request */
         src_addr = hgi->addr;
     }
-
     hret = margo_bulk_transfer(mid, HG_BULK_PULL, src_addr, in.bulk_handle,
             in.bulk_offset, bulk_handle, 0, in.bulk_size);
     if(hret != HG_SUCCESS)
     {
         out.ret = BAKE_ERR_MERCURY;
-        if(in.remote_addr_str)
-            margo_addr_free(mid, src_addr);
-        margo_bulk_free(bulk_handle);
-        margo_free_input(handle, &in);
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
+        goto finish;
     }
 
     /* TODO: should this have an abt shim in case it blocks? */
@@ -784,11 +780,15 @@ static void bake_create_write_persist_ult(hg_handle_t handle)
 
     out.ret = BAKE_SUCCESS;
 
-    if(in.remote_addr_str)
+finish:
+    if(lock != ABT_RWLOCK_NULL)
+        ABT_rwlock_unlock(lock);
+    margo_respond(handle, &out);
+    if(in.remote_addr_str) {
         margo_addr_free(mid, src_addr);
+    }
     margo_bulk_free(bulk_handle);
     margo_free_input(handle, &in);
-    margo_respond(handle, &out);
     margo_destroy(handle);
     return;
 }
@@ -801,6 +801,7 @@ static void bake_get_size_ult(hg_handle_t handle)
     bake_get_size_in_t in;
     hg_return_t hret;
     pmemobj_region_id_t* prid;
+    ABT_rwlock lock = ABT_RWLOCK_NULL;
 
     memset(&out, 0, sizeof(out));
 
@@ -810,36 +811,34 @@ static void bake_get_size_ult(hg_handle_t handle)
     bake_provider_t svr_ctx = margo_registered_data(mid, hgi->id);
     if(!svr_ctx) {
         out.ret = BAKE_ERR_UNKNOWN_PROVIDER;
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
+        goto finish;
     }
 
     hret = margo_get_input(handle, &in);
     if(hret != HG_SUCCESS)
     {
         out.ret = BAKE_ERR_MERCURY;
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
+        goto finish;
     }
 
     prid = (pmemobj_region_id_t*)in.rid.data;
-
+    /* lock provider */
+    lock = svr_ctx->lock;
+    ABT_rwlock_rdlock(lock);
     region_content_t* region = pmemobj_direct(prid->oid);
     if(!region)
     {
         out.ret = BAKE_ERR_PMEM;
-        margo_free_input(handle, &in);
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
+        goto finish;
     }
     out.size = region->size;
     out.ret = BAKE_SUCCESS;
 
-    margo_free_input(handle, &in);
+finish:
+    if(lock != ABT_RWLOCK_NULL)
+        ABT_rwlock_unlock(lock);
     margo_respond(handle, &out);
+    margo_free_input(handle, &in);
     margo_destroy(handle);
     return;
 }
@@ -852,6 +851,7 @@ static void bake_get_data_ult(hg_handle_t handle)
     bake_get_data_in_t in;
     hg_return_t hret;
     pmemobj_region_id_t* prid;
+    ABT_rwlock lock = ABT_RWLOCK_NULL;
 
     memset(&out, 0, sizeof(out));
 
@@ -861,40 +861,37 @@ static void bake_get_data_ult(hg_handle_t handle)
     bake_provider_t svr_ctx = margo_registered_data(mid, hgi->id);
     if(!svr_ctx) {
         out.ret = BAKE_ERR_UNKNOWN_PROVIDER;
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
+        goto finish;
     }
 
     hret = margo_get_input(handle, &in);
     if(hret != HG_SUCCESS)
     {
         out.ret = BAKE_ERR_MERCURY;
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
+        goto finish;
     }
 
     prid = (pmemobj_region_id_t*)in.rid.data;
-
+    /* lock provider */
+    lock = svr_ctx->lock;
+    ABT_rwlock_rdlock(lock);
     /* find memory address for target object */
     region_content_t* region = pmemobj_direct(prid->oid);
     if(!region)
     {
         out.ret = BAKE_ERR_UNKNOWN_REGION;
-        margo_free_input(handle, &in);
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
+        goto finish;
     }
 
     out.ptr = (uint64_t)(region->data);
     out.ret = BAKE_SUCCESS;
 
-    margo_free_input(handle, &in);
+finish:
+    if(lock != ABT_RWLOCK_NULL)
+        ABT_rwlock_unlock(lock);
     margo_respond(handle, &out);
+    margo_free_input(handle, &in);
     margo_destroy(handle);
-    return;
 }
 DEFINE_MARGO_RPC_HANDLER(bake_get_data_ult)
 
@@ -918,14 +915,17 @@ static void bake_read_ult(hg_handle_t handle)
 {
     bake_read_out_t out;
     bake_read_in_t in;
+    in.bulk_handle = HG_BULK_NULL;
+    in.remote_addr_str = NULL;
     hg_return_t hret;
-    hg_addr_t src_addr;
-    char* buffer;
-    hg_bulk_t bulk_handle;
+    hg_addr_t src_addr = HG_ADDR_NULL;
+    char* buffer = NULL;
+    hg_bulk_t bulk_handle = HG_BULK_NULL;
     const struct hg_info *hgi;
     margo_instance_id mid;
     pmemobj_region_id_t* prid;
     hg_size_t size_to_read;
+    ABT_rwlock lock = ABT_RWLOCK_NULL;
 
     memset(&out, 0, sizeof(out));
 
@@ -936,40 +936,32 @@ static void bake_read_ult(hg_handle_t handle)
         margo_registered_data(mid, hgi->id);
     if(!svr_ctx) {
         out.ret = BAKE_ERR_UNKNOWN_PROVIDER;
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
+        goto finish;
     }
 
     hret = margo_get_input(handle, &in);
     if(hret != HG_SUCCESS)
     {
         out.ret = BAKE_ERR_MERCURY;
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
+        goto finish;
     }
 
     prid = (pmemobj_region_id_t*)in.rid.data;
-
+    /* lock provider */
+    lock = svr_ctx->lock;
+    ABT_rwlock_rdlock(lock);
     /* find memory address for target object */
     region_content_t* region = pmemobj_direct(prid->oid);
     if(!region)
     {
         out.ret = BAKE_ERR_UNKNOWN_REGION;
-        margo_free_input(handle, &in);
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
+        goto finish;
     }
 
     if(in.region_offset > region->size)
     {
         out.ret = BAKE_ERR_OUT_OF_BOUNDS;
-        margo_free_input(handle, &in);
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
+        goto finish;
     }
 
     if(in.region_offset + in.bulk_size > region->size) {
@@ -986,10 +978,7 @@ static void bake_read_ult(hg_handle_t handle)
     if(hret != HG_SUCCESS)
     {
         out.ret = BAKE_ERR_MERCURY;
-        margo_free_input(handle, &in);
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
+        goto finish;
     }
 
     if(in.remote_addr_str)
@@ -999,11 +988,7 @@ static void bake_read_ult(hg_handle_t handle)
         if(hret != HG_SUCCESS)
         {
             out.ret = BAKE_ERR_MERCURY;
-            margo_bulk_free(bulk_handle);
-            margo_free_input(handle, &in);
-            margo_respond(handle, &out);
-            margo_destroy(handle);
-            return;
+            goto finish;
         }
     }
     else
@@ -1011,31 +996,26 @@ static void bake_read_ult(hg_handle_t handle)
         /* no proxy write, use the source of this request */
         src_addr = hgi->addr;
     }
-
     hret = margo_bulk_transfer(mid, HG_BULK_PUSH, src_addr, in.bulk_handle,
             in.bulk_offset, bulk_handle, 0, size_to_read);
     if(hret != HG_SUCCESS)
     {
         out.ret = BAKE_ERR_MERCURY;
-        if(in.remote_addr_str)
-            margo_addr_free(mid, src_addr);
-        margo_bulk_free(bulk_handle);
-        margo_free_input(handle, &in);
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
+        goto finish;
     }
 
     out.ret = BAKE_SUCCESS;
     out.size = size_to_read;
 
+finish:
+    if(lock != ABT_RWLOCK_NULL)
+        ABT_rwlock_unlock(lock);
+    margo_respond(handle, &out);
     if(in.remote_addr_str)
         margo_addr_free(mid, src_addr);
     margo_bulk_free(bulk_handle);
     margo_free_input(handle, &in);
-    margo_respond(handle, &out);
     margo_destroy(handle);
-    return;
 }
 DEFINE_MARGO_RPC_HANDLER(bake_read_ult)
 
@@ -1044,11 +1024,14 @@ DEFINE_MARGO_RPC_HANDLER(bake_read_ult)
 static void bake_eager_read_ult(hg_handle_t handle)
 {
     bake_eager_read_out_t out;
+    out.buffer = NULL;
+    out.size = 0;
     bake_eager_read_in_t in;
     hg_return_t hret;
-    char* buffer;
+    char* buffer = NULL;
     hg_size_t size_to_read;
     pmemobj_region_id_t* prid;
+    ABT_rwlock lock = ABT_RWLOCK_NULL;
 
     memset(&out, 0, sizeof(out));
 
@@ -1059,40 +1042,34 @@ static void bake_eager_read_ult(hg_handle_t handle)
         margo_registered_data(mid, hgi->id);
     if(!svr_ctx) {
         out.ret = BAKE_ERR_UNKNOWN_PROVIDER;
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
+        goto finish;
     }
 
     hret = margo_get_input(handle, &in);
     if(hret != HG_SUCCESS)
     {
         out.ret = BAKE_ERR_MERCURY;
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
+        goto finish;
     }
 
     prid = (pmemobj_region_id_t*)in.rid.data;
+
+    /* lock provider */
+    lock = svr_ctx->lock;
+    ABT_rwlock_rdlock(lock);
 
     /* find memory address for target object */
     region_content_t* region = pmemobj_direct(prid->oid);
     if(!region)
     {
         out.ret = BAKE_ERR_UNKNOWN_REGION;
-        margo_free_input(handle, &in);
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
+        goto finish;
     }
 
     if(in.region_offset > region->size)
     {
         out.ret = BAKE_ERR_OUT_OF_BOUNDS;
-        margo_free_input(handle, &in);
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
+        goto finish;
     }
 
     if(in.region_offset + in.size > region->size) {
@@ -1107,10 +1084,12 @@ static void bake_eager_read_ult(hg_handle_t handle)
     out.buffer = buffer;
     out.size = size_to_read;
 
-    margo_free_input(handle, &in);
+finish:
+    if(lock != ABT_RWLOCK_NULL)
+        ABT_rwlock_unlock(lock);
     margo_respond(handle, &out);
+    margo_free_input(handle, &in);
     margo_destroy(handle);
-    return;
 }
 DEFINE_MARGO_RPC_HANDLER(bake_eager_read_ult)
 
@@ -1133,19 +1112,17 @@ static void bake_probe_ult(hg_handle_t handle)
         return;
     }
 
-    out.ret = BAKE_SUCCESS;
-
     uint64_t targets_count;
     bake_provider_count_storage_targets(svr_ctx, &targets_count);
     bake_target_id_t targets[targets_count];
     bake_provider_list_storage_targets(svr_ctx, targets);
 
+    out.ret = BAKE_SUCCESS;
     out.targets = targets;
     out.num_targets = targets_count;
 
     margo_respond(handle, &out);
     margo_destroy(handle);
-    return;
 }
 DEFINE_MARGO_RPC_HANDLER(bake_probe_ult)
 
@@ -1155,6 +1132,7 @@ static void bake_remove_ult(hg_handle_t handle)
     bake_remove_out_t out;
     hg_return_t hret;
     pmemobj_region_id_t* prid;
+    ABT_rwlock lock = ABT_RWLOCK_NULL;
 
     memset(&out, 0, sizeof(out));
 
@@ -1164,39 +1142,43 @@ static void bake_remove_ult(hg_handle_t handle)
     bake_provider_t svr_ctx = margo_registered_data(mid, info->id);
     if(!svr_ctx) {
         out.ret = BAKE_ERR_UNKNOWN_PROVIDER;
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
+        goto finish;
     }
 
     hret = margo_get_input(handle, &in);
     if(hret != HG_SUCCESS)
     {
         out.ret = BAKE_ERR_MERCURY;
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
+        goto finish;
     }
 
     prid = (pmemobj_region_id_t*)in.rid.data;
 
+    /* lock provider */
+    lock = svr_ctx->lock;
+    ABT_rwlock_rdlock(lock);
     pmemobj_free(&prid->oid);
 
     out.ret = BAKE_SUCCESS;
 
-    margo_free_input(handle, &in);
+finish:
+    if(lock != ABT_RWLOCK_NULL)
+        ABT_rwlock_unlock(lock);
     margo_respond(handle, &out);
+    margo_free_input(handle, &in);
     margo_destroy(handle);
-    return;
 }
 DEFINE_MARGO_RPC_HANDLER(bake_remove_ult)
 
 static void bake_migrate_region_ult(hg_handle_t handle)
 {
     bake_migrate_region_in_t in;
+    in.dest_addr = NULL;
     bake_migrate_region_out_t out;
     hg_return_t hret;
     pmemobj_region_id_t* prid;
+    hg_addr_t dest_addr = HG_ADDR_NULL;
+    ABT_rwlock lock = ABT_RWLOCK_NULL;
 
     memset(&out, 0, sizeof(out));
 
@@ -1206,49 +1188,41 @@ static void bake_migrate_region_ult(hg_handle_t handle)
     bake_provider_t svr_ctx = margo_registered_data(mid, info->id);
     if(!svr_ctx) {
         out.ret = BAKE_ERR_UNKNOWN_PROVIDER;
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
+        goto finish;
     }
 
     hret = margo_get_input(handle, &in);
     if(hret != HG_SUCCESS)
     {
         out.ret = BAKE_ERR_MERCURY;
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
+        goto finish;
     }
 
     prid = (pmemobj_region_id_t*)in.source_rid.data;
 
+    /* lock provider */
+    lock = svr_ctx->lock;
+    ABT_rwlock_rdlock(lock);
     /* find memory address for target object */
     region_content_t* region = pmemobj_direct(prid->oid);
     if(!region)
     {
         out.ret = BAKE_ERR_UNKNOWN_REGION;
-        margo_free_input(handle, &in);
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
+        goto finish;
     }
     /* get the size of the region */
     size_t region_size = region->size;
     char* region_data  = region->data;
 
     /* lookup the address of the destination provider */
-    hg_addr_t dest_addr;
     hret = margo_addr_lookup(mid, in.dest_addr, &dest_addr);
     if(hret != HG_SUCCESS) {
         out.ret = BAKE_ERR_MERCURY;
-        margo_free_input(handle, &in);
-        margo_respond(handle, &out);
-        margo_destroy(handle);
-        return;
+        goto finish;
     }
 
     { /* in this block we issue a create_write_persist to the destination */
-        hg_handle_t cwp_handle;
+        hg_handle_t cwp_handle = HG_HANDLE_NULL;
         bake_create_write_persist_in_t cwp_in;
         bake_create_write_persist_out_t cwp_out;
 
@@ -1261,78 +1235,59 @@ static void bake_migrate_region_ult(hg_handle_t handle)
                 HG_BULK_READ_ONLY, &cwp_in.bulk_handle);
         if(hret != HG_SUCCESS) {
             out.ret = BAKE_ERR_MERCURY;
-            margo_free_input(handle, &in);
-            margo_respond(handle, &out);
-            margo_destroy(handle);
-            return;
+            goto finish_scope;
         }
 
         hret = margo_create(mid, dest_addr,
                             svr_ctx->bake_create_write_persist_id, &cwp_handle);
         if(hret != HG_SUCCESS) {
             out.ret = BAKE_ERR_MERCURY;
-            margo_bulk_free(cwp_in.bulk_handle);
-            margo_free_input(handle, &in);
-            margo_respond(handle, &out);
-            margo_destroy(handle);
-            return;
+            goto finish_scope;
         }
 
         hret = margo_provider_forward(in.dest_provider_id, cwp_handle, &cwp_in);
         if(hret != HG_SUCCESS)
         {
             out.ret = BAKE_ERR_MERCURY;
-            margo_bulk_free(cwp_in.bulk_handle);
-            margo_destroy(cwp_handle);
-            margo_free_input(handle, &in);
-            margo_respond(handle, &out);
-            margo_destroy(handle);  
-            return;
+            goto finish_scope;
         }
 
         hret = margo_get_output(cwp_handle, &cwp_out);
         if(hret != HG_SUCCESS)
         {
             out.ret = BAKE_ERR_MERCURY;
-            margo_bulk_free(cwp_in.bulk_handle);
-            margo_destroy(cwp_handle);
-            margo_free_input(handle, &in);
-            margo_respond(handle, &out);
-            margo_destroy(handle);
-            return;
+            goto finish_scope;
         }
 
         if(cwp_out.ret != BAKE_SUCCESS)
         {
             out.ret = cwp_out.ret;
-            margo_bulk_free(cwp_in.bulk_handle);
-            margo_destroy(cwp_handle);
-            margo_free_input(handle, &in);
-            margo_respond(handle, &out);
-            margo_destroy(handle);
-            return;
+            goto finish_scope;
         }
 
         out.dest_rid = cwp_out.rid;
+        out.ret = BAKE_SUCCESS;
 
+finish_scope:
         margo_free_output(cwp_handle, &cwp_out);
         margo_bulk_free(cwp_in.bulk_handle);
         margo_destroy(cwp_handle);
     } /* end of create-write-persist block */
 
-    margo_addr_free(mid, dest_addr);
+    if(out.ret != BAKE_SUCCESS)
+        goto finish;
 
     if(in.remove_src) {
         pmemobj_free(&prid->oid);
     }
     
-    out.ret = BAKE_SUCCESS;
-
-    margo_free_input(handle, &in);
+finish:
+    if(lock != ABT_RWLOCK_NULL)
+        ABT_rwlock_unlock(lock);
     margo_respond(handle, &out);
+    margo_addr_free(mid, dest_addr);
+    margo_free_input(handle, &in);
     margo_destroy(handle);
-
-    return;
 }
 DEFINE_MARGO_RPC_HANDLER(bake_migrate_region_ult)
 
@@ -1347,6 +1302,7 @@ static void bake_migrate_target_ult(hg_handle_t handle)
     int ret;
     remi_provider_handle_t remi_ph = REMI_PROVIDER_HANDLE_NULL;
     remi_fileset_t local_fileset = REMI_FILESET_NULL;
+    ABT_rwlock lock = ABT_RWLOCK_NULL;
 
     memset(&out, 0, sizeof(out));
 
@@ -1366,6 +1322,9 @@ static void bake_migrate_target_ult(hg_handle_t handle)
         goto finish;
     }
 
+    /* lock provider */
+    lock = svr_ctx->lock;
+    ABT_rwlock_wrlock(lock);
     bake_pmem_entry_t* entry = find_pmem_entry(svr_ctx, in.target_id);
     if(!entry) {
         out.ret = BAKE_ERR_UNKNOWN_TARGET;
@@ -1412,7 +1371,8 @@ static void bake_migrate_target_ult(hg_handle_t handle)
     out.ret = BAKE_SUCCESS;
 
 finish:
-
+    if(lock != ABT_RWLOCK_NULL)
+        ABT_rwlock_unlock(lock);
     remi_fileset_free(local_fileset);
     remi_provider_handle_release(remi_ph);
     margo_addr_free(mid, dest_addr);
@@ -1432,6 +1392,8 @@ static void bake_server_finalize_cb(void *data)
     bake_provider_remove_all_storage_targets(svr_ctx);
 
     remi_client_finalize(svr_ctx->remi_client);
+
+    ABT_rwlock_free(&(svr_ctx->lock));
 
     free(svr_ctx);
 
