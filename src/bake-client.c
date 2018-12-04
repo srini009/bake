@@ -29,6 +29,7 @@ struct bake_client
     hg_id_t bake_write_id;
     hg_id_t bake_persist_id;
     hg_id_t bake_create_write_persist_id;
+    hg_id_t bake_eager_create_write_persist_id;
     hg_id_t bake_get_size_id;
     hg_id_t bake_get_data_id;
     hg_id_t bake_read_id;
@@ -59,20 +60,21 @@ static int bake_client_register(bake_client_t client, margo_instance_id mid)
 
     if(flag == HG_TRUE) { /* RPCs already registered */
 
-        margo_registered_name(mid, "bake_probe_rpc",                &client->bake_probe_id,                &flag);
-        margo_registered_name(mid, "bake_create_rpc",               &client->bake_create_id,               &flag);
-        margo_registered_name(mid, "bake_write_rpc",                &client->bake_write_id,                &flag);
-        margo_registered_name(mid, "bake_eager_write_rpc",          &client->bake_eager_write_id,          &flag);
-        margo_registered_name(mid, "bake_eager_read_rpc",           &client->bake_eager_read_id,           &flag);
-        margo_registered_name(mid, "bake_persist_rpc",              &client->bake_persist_id,              &flag);
-        margo_registered_name(mid, "bake_create_write_persist_rpc", &client->bake_create_write_persist_id, &flag);
-        margo_registered_name(mid, "bake_get_size_rpc",             &client->bake_get_size_id,             &flag);
-        margo_registered_name(mid, "bake_get_data_rpc",             &client->bake_get_data_id,             &flag);
-        margo_registered_name(mid, "bake_read_rpc",                 &client->bake_read_id,                 &flag);
-        margo_registered_name(mid, "bake_noop_rpc",                 &client->bake_noop_id,                 &flag);
-        margo_registered_name(mid, "bake_remove_rpc",               &client->bake_remove_id,               &flag);
-        margo_registered_name(mid, "bake_migrate_region_rpc",       &client->bake_migrate_region_id,       &flag);
-        margo_registered_name(mid, "bake_migrate_target_rpc",       &client->bake_migrate_target_id,       &flag);
+        margo_registered_name(mid, "bake_probe_rpc",                      &client->bake_probe_id,                      &flag);
+        margo_registered_name(mid, "bake_create_rpc",                     &client->bake_create_id,                     &flag);
+        margo_registered_name(mid, "bake_write_rpc",                      &client->bake_write_id,                      &flag);
+        margo_registered_name(mid, "bake_eager_write_rpc",                &client->bake_eager_write_id,                &flag);
+        margo_registered_name(mid, "bake_eager_read_rpc",                 &client->bake_eager_read_id,                 &flag);
+        margo_registered_name(mid, "bake_persist_rpc",                    &client->bake_persist_id,                    &flag);
+        margo_registered_name(mid, "bake_create_write_persist_rpc",       &client->bake_create_write_persist_id,       &flag);
+        margo_registered_name(mid, "bake_eager_create_write_persist_rpc", &client->bake_eager_create_write_persist_id, &flag);
+        margo_registered_name(mid, "bake_get_size_rpc",                   &client->bake_get_size_id,                   &flag);
+        margo_registered_name(mid, "bake_get_data_rpc",                   &client->bake_get_data_id,                   &flag);
+        margo_registered_name(mid, "bake_read_rpc",                       &client->bake_read_id,                       &flag);
+        margo_registered_name(mid, "bake_noop_rpc",                       &client->bake_noop_id,                       &flag);
+        margo_registered_name(mid, "bake_remove_rpc",                     &client->bake_remove_id,                     &flag);
+        margo_registered_name(mid, "bake_migrate_region_rpc",             &client->bake_migrate_region_id,             &flag);
+        margo_registered_name(mid, "bake_migrate_target_rpc",             &client->bake_migrate_target_id,             &flag);
 
     } else { /* RPCs not already registered */
 
@@ -97,6 +99,9 @@ static int bake_client_register(bake_client_t client, margo_instance_id mid)
         client->bake_create_write_persist_id =
             MARGO_REGISTER(mid, "bake_create_write_persist_rpc",
                     bake_create_write_persist_in_t, bake_create_write_persist_out_t, NULL);
+        client->bake_eager_create_write_persist_id =
+            MARGO_REGISTER(mid, "bake_eager_create_write_persist_rpc",
+                    bake_eager_create_write_persist_in_t, bake_eager_create_write_persist_out_t, NULL);
         client->bake_get_size_id = 
             MARGO_REGISTER(mid, "bake_get_size_rpc",
                     bake_get_size_in_t, bake_get_size_out_t, NULL);
@@ -516,6 +521,53 @@ int bake_persist(
     return(ret);
 }
 
+static int bake_eager_create_write_persist(
+    bake_provider_handle_t provider,
+    bake_target_id_t bti,
+    void const *buf,
+    uint64_t buf_size,
+    bake_region_id_t *rid)
+{
+    hg_return_t hret;
+    hg_handle_t handle;
+    bake_eager_create_write_persist_in_t in;
+    bake_eager_create_write_persist_out_t out;
+    int ret;
+
+    in.bti = bti;
+    in.buffer = (char*)buf;
+    in.size = buf_size;
+
+    hret = margo_create(provider->client->mid, provider->addr,
+            provider->client->bake_eager_create_write_persist_id, &handle);
+    if(hret != HG_SUCCESS)
+    {
+        return BAKE_ERR_MERCURY;
+    }
+
+    hret = margo_provider_forward(provider->provider_id, handle, &in);
+    if(hret != HG_SUCCESS)
+    {
+        margo_destroy(handle);
+        return BAKE_ERR_MERCURY;
+    }
+
+    hret = margo_get_output(handle, &out);
+    if(hret != HG_SUCCESS)
+    {
+        margo_destroy(handle);
+        return BAKE_ERR_MERCURY;
+    }
+
+    ret = out.ret;
+    if(ret == 0)
+        *rid = out.rid;
+
+    margo_free_output(handle, &out);
+    margo_destroy(handle);
+    return(ret);
+}
+
 int bake_create_write_persist(
     bake_provider_handle_t provider,
     bake_target_id_t bti,
@@ -529,7 +581,8 @@ int bake_create_write_persist(
     bake_create_write_persist_out_t out;
     int ret;
 
-    /* XXX eager path? */
+    if(buf_size <= provider->eager_limit)
+        return(bake_eager_create_write_persist(provider, bti, buf, buf_size, rid));
 
     in.bti = bti;
     in.bulk_offset = 0;

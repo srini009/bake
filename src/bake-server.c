@@ -20,6 +20,7 @@ DECLARE_MARGO_RPC_HANDLER(bake_write_ult)
 DECLARE_MARGO_RPC_HANDLER(bake_eager_write_ult)
 DECLARE_MARGO_RPC_HANDLER(bake_persist_ult)
 DECLARE_MARGO_RPC_HANDLER(bake_create_write_persist_ult)
+DECLARE_MARGO_RPC_HANDLER(bake_eager_create_write_persist_ult)
 DECLARE_MARGO_RPC_HANDLER(bake_get_size_ult)
 DECLARE_MARGO_RPC_HANDLER(bake_get_data_ult)
 DECLARE_MARGO_RPC_HANDLER(bake_read_ult)
@@ -170,6 +171,10 @@ int bake_provider_register(
     rpc_id = MARGO_REGISTER_PROVIDER(mid, "bake_create_write_persist_rpc",
             bake_create_write_persist_in_t, bake_create_write_persist_out_t,
             bake_create_write_persist_ult, provider_id, abt_pool);
+    margo_register_data(mid, rpc_id, (void*)tmp_svr_ctx, NULL);
+    rpc_id = MARGO_REGISTER_PROVIDER(mid, "bake_eager_create_write_persist_rpc",
+            bake_eager_create_write_persist_in_t, bake_eager_create_write_persist_out_t,
+            bake_eager_create_write_persist_ult, provider_id, abt_pool);
     margo_register_data(mid, rpc_id, (void*)tmp_svr_ctx, NULL);
     rpc_id = MARGO_REGISTER_PROVIDER(mid, "bake_get_size_rpc",
             bake_get_size_in_t, bake_get_size_out_t, 
@@ -739,8 +744,12 @@ static void bake_create_write_persist_ult(hg_handle_t handle)
         out.ret = BAKE_ERR_UNKNOWN_TARGET;
         goto finish;
     }
-
+#ifdef USE_SIZECHECK_HEADERS
     size_t content_size = in.bulk_size + sizeof(uint64_t);
+#else
+    size_t content_size = in.bulk_size;
+#endif
+
     prid = (pmemobj_region_id_t*)out.rid.data;
 
     ret = pmemobj_alloc(entry->pmem_pool, &prid->oid,
@@ -814,7 +823,97 @@ finish:
 }
 DEFINE_MARGO_RPC_HANDLER(bake_create_write_persist_ult)
 
-    /* service a remote RPC that retrieves the size of a BAKE region */
+static void bake_eager_create_write_persist_ult(hg_handle_t handle)
+{
+    bake_eager_create_write_persist_out_t out;
+    bake_eager_create_write_persist_in_t in;
+    in.buffer = NULL;
+    in.size = 0;
+    char* buffer = NULL;
+    const struct hg_info *hgi = NULL;
+    margo_instance_id mid;
+    hg_return_t hret;
+    int ret;
+
+    pmemobj_region_id_t* prid;
+    ABT_rwlock lock = ABT_RWLOCK_NULL;
+
+    memset(&out, 0, sizeof(out));
+
+    mid = margo_hg_handle_get_instance(handle);
+    assert(mid);
+    hgi = margo_get_info(handle);
+    bake_provider_t svr_ctx = margo_registered_data(mid, hgi->id);
+    if(!svr_ctx) {
+        out.ret = BAKE_ERR_UNKNOWN_PROVIDER;
+        goto finish;
+    }
+
+    /* TODO: this check needs to be somewhere else */
+    assert(sizeof(pmemobj_region_id_t) <= BAKE_REGION_ID_DATA_SIZE);
+
+    hret = margo_get_input(handle, &in);
+    if(hret != HG_SUCCESS)
+    {
+        out.ret = BAKE_ERR_MERCURY;
+        goto finish;
+    }
+
+    /* lock provider */
+    lock = svr_ctx->lock;
+    ABT_rwlock_rdlock(lock);
+    /* find the pmem pool */
+    bake_pmem_entry_t* entry = find_pmem_entry(svr_ctx, in.bti);
+    if(entry == NULL) {
+        out.ret = BAKE_ERR_UNKNOWN_TARGET;
+        goto finish;
+    }
+
+#ifdef USE_SIZECHECK_HEADERS
+    size_t content_size = in.size + sizeof(uint64_t);
+#else
+    size_t content_size = in.size;
+#endif
+    prid = (pmemobj_region_id_t*)out.rid.data;
+
+    ret = pmemobj_alloc(entry->pmem_pool, &prid->oid,
+            content_size, 0, NULL, NULL);
+    if(ret != 0)
+    {
+        out.ret = BAKE_ERR_PMEM;
+        goto finish;
+    }
+
+    /* find memory address for target object */
+    region_content_t* region = pmemobj_direct(prid->oid);
+    if(!region)
+    {
+        out.ret = BAKE_ERR_PMEM;
+        goto finish;
+    }
+#ifdef USE_SIZECHECK_HEADERS
+    region->size = in.size;
+#endif
+    buffer = region->data;
+
+    memcpy(buffer, in.buffer, in.size);
+
+    /* TODO: should this have an abt shim in case it blocks? */
+    pmemobj_persist(entry->pmem_pool, region, content_size);
+
+    out.ret = BAKE_SUCCESS;
+
+finish:
+    if(lock != ABT_RWLOCK_NULL)
+        ABT_rwlock_unlock(lock);
+    margo_respond(handle, &out);
+    margo_free_input(handle, &in);
+    margo_destroy(handle);
+    return;
+}
+DEFINE_MARGO_RPC_HANDLER(bake_eager_create_write_persist_ult)
+
+/* service a remote RPC that retrieves the size of a BAKE region */
 static void bake_get_size_ult(hg_handle_t handle)
 {
     bake_get_size_out_t out;

@@ -41,7 +41,7 @@ typedef struct
 {
     bake_region_id_t rid;
     uint64_t region_offset;
-    uint32_t size;
+    uint64_t size;
     char * buffer;
 } bake_eager_write_in_t;
 static inline hg_return_t hg_proc_bake_eager_write_in_t(hg_proc_t proc, void *v_out_p);
@@ -66,6 +66,18 @@ MERCURY_GEN_PROC(bake_create_write_persist_in_t,
     ((uint64_t)(bulk_size))\
     ((hg_string_t)(remote_addr_str)))
 MERCURY_GEN_PROC(bake_create_write_persist_out_t,
+    ((int32_t)(ret))\
+    ((bake_region_id_t)(rid)))
+
+/* BAKE eager create/write/persist */
+typedef struct
+{
+    bake_target_id_t bti;
+    uint64_t size;
+    char * buffer;
+} bake_eager_create_write_persist_in_t;
+static inline hg_return_t hg_proc_bake_eager_create_write_persist_in_t(hg_proc_t proc, void *v_out_p);
+MERCURY_GEN_PROC(bake_eager_create_write_persist_out_t,
     ((int32_t)(ret))\
     ((bake_region_id_t)(rid)))
 
@@ -177,7 +189,7 @@ static inline hg_return_t hg_proc_bake_eager_write_in_t(hg_proc_t proc, void *v_
 
     hg_proc_bake_region_id_t(proc, &in->rid);
     hg_proc_uint64_t(proc, &in->region_offset);
-    hg_proc_uint32_t(proc, &in->size);
+    hg_proc_uint64_t(proc, &in->size);
     if(in->size)
     {
         buf = hg_proc_save_ptr(proc, in->size);
@@ -191,6 +203,26 @@ static inline hg_return_t hg_proc_bake_eager_write_in_t(hg_proc_t proc, void *v_
     return(HG_SUCCESS);
 }
 
+static inline hg_return_t hg_proc_bake_eager_create_write_persist_in_t(hg_proc_t proc, void *v_out_p)
+{
+    /* TODO: error checking */
+    bake_eager_create_write_persist_in_t *in = v_out_p;
+    void *buf = NULL;
+
+    hg_proc_bake_target_id_t(proc, &in->bti);
+    hg_proc_uint64_t(proc, &in->size);
+    if(in->size)
+    {
+        buf = hg_proc_save_ptr(proc, in->size);
+        if(hg_proc_get_op(proc) == HG_ENCODE)
+            memcpy(buf, in->buffer, in->size);
+        if(hg_proc_get_op(proc) == HG_DECODE)
+            in->buffer = buf;
+        hg_proc_restore_ptr(proc, buf, in->size);
+    }
+
+    return(HG_SUCCESS);
+}
 
 static inline hg_return_t hg_proc_bake_eager_read_out_t(hg_proc_t proc, void *v_out_p)
 {
