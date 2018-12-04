@@ -254,7 +254,8 @@ static void proxy_write_ult(hg_handle_t handle)
         assert(ret == 0);
 
         /* persist the BAKE region */
-        ret = bake_persist(g_proxy_svr_ctx->svr_bph, g_proxy_svr_ctx->the_rid);
+        ret = bake_persist(g_proxy_svr_ctx->svr_bph, g_proxy_svr_ctx->the_rid,
+                0, in.bulk_size);
         assert(ret == 0);
     }
 
