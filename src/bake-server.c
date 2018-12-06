@@ -87,30 +87,7 @@ int bake_makepool(
     PMEMoid root_oid;
     bake_root_t *root;
 
-    int fd = creat(pool_name, pool_mode);
-    if(fd <= 0) {
-        fprintf(stderr, "creat failed\n");
-        return BAKE_ERR_ALLOCATION;
-    }
-
-    char* buf = malloc(1024*1024);
-    memset(buf,0,1024*1024);
-
-    size_t remaining = pool_size;
-    while(remaining) {
-        if(remaining >= 1024*1024) {
-            write(fd, buf, 1024*1024);
-            remaining -= 1024*1024;
-        } else {
-            write(fd, buf, remaining);
-            remaining = 0;
-        }
-    }
-    free(buf);
-
-    close(fd);
-
-    pool = pmemobj_create(pool_name, NULL, 0, pool_mode);
+    pool = pmemobj_create(pool_name, NULL, pool_size, pool_mode);
     if(!pool)
     {
         fprintf(stderr, "pmemobj_create: %s\n", pmemobj_errormsg());
