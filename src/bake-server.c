@@ -15,6 +15,7 @@
 #include "bake-server.h"
 #include "uthash.h"
 #include "bake-rpc.h"
+#include "bake-timing.h"
 
 DECLARE_MARGO_RPC_HANDLER(bake_shutdown_ult)
 DECLARE_MARGO_RPC_HANDLER(bake_create_ult)
@@ -393,6 +394,7 @@ int bake_provider_list_storage_targets(
 /* service a remote RPC that creates a BAKE region */
 static void bake_create_ult(hg_handle_t handle)
 {
+    TIMERS_INITIALIZE("start","alloc","persist","respond");
     bake_create_out_t out;
     bake_create_in_t in;
     hg_return_t hret;
@@ -438,12 +440,16 @@ static void bake_create_ult(hg_handle_t handle)
     size_t content_size = in.region_size;
 #endif
 
+    TIMERS_END_STEP(0);
+
     int ret = pmemobj_alloc(entry->pmem_pool, &prid->oid,
             content_size, 0, NULL, NULL);
     if(ret != 0) {
         out.ret = BAKE_ERR_PMEM;
         goto finish;
     }
+
+    TIMERS_END_STEP(1);
 
     region_content_t* region = (region_content_t*)pmemobj_direct(prid->oid);
     if(!region) {
@@ -458,12 +464,16 @@ static void bake_create_ult(hg_handle_t handle)
     pmemobj_persist(pmem_pool, region, sizeof(region->size));
 #endif
 
+    TIMERS_END_STEP(2);
+
     out.ret = BAKE_SUCCESS;
 
 finish:
     if(lock != ABT_RWLOCK_NULL)
         ABT_rwlock_unlock(lock);
     margo_respond(handle, &out);
+    TIMERS_END_STEP(3);
+    TIMERS_FINALIZE();
     margo_free_input(handle, &in);
     margo_destroy(handle);
     return;
@@ -473,6 +483,7 @@ DEFINE_MARGO_RPC_HANDLER(bake_create_ult)
     /* service a remote RPC that writes to a BAKE region */
 static void bake_write_ult(hg_handle_t handle)
 {
+    TIMERS_INITIALIZE("start","bulk_create","bulk_xfer","respond");
     bake_write_out_t out;
     bake_write_in_t in;
     in.bulk_handle = HG_BULK_NULL;
@@ -524,6 +535,8 @@ static void bake_write_ult(hg_handle_t handle)
     }
 #endif
 
+    TIMERS_END_STEP(0);
+
     buffer = region->data + in.region_offset;
 
     /* create bulk handle for local side of transfer */
@@ -534,6 +547,8 @@ static void bake_write_ult(hg_handle_t handle)
         out.ret = BAKE_ERR_MERCURY;
         goto finish;
     }
+
+    TIMERS_END_STEP(1);
 
     if(in.remote_addr_str)
     {
@@ -559,12 +574,16 @@ static void bake_write_ult(hg_handle_t handle)
         goto finish;
     }
 
+    TIMERS_END_STEP(2);
+
     out.ret = BAKE_SUCCESS;
 
 finish:
     if(lock != ABT_RWLOCK_NULL)
         ABT_rwlock_unlock(lock);
     margo_respond(handle, &out);
+    TIMERS_END_STEP(3);
+    TIMERS_FINALIZE();
     if(in.remote_addr_str)
         margo_addr_free(mid, src_addr);
     margo_bulk_free(bulk_handle);
@@ -577,6 +596,7 @@ DEFINE_MARGO_RPC_HANDLER(bake_write_ult)
     /* service a remote RPC that writes to a BAKE region in eager mode */
 static void bake_eager_write_ult(hg_handle_t handle)
 {
+    TIMERS_INITIALIZE("start","memcpy","respond");
     bake_eager_write_out_t out;
     bake_eager_write_in_t in;
     in.buffer = NULL;
@@ -626,9 +646,13 @@ static void bake_eager_write_ult(hg_handle_t handle)
     }
 #endif
 
+    TIMERS_END_STEP(0);
+
     buffer = region->data + in.region_offset;
 
     memcpy(buffer, in.buffer, in.size);
+
+    TIMERS_END_STEP(1);
 
     out.ret = BAKE_SUCCESS;
 
@@ -636,6 +660,8 @@ finish:
     if(lock != ABT_RWLOCK_NULL)
         ABT_rwlock_unlock(lock);
     margo_respond(handle, &out);
+    TIMERS_END_STEP(2);
+    TIMERS_FINALIZE();
     margo_free_input(handle, &in);
     margo_destroy(handle);
     return;
@@ -645,6 +671,7 @@ DEFINE_MARGO_RPC_HANDLER(bake_eager_write_ult)
     /* service a remote RPC that persists to a BAKE region */
 static void bake_persist_ult(hg_handle_t handle)
 {
+    TIMERS_INITIALIZE("start","persist","respond");
     bake_persist_out_t out;
     bake_persist_in_t in;
     hg_return_t hret;
@@ -684,9 +711,13 @@ static void bake_persist_ult(hg_handle_t handle)
     }
     buffer = region->data;
 
+    TIMERS_END_STEP(0);
+
     /* TODO: should this have an abt shim in case it blocks? */
     PMEMobjpool* pmem_pool = pmemobj_pool_by_oid(prid->oid);
     pmemobj_persist(pmem_pool, buffer + in.offset, in.size);
+
+    TIMERS_END_STEP(1);
 
     out.ret = BAKE_SUCCESS;
 
@@ -694,6 +725,7 @@ finish:
     if(lock != ABT_RWLOCK_NULL)
         ABT_rwlock_unlock(lock);
     margo_respond(handle, &out);
+    TIMERS_END_STEP(2);
     margo_free_input(handle, &in);
     margo_destroy(handle);
     return;
@@ -702,6 +734,7 @@ DEFINE_MARGO_RPC_HANDLER(bake_persist_ult)
 
 static void bake_create_write_persist_ult(hg_handle_t handle)
 {
+    TIMERS_INITIALIZE("start","alloc","bulk_create","bulk_xfer","persist","respond");
     bake_create_write_persist_out_t out;
     bake_create_write_persist_in_t in;
     in.bulk_handle = HG_BULK_NULL;
@@ -752,6 +785,8 @@ static void bake_create_write_persist_ult(hg_handle_t handle)
     size_t content_size = in.bulk_size;
 #endif
 
+    TIMERS_END_STEP(0);
+
     prid = (pmemobj_region_id_t*)out.rid.data;
 
     ret = pmemobj_alloc(entry->pmem_pool, &prid->oid,
@@ -761,6 +796,8 @@ static void bake_create_write_persist_ult(hg_handle_t handle)
         out.ret = BAKE_ERR_PMEM;
         goto finish;
     }
+
+    TIMERS_END_STEP(1);
 
     /* find memory address for target object */
     region_content_t* region = pmemobj_direct(prid->oid);
@@ -782,6 +819,8 @@ static void bake_create_write_persist_ult(hg_handle_t handle)
         out.ret = BAKE_ERR_MERCURY;
         goto finish;
     }
+
+    TIMERS_END_STEP(2);
 
     if(in.remote_addr_str)
     {
@@ -806,15 +845,21 @@ static void bake_create_write_persist_ult(hg_handle_t handle)
         goto finish;
     }
 
+    TIMERS_END_STEP(3);
+
     /* TODO: should this have an abt shim in case it blocks? */
     pmemobj_persist(entry->pmem_pool, region, content_size);
 
     out.ret = BAKE_SUCCESS;
 
+    TIMERS_END_STEP(4);
+
 finish:
     if(lock != ABT_RWLOCK_NULL)
         ABT_rwlock_unlock(lock);
     margo_respond(handle, &out);
+    TIMERS_END_STEP(5);
+    TIMERS_FINALIZE();
     if(in.remote_addr_str) {
         margo_addr_free(mid, src_addr);
     }
@@ -827,6 +872,7 @@ DEFINE_MARGO_RPC_HANDLER(bake_create_write_persist_ult)
 
 static void bake_eager_create_write_persist_ult(hg_handle_t handle)
 {
+    TIMERS_INITIALIZE("start","alloc","memcpy","persist","respond");
     bake_eager_create_write_persist_out_t out;
     bake_eager_create_write_persist_in_t in;
     in.buffer = NULL;
@@ -878,6 +924,8 @@ static void bake_eager_create_write_persist_ult(hg_handle_t handle)
 #endif
     prid = (pmemobj_region_id_t*)out.rid.data;
 
+    TIMERS_END_STEP(0);
+
     ret = pmemobj_alloc(entry->pmem_pool, &prid->oid,
             content_size, 0, NULL, NULL);
     if(ret != 0)
@@ -885,6 +933,8 @@ static void bake_eager_create_write_persist_ult(hg_handle_t handle)
         out.ret = BAKE_ERR_PMEM;
         goto finish;
     }
+
+    TIMERS_END_STEP(1);
 
     /* find memory address for target object */
     region_content_t* region = pmemobj_direct(prid->oid);
@@ -900,8 +950,12 @@ static void bake_eager_create_write_persist_ult(hg_handle_t handle)
 
     memcpy(buffer, in.buffer, in.size);
 
+    TIMERS_END_STEP(2);
+
     /* TODO: should this have an abt shim in case it blocks? */
     pmemobj_persist(entry->pmem_pool, region, content_size);
+
+    TIMERS_END_STEP(3);
 
     out.ret = BAKE_SUCCESS;
 
@@ -909,6 +963,8 @@ finish:
     if(lock != ABT_RWLOCK_NULL)
         ABT_rwlock_unlock(lock);
     margo_respond(handle, &out);
+    TIMERS_END_STEP(4);
+    TIMERS_FINALIZE();
     margo_free_input(handle, &in);
     margo_destroy(handle);
     return;
@@ -918,6 +974,7 @@ DEFINE_MARGO_RPC_HANDLER(bake_eager_create_write_persist_ult)
 /* service a remote RPC that retrieves the size of a BAKE region */
 static void bake_get_size_ult(hg_handle_t handle)
 {
+    TIMERS_INITIALIZE("start","respond");
     bake_get_size_out_t out;
     bake_get_size_in_t in;
     hg_return_t hret;
@@ -959,10 +1016,13 @@ static void bake_get_size_ult(hg_handle_t handle)
     out.ret = BAKE_ERR_OP_UNSUPPORTED;
 #endif
 
+    TIMERS_END_STEP(0);
 finish:
     if(lock != ABT_RWLOCK_NULL)
         ABT_rwlock_unlock(lock);
     margo_respond(handle, &out);
+    TIMERS_END_STEP(1);
+    TIMERS_FINALIZE();
     margo_free_input(handle, &in);
     margo_destroy(handle);
     return;
@@ -972,6 +1032,7 @@ DEFINE_MARGO_RPC_HANDLER(bake_get_size_ult)
     /* Get the raw pointer of a region */
 static void bake_get_data_ult(hg_handle_t handle)
 {
+    TIMERS_INITIALIZE("start","respond");
     bake_get_data_out_t out;
     bake_get_data_in_t in;
     hg_return_t hret;
@@ -1011,10 +1072,14 @@ static void bake_get_data_ult(hg_handle_t handle)
     out.ptr = (uint64_t)(region->data);
     out.ret = BAKE_SUCCESS;
 
+    TIMERS_END_STEP(0);
+
 finish:
     if(lock != ABT_RWLOCK_NULL)
         ABT_rwlock_unlock(lock);
     margo_respond(handle, &out);
+    TIMERS_END_STEP(1);
+    TIMERS_FINALIZE();
     margo_free_input(handle, &in);
     margo_destroy(handle);
 }
@@ -1038,6 +1103,7 @@ DEFINE_MARGO_RPC_HANDLER(bake_noop_ult)
 /* service a remote RPC that reads from a BAKE region */
 static void bake_read_ult(hg_handle_t handle)
 {
+    TIMERS_INITIALIZE("start","bulk_create","bulk_xfer","respond");
     bake_read_out_t out;
     bake_read_in_t in;
     in.bulk_handle = HG_BULK_NULL;
@@ -1100,6 +1166,8 @@ static void bake_read_ult(hg_handle_t handle)
 
     buffer = region->data + in.region_offset;
 
+    TIMERS_END_STEP(0);
+
     /* create bulk handle for local side of transfer */
     hret = margo_bulk_create(mid, 1, (void**)(&buffer), &size_to_read,
             HG_BULK_READ_ONLY, &bulk_handle);
@@ -1108,6 +1176,8 @@ static void bake_read_ult(hg_handle_t handle)
         out.ret = BAKE_ERR_MERCURY;
         goto finish;
     }
+
+    TIMERS_END_STEP(1);
 
     if(in.remote_addr_str)
     {
@@ -1132,6 +1202,8 @@ static void bake_read_ult(hg_handle_t handle)
         goto finish;
     }
 
+    TIMERS_END_STEP(2);
+
     out.ret = BAKE_SUCCESS;
     out.size = size_to_read;
 
@@ -1139,6 +1211,8 @@ finish:
     if(lock != ABT_RWLOCK_NULL)
         ABT_rwlock_unlock(lock);
     margo_respond(handle, &out);
+    TIMERS_END_STEP(3);
+    TIMERS_FINALIZE();
     if(in.remote_addr_str)
         margo_addr_free(mid, src_addr);
     margo_bulk_free(bulk_handle);
@@ -1151,6 +1225,7 @@ DEFINE_MARGO_RPC_HANDLER(bake_read_ult)
      * response */
 static void bake_eager_read_ult(hg_handle_t handle)
 {
+    TIMERS_INITIALIZE("start","respond");
     bake_eager_read_out_t out;
     out.buffer = NULL;
     out.size = 0;
@@ -1213,10 +1288,14 @@ static void bake_eager_read_ult(hg_handle_t handle)
     out.buffer = buffer;
     out.size = size_to_read;
 
+    TIMERS_END_STEP(0);
+
 finish:
     if(lock != ABT_RWLOCK_NULL)
         ABT_rwlock_unlock(lock);
     margo_respond(handle, &out);
+    TIMERS_END_STEP(1);
+    TIMERS_FINALIZE();
     margo_free_input(handle, &in);
     margo_destroy(handle);
 }
@@ -1225,6 +1304,7 @@ DEFINE_MARGO_RPC_HANDLER(bake_eager_read_ult)
     /* service a remote RPC that probes for a BAKE target id */
 static void bake_probe_ult(hg_handle_t handle)
 {
+    TIMERS_INITIALIZE("start","respond");
     bake_probe_out_t out;
 
     memset(&out, 0, sizeof(out));
@@ -1250,13 +1330,20 @@ static void bake_probe_ult(hg_handle_t handle)
     out.targets = targets;
     out.num_targets = targets_count;
 
+    TIMERS_END_STEP(0);
+
     margo_respond(handle, &out);
+
+    TIMERS_END_STEP(1);
+    TIMERS_FINALIZE();
+
     margo_destroy(handle);
 }
 DEFINE_MARGO_RPC_HANDLER(bake_probe_ult)
 
 static void bake_remove_ult(hg_handle_t handle)
 {
+    TIMERS_INITIALIZE("start","remove","respond");
     bake_remove_in_t in;
     bake_remove_out_t out;
     hg_return_t hret;
@@ -1286,7 +1373,12 @@ static void bake_remove_ult(hg_handle_t handle)
     /* lock provider */
     lock = svr_ctx->lock;
     ABT_rwlock_rdlock(lock);
+
+    TIMERS_END_STEP(0);
+
     pmemobj_free(&prid->oid);
+
+    TIMERS_END_STEP(1);
 
     out.ret = BAKE_SUCCESS;
 
@@ -1294,6 +1386,8 @@ finish:
     if(lock != ABT_RWLOCK_NULL)
         ABT_rwlock_unlock(lock);
     margo_respond(handle, &out);
+    TIMERS_END_STEP(2);
+    TIMERS_FINALIZE();
     margo_free_input(handle, &in);
     margo_destroy(handle);
 }
@@ -1301,6 +1395,7 @@ DEFINE_MARGO_RPC_HANDLER(bake_remove_ult)
 
 static void bake_migrate_region_ult(hg_handle_t handle)
 {
+    TIMERS_INITIALIZE("start","bulk_create","forward","remove","respond");
     bake_migrate_region_in_t in;
     in.dest_addr = NULL;
     bake_migrate_region_out_t out;
@@ -1359,6 +1454,8 @@ static void bake_migrate_region_ult(hg_handle_t handle)
         goto finish;
     }
 
+    TIMERS_END_STEP(0);
+
     { /* in this block we issue a create_write_persist to the destination */
         hg_handle_t cwp_handle = HG_HANDLE_NULL;
         bake_create_write_persist_in_t cwp_in;
@@ -1375,6 +1472,8 @@ static void bake_migrate_region_ult(hg_handle_t handle)
             out.ret = BAKE_ERR_MERCURY;
             goto finish_scope;
         }
+
+        TIMERS_END_STEP(1);
 
         hret = margo_create(mid, dest_addr,
                             svr_ctx->bake_create_write_persist_id, &cwp_handle);
@@ -1406,6 +1505,8 @@ static void bake_migrate_region_ult(hg_handle_t handle)
         out.dest_rid = cwp_out.rid;
         out.ret = BAKE_SUCCESS;
 
+        TIMERS_END_STEP(2);
+
 finish_scope:
         margo_free_output(cwp_handle, &cwp_out);
         margo_bulk_free(cwp_in.bulk_handle);
@@ -1418,11 +1519,15 @@ finish_scope:
     if(in.remove_src) {
         pmemobj_free(&prid->oid);
     }
+
+    TIMERS_END_STEP(3);
     
 finish:
     if(lock != ABT_RWLOCK_NULL)
         ABT_rwlock_unlock(lock);
     margo_respond(handle, &out);
+    TIMERS_END_STEP(4);
+    TIMERS_FINALIZE();
     margo_addr_free(mid, dest_addr);
     margo_free_input(handle, &in);
     margo_destroy(handle);
@@ -1431,6 +1536,7 @@ DEFINE_MARGO_RPC_HANDLER(bake_migrate_region_ult)
 
 static void bake_migrate_target_ult(hg_handle_t handle)
 {
+    TIMERS_INITIALIZE("start","remi_init","remi_migrate","remove","respond");
     bake_migrate_target_in_t in;
     in.dest_remi_addr = NULL;
     in.dest_root = NULL;
@@ -1469,6 +1575,8 @@ static void bake_migrate_target_ult(hg_handle_t handle)
         goto finish;
     }
 
+    TIMERS_END_STEP(0);
+
     /* lookup the address of the destination REMI provider */
     hret = margo_addr_lookup(mid, in.dest_remi_addr, &dest_addr);
     if(hret != HG_SUCCESS) {
@@ -1496,6 +1604,9 @@ static void bake_migrate_target_ult(hg_handle_t handle)
         out.ret = BAKE_ERR_REMI;
         goto finish;
     }
+
+    TIMERS_END_STEP(1);
+
     /* issue the migration */
     int status = 0;
     ret = remi_fileset_migrate(remi_ph, local_fileset, in.dest_root, in.remove_src, REMI_USE_ABTIO, &status);
@@ -1503,8 +1614,13 @@ static void bake_migrate_target_ult(hg_handle_t handle)
         out.ret = BAKE_ERR_REMI;
         goto finish;
     }
+
+    TIMERS_END_STEP(2);
+
     /* remove the target from the list of managed targets */
     bake_provider_remove_storage_target(svr_ctx, in.target_id);
+
+    TIMERS_END_STEP(3);
 
     out.ret = BAKE_SUCCESS;
 
@@ -1516,6 +1632,8 @@ finish:
     margo_addr_free(mid, dest_addr);
     margo_free_input(handle, &in);
     margo_respond(handle, &out);
+    TIMERS_END_STEP(4);
+    TIMERS_FINALIZE();
     margo_destroy(handle);
 
     return;

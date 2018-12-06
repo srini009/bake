@@ -35,16 +35,17 @@ int main(int argc, char **argv)
     int fd;
     char* local_region;
     int region_fd;
-    uint64_t check_size;
+    uint64_t size;
  
-    if(argc != 5)
+    if(argc != 6)
     {
-        fprintf(stderr, "Usage: bake-copy-from <server addr> <mplex id> <identifier file> <output file>\n");
-        fprintf(stderr, "  Example: ./bake-copy-from tcp://localhost:1234 3 /tmp/bb-copy-rid.0GjOlu /tmp/output.dat\n");
+        fprintf(stderr, "Usage: bake-copy-from <server addr> <mplex id> <identifier file> <output file> <size>\n");
+        fprintf(stderr, "  Example: ./bake-copy-from tcp://localhost:1234 3 /tmp/bb-copy-rid.0GjOlu /tmp/output.dat 256\n");
         return(-1);
     }
     svr_addr_str = argv[1];
     mplex_id = atoi(argv[2]);
+    size = atol(argv[5]);
 
     /* initialize Margo using the transport portion of the server
      * address (i.e., the part before the first : character if present)
@@ -110,6 +111,8 @@ int main(int argc, char **argv)
     }
     close(region_fd);
 
+#ifdef USE_SIZECHECK_HEADERS
+    uint64_t check_size;
     ret = bake_get_size(bph, rid, &check_size);
     if(ret != 0)
     {
@@ -120,6 +123,15 @@ int main(int argc, char **argv)
         margo_finalize(mid);
         return(-1);
     }
+    if(check_size != size) {
+        fprintf(stderr, "Error: incorrect size provided\n");
+        bake_provider_handle_release(bph);
+        margo_addr_free(mid, svr_addr);
+        bake_client_finalize(bcl);
+        margo_finalize(mid);
+        return(-1);
+    }
+#endif
 
     fd = open(argv[4], O_RDWR|O_TRUNC|O_CREAT, S_IRUSR|S_IWUSR);
     if(fd < 0)
@@ -132,7 +144,7 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    ret = ftruncate(fd, check_size);
+    ret = ftruncate(fd, size);
     if(ret < 0)
     {
         perror("ftruncate");
@@ -144,7 +156,7 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    local_region = mmap(NULL, check_size, PROT_WRITE, MAP_SHARED, fd, 0);
+    local_region = mmap(NULL, size, PROT_WRITE, MAP_SHARED, fd, 0);
     if(local_region == MAP_FAILED)
     {
         perror("mmap");
@@ -163,11 +175,11 @@ int main(int argc, char **argv)
         rid,
         0,
         local_region,
-        check_size,
+        size,
         &bytes_read);
     if(ret != 0)
     {
-        munmap(local_region, check_size);
+        munmap(local_region, size);
         close(fd);
         bake_provider_handle_release(bph);
         margo_addr_free(mid, svr_addr);
@@ -177,7 +189,7 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    munmap(local_region, check_size);
+    munmap(local_region, size);
     close(fd);
     bake_provider_handle_release(bph);
     margo_addr_free(mid, svr_addr);

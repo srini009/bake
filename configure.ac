@@ -90,7 +90,13 @@ AC_ARG_ENABLE([sizecheck],
     AS_HELP_STRING([--enable-sizecheck], [Adds a header in regions to keep track of region sizes (may degrade performance) @<:@default=no@:>@]),
     [AS_CASE(${enableval}, [yes], [AC_DEFINE([USE_SIZECHECK_HEADERS], 1, [Enable sizecheck])], [no], [],
     [AC_MSG_ERROR([bad value ${enableval} for --enable-sizecheck])])],
-    [enable_sizecheck=yes])
+    [enable_sizecheck=no])
+
+AC_ARG_ENABLE([timers],
+    AS_HELP_STRING([--enable-timers], [Print detailed timers from each function on stdout @<:@default=no@:>@]),
+    [AS_CASE(${enableval}, [yes], [AC_DEFINE([ENABLE_TIMING], 1, [Enable timers])], [no], [],
+    [AC_MSG_ERROR([bad value ${enableval} for --enable-timers])])],
+    [enable_timers=no])
 
 AC_CONFIG_FILES([Makefile maint/bake-client.pc maint/bake-server.pc])
 AC_OUTPUT

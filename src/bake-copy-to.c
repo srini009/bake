@@ -193,6 +193,7 @@ int main(int argc, char **argv)
         return(-1);
     }
 
+#ifdef USE_SIZECHECK_HEADERS
     /* safety check size */
     ret = bake_get_size(bph, rid, &check_size);
     if(ret != 0)
@@ -204,17 +205,18 @@ int main(int argc, char **argv)
         fprintf(stderr, "Error: bake_get_size()\n");
         return(-1);
     }
-   
-    bake_provider_handle_release(bph);
-    margo_addr_free(mid, svr_addr);
-    bake_client_finalize(bcl);
-    margo_finalize(mid);
 
     if(check_size != statbuf.st_size)
     {
         fprintf(stderr, "Error: size mismatch!\n");
         return(-1);
     }
+#endif
+   
+    bake_provider_handle_release(bph);
+    margo_addr_free(mid, svr_addr);
+    bake_client_finalize(bcl);
+    margo_finalize(mid);
 
     sprintf(region_file, "/tmp/bb-copy-rid.XXXXXX");
     region_fd = mkstemp(region_file);
