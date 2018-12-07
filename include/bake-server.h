@@ -119,6 +119,23 @@ int bake_provider_list_storage_targets(
         bake_provider_t provider,
         bake_target_id_t* targets);
 
+/**
+ * @brief Sets the size of the intermediate buffer used for transfering data.
+ * The size is set to 0 by default. A size of 0 indicates that RDMA will be
+ * done all at once and target the backend device directly without using an
+ * intermediate buffer.
+ *
+ * @param provider Bake provider
+ * @param target_id Target for which to change the buffer size.
+ * @param size Size of the buffer.
+ *
+ * @return 0 on success, -1 on failure
+ */
+int bake_provider_set_target_xfer_buffer_size(
+        bake_provider_t provider,
+        bake_target_id_t target_id,
+        size_t size);
+
 #ifdef __cplusplus
 }
 #endif

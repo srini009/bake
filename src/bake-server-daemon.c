@@ -24,6 +24,7 @@ struct options
     unsigned num_pools;
     char **bake_pools;
     char *host_file;
+    size_t buf_size;
     mplex_mode_t mplex_mode;
 };
 
@@ -33,7 +34,8 @@ static void usage(int argc, char **argv)
     fprintf(stderr, "       listen_addr is the Mercury address to listen on\n");
     fprintf(stderr, "       bake_pool is the path to the BAKE pool\n");
     fprintf(stderr, "       [-f filename] to write the server address to a file\n");
-    fprintf(stderr, "       [-m mode] multiplexing mode (providers or targets) for managing multiple pools (default is targets)\n"); 
+    fprintf(stderr, "       [-m mode] multiplexing mode (providers or targets) for managing multiple pools (default is targets)\n");
+    fprintf(stderr, "       [-b size] buffer size for writes on provider\n");
     fprintf(stderr, "Example: ./bake-server-daemon tcp://localhost:1234 /dev/shm/foo.dat /dev/shm/bar.dat\n");
     return;
 }
@@ -45,7 +47,7 @@ static void parse_args(int argc, char **argv, struct options *opts)
     memset(opts, 0, sizeof(*opts));
 
     /* get options */
-    while((opt = getopt(argc, argv, "f:m:")) != -1)
+    while((opt = getopt(argc, argv, "f:m:b:")) != -1)
     {
         switch(opt)
         {
@@ -61,6 +63,9 @@ static void parse_args(int argc, char **argv, struct options *opts)
                     fprintf(stderr, "Unrecognized multiplexing mode \"%s\"\n", optarg);
                     exit(EXIT_FAILURE);
                 }
+                break;
+            case 'b':
+                opts->buf_size = atol(optarg);
                 break;
             default:
                 usage(argc, argv);
@@ -169,6 +174,8 @@ int main(int argc, char **argv)
                 return(-1);
             }
 
+            bake_provider_set_target_xfer_buffer_size(provider, tid, opts.buf_size);
+
             printf("Provider %d managing new target at multiplex id %d\n", i, i+1);
         }
 
@@ -197,6 +204,8 @@ int main(int argc, char **argv)
                 margo_finalize(mid);                                    
                 return(-1);
             }
+
+            bake_provider_set_target_xfer_buffer_size(provider, tid, opts.buf_size);
 
             printf("Provider 0 managing new target at multiplex id %d\n", 1);
         }
