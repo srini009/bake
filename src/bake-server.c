@@ -10,6 +10,8 @@
 #include <libpmemobj.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <margo.h>
+#include <margo-bulk-pool.h>
 #include <remi/remi-client.h>
 #include <remi/remi-server.h>
 #include "bake-server.h"
@@ -61,11 +63,15 @@ typedef struct
     char* root;
     char* filename;
     size_t xfer_buffer_size;
+    size_t xfer_buffer_count;
+    uint32_t xfer_concurrency;
+    margo_bulk_pool_t xfer_bulk_pool;
     UT_hash_handle hh;
 } bake_pmem_entry_t;
 
 typedef struct bake_server_context_t
 {
+    margo_instance_id mid;
     ABT_rwlock lock; // write-locked during migration, read-locked by all other
     // operations. There should be something better to avoid locking everything
     // but we are going with that for simplicity for now.
@@ -76,9 +82,24 @@ typedef struct bake_server_context_t
     remi_provider_t remi_provider;
 } bake_server_context_t;
 
+typedef struct xfer_args {
+    margo_instance_id   mid;            // margo instance
+    size_t              size;           // size of data to transfer
+    char*               target;         // start address where data should land in local process
+    size_t              buf_size;       // size of buffers in the pool of buffers
+    margo_bulk_pool_t   buf_pool;       // pool of buffers
+    hg_addr_t           remote_addr;    // remote address
+    hg_bulk_t           remote_bulk;    // remote bulk handle for transfers
+    size_t              remote_offset;  // remote offset at which to take the data
+    int32_t             op_type;        // type of operation (PUSH or PULL)
+    int32_t             ret;            // return value of the xfer_ult function
+} xfer_args;
+
 static void bake_server_finalize_cb(void *data);
 
 static int bake_target_post_migration_callback(remi_fileset_t fileset, void* provider);
+
+static void xfer_ult(xfer_args* args);
 
 int bake_makepool(
         const char *pool_name,
@@ -142,6 +163,8 @@ int bake_provider_register(
     tmp_svr_ctx = calloc(1,sizeof(*tmp_svr_ctx));
     if(!tmp_svr_ctx)
         return BAKE_ERR_ALLOCATION;
+
+    tmp_svr_ctx->mid = mid;
 
     /* Create rwlock */
     ret = ABT_rwlock_create(&(tmp_svr_ctx->lock));
@@ -359,6 +382,7 @@ int bake_provider_remove_all_storage_targets(
     HASH_ITER(hh, provider->targets, p, tmp) {
         HASH_DEL(provider->targets, p);
         pmemobj_close(p->pmem_pool);
+        margo_bulk_pool_destroy(p->xfer_bulk_pool);
         free(p->filename);
         free(p->root);
         free(p);
@@ -393,9 +417,10 @@ int bake_provider_list_storage_targets(
     return BAKE_SUCCESS;
 }
 
-int bake_provider_set_target_xfer_buffer_size(
+int bake_provider_set_target_xfer_buffer(
         bake_provider_t provider,
         bake_target_id_t target_id,
+        size_t count,
         size_t size)
 {
     int ret = BAKE_SUCCESS;
@@ -406,6 +431,40 @@ int bake_provider_set_target_xfer_buffer_size(
         goto finish;
     }
     entry->xfer_buffer_size = size;
+    entry->xfer_buffer_count = count;
+    if(entry->xfer_bulk_pool) {
+        margo_bulk_pool_destroy(entry->xfer_bulk_pool);
+    }
+    if(size && count) {
+       hg_return_t hret = margo_bulk_pool_create(
+                provider->mid, 
+                count,
+                size,
+                HG_BULK_READWRITE,
+                &(entry->xfer_bulk_pool));
+       if(hret != HG_SUCCESS) {
+           ret = -1;
+           goto finish;
+        }
+    }
+finish:
+    ABT_rwlock_unlock(provider->lock);
+    return ret;
+}
+
+int bake_provider_set_target_xfer_concurrency(
+        bake_provider_t provider,
+        bake_target_id_t target_id,
+        uint32_t num_threads)
+{
+    int ret = BAKE_SUCCESS;
+    ABT_rwlock_rdlock(provider->lock);
+    bake_pmem_entry_t* entry = find_pmem_entry(provider, target_id);
+    if(entry == NULL) {
+        ret = -1;
+        goto finish;
+    }
+    entry->xfer_concurrency = num_threads;
 finish:
     ABT_rwlock_unlock(provider->lock);
     return ret;
@@ -817,9 +876,12 @@ static void bake_create_write_persist_ult(hg_handle_t handle)
     in.bulk_handle = HG_BULK_NULL;
     in.remote_addr_str = NULL;
     hg_addr_t src_addr = HG_ADDR_NULL;
+    ABT_pool handler_pool;
     char* buffer = NULL;
     char* memory = NULL;
     size_t xfer_buf_size = 0;
+    size_t xfer_buf_count = 0;
+    uint32_t max_num_threads = 0;
     hg_bulk_t bulk_handle = HG_BULK_NULL;
     const struct hg_info *hgi = NULL;
     margo_instance_id mid;
@@ -831,6 +893,7 @@ static void bake_create_write_persist_ult(hg_handle_t handle)
     memset(&out, 0, sizeof(out));
 
     mid = margo_hg_handle_get_instance(handle);
+    handler_pool = margo_hg_handle_get_handler_pool(handle);
     assert(mid);
     hgi = margo_get_info(handle);
     bake_provider_t svr_ctx = margo_registered_data(mid, hgi->id);
@@ -859,7 +922,9 @@ static void bake_create_write_persist_ult(hg_handle_t handle)
         goto finish;
     }
 
-    xfer_buf_size = entry->xfer_buffer_size;
+    xfer_buf_size   = entry->xfer_buffer_size;
+    xfer_buf_count  = entry->xfer_buffer_count;
+    max_num_threads = entry->xfer_concurrency;
 
 #ifdef USE_SIZECHECK_HEADERS
     size_t content_size = in.bulk_size + sizeof(uint64_t);
@@ -909,7 +974,9 @@ static void bake_create_write_persist_ult(hg_handle_t handle)
         src_addr = hgi->addr;
     }
 
-    if(xfer_buf_size == 0 || xfer_buf_size > in.bulk_size) { // don't use an intermediate buffer
+    if(xfer_buf_size == 0 
+    || xfer_buf_count == 0
+    || xfer_buf_size > in.bulk_size) { // don't use an intermediate buffer
 
         /* create bulk handle for local side of transfer */
         hret = margo_bulk_create(mid, 1, (void**)(&memory), &in.bulk_size,
@@ -932,40 +999,66 @@ static void bake_create_write_persist_ult(hg_handle_t handle)
 
     } else {
 
-        buffer = calloc(xfer_buf_size,1);
+        /* Definition of xfer_args:
+        typedef struct xfer_args {
+            margo_instance_id   mid;
+            size_t              size;
+            char*               target;
+            size_t              buf_size;
+            margo_bulk_pool_t   buf_pool;
+            hg_addr_t           remote_addr;
+            hg_bulk_t           remote_bulk;
+            hg_bulk_t           remote_offset;
+            int32_t             op_type;
+            int32_t             ret;
+        } xfer_args;
+        */
 
-        /* create bulk handle for local side of transfer */
-        hret = margo_bulk_create(mid, 1, (void**)(&buffer), &xfer_buf_size,
-            HG_BULK_WRITE_ONLY, &bulk_handle);
-        if(hret != HG_SUCCESS)
-        {
-            out.ret = BAKE_ERR_MERCURY;
-            goto finish;
-        }
+        // (1) compute the maximum number of ULTs that can handle this transfer
+        // as well as the number of individual transfers needed given the buffer sizes
 
-        TIMERS_END_STEP(2);
+        // number of xfers of up to xfer_buf_size needed in total
+        size_t num_xfers_needed = in.bulk_size / xfer_buf_size;
+        if(num_xfers_needed * xfer_buf_size < in.bulk_size) num_xfers_needed += 1;
+        // number of threads that will be spawned
+        uint32_t num_threads = num_xfers_needed;
+        num_threads = num_threads < max_num_threads ? num_threads : max_num_threads;
+        // maximum number of xfers per thread
+        size_t xfer_per_thread = num_xfers_needed / num_threads;
+        if(xfer_per_thread * num_threads < num_xfers_needed) xfer_per_thread += 1;
 
-        size_t remaining_size = in.bulk_size;
+        // (2) create the array of arguments and ULTs
+        xfer_args* args  = alloca(sizeof(*args)*num_threads);
+        ABT_thread* ults = alloca(sizeof(*ults)*num_threads);
+        unsigned int i;
         size_t current_offset = 0;
-        size_t current_size = xfer_buf_size;
+        size_t remaining_size = in.bulk_size;
+        size_t current_size = xfer_per_thread * xfer_buf_size;
 
-        while(remaining_size != 0) {
+        for(i=0; i < num_threads; i++) {
 
-            current_size = remaining_size < xfer_buf_size ? remaining_size : xfer_buf_size;
+            current_size = current_size > remaining_size ? remaining_size : current_size;
 
-            hret = margo_bulk_transfer(mid, HG_BULK_PULL, src_addr, in.bulk_handle,
-                    in.bulk_offset+current_offset, bulk_handle, 0, current_size);
-            if(hret != HG_SUCCESS)
-            {
-                out.ret = BAKE_ERR_MERCURY;
-                goto finish;
-            }
+            args->mid           = mid;
+            args->size          = current_size;
+            args->target        = memory + current_offset;
+            args->buf_size      = xfer_buf_size;
+            args->buf_pool      = entry->xfer_bulk_pool;
+            args->remote_addr   = src_addr;
+            args->remote_bulk   = in.bulk_handle;
+            args->remote_offset = current_offset;
+            args->op_type       = HG_BULK_PULL;
+            args->ret           = 0;
 
-            memcpy(memory+current_offset, buffer, current_size);
+            ABT_thread_create(handler_pool, (void (*)(void*))xfer_ult, args+i, ABT_THREAD_ATTR_NULL, ults+i);
 
             current_offset += current_size;
             remaining_size -= current_size;
         }
+
+        // (3) join and free the ULTs
+        ABT_thread_join_many(num_threads, ults);
+        ABT_thread_free_many(num_threads, ults);
 
     }
 
@@ -1805,4 +1898,89 @@ static int bake_target_post_migration_callback(remi_fileset_t fileset, void* uar
     remi_fileset_get_root(fileset, args.root, &root_size);
     remi_fileset_foreach_file(fileset, migration_fileset_cb, &args);
     return 0;
+}
+
+static void xfer_ult(xfer_args* args)
+{
+    /*
+    typedef struct xfer_args {
+        margo_instance_id   mid;
+        size_t              size;
+        char*               target;
+        size_t              buf_size;
+        margo_bulk_pool_t   buf_pool;
+        hg_addr_t           remote_addr;
+        hg_bulk_t           remote_bulk;
+        hg_bulk_t           remote_offset;
+        int32_t             op_type;
+        int32_t             ret;
+    } xfer_args;
+    */
+    hg_bulk_t local_bulk = HG_BULK_NULL;
+
+    // (1) compute how many iterations must be done
+    size_t num_xfers = args->size / args->buf_size;
+    if(num_xfers * args->buf_size < args->size) 
+        num_xfers += 1;
+    
+
+    // (2) for each segment...
+    int ret;
+    unsigned int i;
+    hg_return_t hret;
+    size_t remaining_size = args->size;
+    size_t current_offset = 0;
+    size_t current_size   = args->buf_size;
+
+    for(i = 0; i < num_xfers; i++) {
+        // (3) get a bulk handle from the pool to do the transfer
+        ret = margo_bulk_pool_get(args->buf_pool, &local_bulk);
+        if(ret != 0) {
+            args->ret = ret;
+            return;
+        }
+
+        // (4) get the bulk's underlying buffer
+        void* local_buf_ptr = NULL;
+        hg_size_t local_buf_size = 0;
+        hg_uint32_t actual_count = 0;
+        ret = margo_bulk_access(local_bulk, 0, 
+                args->buf_size, HG_BULK_READWRITE, 1, 
+                &local_buf_ptr, &local_buf_size, &actual_count);
+        if(ret != 0) {
+            args->ret = ret;
+            margo_bulk_pool_release(args->buf_pool, local_bulk);
+            return;
+        }
+
+        // (5) Compute the current size to be accessed
+        current_size = current_size < remaining_size ? current_size : remaining_size;
+
+        // (6) execute the bulk transfer
+        hret = margo_bulk_transfer(args->mid, args->op_type,
+                args->remote_addr, args->remote_bulk,
+                args->remote_offset + current_offset,
+                local_bulk, 0, current_size);
+        if(hret != HG_SUCCESS)
+        {
+            args->ret = BAKE_ERR_MERCURY;
+            margo_bulk_pool_release(args->buf_pool, local_bulk);
+            return;
+        }
+
+        // (7) copy the data to its final location
+        memcpy(args->target + current_offset, local_buf_ptr, current_size);
+
+        // (8) release the buffer
+        ret = margo_bulk_pool_release(args->buf_pool, local_bulk);
+        if(ret != 0) {
+            args->ret = ret;
+            return;
+        }
+
+        // (9) update the current offset
+        current_offset += current_size;
+    }
+
+    args->ret = 0;
 }
