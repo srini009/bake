@@ -13,8 +13,7 @@
 
 #include "bake-client.h"
 
-#define ALLOC_BUF_SIZE 512
-
+static char* read_input_file(const char* filename);
 
 int main(int argc, char *argv[])
 {
@@ -29,20 +28,23 @@ int main(int argc, char *argv[])
     uint64_t num_targets;
     bake_target_id_t bti;
     bake_region_id_t the_rid;
-    const char *test_str = "This is a test string for create-write-persist test.";
+    char *test_str = NULL;
     char *buf;
     uint64_t buf_size;
     hg_return_t hret;
     int ret;
 
-    if(argc != 3)
+    if(argc != 4)
     {
-        fprintf(stderr, "Usage: create-write-persist-test <bake server addr> <mplex id>\n");
+        fprintf(stderr, "Usage: create-write-persist-test <input file> <bake server addr> <mplex id>\n");
         fprintf(stderr, "  Example: ./create-write-persist-test tcp://localhost:1234 1\n");
         return(-1);
     }
-    bake_svr_addr_str = argv[1];
-    mplex_id = atoi(argv[2]);
+    char* input_file = argv[1];
+    bake_svr_addr_str = argv[2];
+    mplex_id = atoi(argv[3]);
+
+    test_str = read_input_file(input_file);
 
     /* initialize Margo using the transport portion of the server
      * address (i.e., the part before the first : character if present)
@@ -86,6 +88,7 @@ int main(int argc, char *argv[])
         margo_finalize(mid);
         return(-1);
     }
+    bake_provider_handle_set_eager_limit(bph, 0);
 
     /* obtain info on the server's BAKE target */
     ret = bake_probe(bph, 1, &bti, &num_targets);
@@ -99,27 +102,13 @@ int main(int argc, char *argv[])
         return(-1);
     }
 
-    buf = malloc(ALLOC_BUF_SIZE);
-    if(!buf)
-    {
-        bake_provider_handle_release(bph);
-        margo_addr_free(mid, svr_addr);
-        bake_client_finalize(bcl);
-        margo_finalize(mid);
-        return(-1);
-    }
-
     /**** write phase ****/
-
-    /* copy the test string into a buffer and forward to the proxy server */
-    strcpy(buf, test_str);
     buf_size = strlen(test_str) + 1;
 
-    ret = bake_create_write_persist(bph, bti, buf, buf_size, &the_rid);
+    ret = bake_create_write_persist(bph, bti, test_str, buf_size, &the_rid);
     if(ret != 0)
     {
         fprintf(stderr, "Error: bake_create_write_persist()\n");
-        free(buf);
         bake_provider_handle_release(bph);
         margo_addr_free(mid, svr_addr);
         bake_client_finalize(bcl);
@@ -129,8 +118,8 @@ int main(int argc, char *argv[])
 
     /**** read-back phase ****/
 
-    /* reset the buffer and read it back via BAKE */
-    memset(buf, 0, ALLOC_BUF_SIZE);
+    buf = malloc(buf_size);
+    memset(buf, 0, buf_size);
 
     uint64_t bytes_read;
     ret = bake_read(bph, the_rid, 0, buf, buf_size, &bytes_read);
@@ -163,6 +152,7 @@ int main(int argc, char *argv[])
     /**** cleanup ****/
 
     free(buf);
+    free(test_str);
     bake_provider_handle_release(bph);
     margo_addr_free(mid, svr_addr);
     bake_client_finalize(bcl);
@@ -170,3 +160,17 @@ int main(int argc, char *argv[])
     return(ret);
 }
 
+static char* read_input_file(const char* filename) {
+    FILE* fp = fopen(filename, "r");
+    if(fp == NULL) {
+        fprintf(stderr, "Could not open %s\n", filename);
+        exit(-1);
+    }
+    fseek(fp, 0, SEEK_END);
+    size_t sz = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+    char* buf = calloc(1,sz+1);
+    fread(buf, 1, sz, fp);
+    fclose(fp);
+    return buf;
+}

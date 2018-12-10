@@ -1039,16 +1039,16 @@ static void bake_create_write_persist_ult(hg_handle_t handle)
 
             current_size = current_size > remaining_size ? remaining_size : current_size;
 
-            args->mid           = mid;
-            args->size          = current_size;
-            args->target        = memory + current_offset;
-            args->buf_size      = xfer_buf_size;
-            args->buf_pool      = entry->xfer_bulk_pool;
-            args->remote_addr   = src_addr;
-            args->remote_bulk   = in.bulk_handle;
-            args->remote_offset = current_offset;
-            args->op_type       = HG_BULK_PULL;
-            args->ret           = 0;
+            args[i].mid           = mid;
+            args[i].size          = current_size;
+            args[i].target        = memory + current_offset;
+            args[i].buf_size      = xfer_buf_size;
+            args[i].buf_pool      = entry->xfer_bulk_pool;
+            args[i].remote_addr   = src_addr;
+            args[i].remote_bulk   = in.bulk_handle;
+            args[i].remote_offset = current_offset;
+            args[i].op_type       = HG_BULK_PULL;
+            args[i].ret           = 0;
 
             ABT_thread_create(handler_pool, (void (*)(void*))xfer_ult, args+i, ABT_THREAD_ATTR_NULL, ults+i);
 
@@ -1911,12 +1911,15 @@ static void xfer_ult(xfer_args* args)
         margo_bulk_pool_t   buf_pool;
         hg_addr_t           remote_addr;
         hg_bulk_t           remote_bulk;
-        hg_bulk_t           remote_offset;
+        hg_size_t           remote_offset;
         int32_t             op_type;
         int32_t             ret;
     } xfer_args;
     */
     hg_bulk_t local_bulk = HG_BULK_NULL;
+
+    fprintf(stderr,"xfer_ult: size=%ld, remote_offset=%ld, buf_size=%ld\n", args->size, args->remote_offset, args->buf_size);
+    ABT_thread_yield();
 
     // (1) compute how many iterations must be done
     size_t num_xfers = args->size / args->buf_size;
@@ -1980,6 +1983,7 @@ static void xfer_ult(xfer_args* args)
 
         // (9) update the current offset
         current_offset += current_size;
+        remaining_size -= current_size;
     }
 
     args->ret = 0;
