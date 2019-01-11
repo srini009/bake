@@ -15,6 +15,7 @@ TESTS += \
  tests/create-write-persist-remove.sh
 
 EXTRA_DIST += \
+ tests/lorem.txt \
  tests/basic.sh \
  tests/copy-to-and-from.sh \
  tests/copy-to-and-from-multi-providers.sh \

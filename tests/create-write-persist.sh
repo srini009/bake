@@ -17,7 +17,7 @@ sleep 1
 #####################
 
 # run test
-run_to 10 tests/create-write-persist-test $svr1 1
+run_to 10 tests/create-write-persist-test $srcdir/tests/lorem.txt $svr1 1
 if [ $? -ne 0 ]; then
     wait
     exit 1

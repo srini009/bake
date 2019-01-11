@@ -165,6 +165,11 @@ int bake_write(
  * Writes data into a previously created BAKE region like bake_write(),
  * except the write is performed on behalf of some remote entity.
  *
+ * Note that by passing NULL as remote_addr, the server will assume
+ * that the hg_bulk_t sent comes from the caller of this function, which
+ * is a way to do a bake_write for a buffer for which an hg_bulk_t was
+ * already created.
+ *
  * @param [in] provider provider handle
  * @param [in] rid identifier for region
  * @param [in] region_offset offset into the target region to write
@@ -218,6 +223,13 @@ int bake_create_write_persist(
         bake_region_id_t *rid);
 
 /**
+ * Issues a bake_create_write_persist on behalf of a remote entity (remote_addr)
+ * that previously sent an hg_bulk_t.
+ *
+ * Note that by passing NULL as remote_addr, the server will assume
+ * that the hg_bulk_t sent comes from the caller of this function, which
+ * is a way to do a bake_create_write_persist for a buffer for which an
+ * hg_bulk_t was already created.
  *
  * @param [in] provider provider handle
  * @param [in] bti BAKE target identifier
@@ -303,6 +315,11 @@ int bake_read(
 /**
  * Reads data from a previously persisted BAKE region like bake_read(),
  * except the read is performed on behalf of some remote entity.
+ *
+ * Note that by passing NULL as remote_addr, the server will assume
+ * that the hg_bulk_t sent comes from the caller of this function, which
+ * is a way to do a bake_read for a buffer for which an hg_bulk_t was
+ * already created.
  *
  * @param [in] provider provider handle
  * @param [in] rid identifier for region

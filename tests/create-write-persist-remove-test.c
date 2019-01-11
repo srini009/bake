@@ -86,6 +86,7 @@ int main(int argc, char *argv[])
         margo_finalize(mid);
         return(-1);
     }
+    bake_provider_handle_set_eager_limit(bph, 0);
 
     /* obtain info on the server's BAKE target */
     ret = bake_probe(bph, 1, &bti, &num_targets);
