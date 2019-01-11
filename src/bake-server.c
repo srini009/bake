@@ -676,56 +676,6 @@ static void bake_write_ult(hg_handle_t handle)
         }
 
     } else { // multiple transfers using intermediate buffer
-#if 0
-        buffer = calloc(xfer_buf_size,1);
-
-        /* create bulk handle for local side of transfer */
-        hret = margo_bulk_create(mid, 1, (void**)(&buffer), &xfer_buf_size,
-                HG_BULK_WRITE_ONLY, &bulk_handle);
-        if(hret != HG_SUCCESS)
-        {
-            out.ret = BAKE_ERR_MERCURY;
-            goto finish;
-        }
-
-        TIMERS_END_STEP(1);
-
-        size_t remaining_size = in.bulk_size;
-        size_t current_offset = 0;
-        size_t current_size = xfer_buf_size;
-
-        while(remaining_size != 0) {
-
-            current_size = remaining_size < xfer_buf_size ? remaining_size : xfer_buf_size;
-
-            hret = margo_bulk_transfer(mid, HG_BULK_PULL, src_addr, in.bulk_handle,
-                    in.bulk_offset+current_offset, bulk_handle, 0, current_size);
-            if(hret != HG_SUCCESS)
-            {
-                out.ret = BAKE_ERR_MERCURY;
-                goto finish;
-            }
-
-            memcpy(memory+current_offset, buffer, current_size);
-
-            remaining_size -= current_size;
-            current_offset += current_size;
-        }
-#endif
-        /* Definition of xfer_args:
-        typedef struct xfer_args {
-            margo_instance_id   mid;
-            size_t              size;
-            char*               target;
-            size_t              buf_size;
-            margo_bulk_pool_t   buf_pool;
-            hg_addr_t           remote_addr;
-            hg_bulk_t           remote_bulk;
-            hg_bulk_t           remote_offset;
-            int32_t             op_type;
-            int32_t             ret;
-        } xfer_args;
-        */
 
         // (1) compute the maximum number of ULTs that can handle this transfer
         // as well as the number of individual transfers needed given the buffer sizes
@@ -1064,21 +1014,6 @@ static void bake_create_write_persist_ult(hg_handle_t handle)
         }
 
     } else {
-
-        /* Definition of xfer_args:
-        typedef struct xfer_args {
-            margo_instance_id   mid;
-            size_t              size;
-            char*               target;
-            size_t              buf_size;
-            margo_bulk_pool_t   buf_pool;
-            hg_addr_t           remote_addr;
-            hg_bulk_t           remote_bulk;
-            hg_bulk_t           remote_offset;
-            int32_t             op_type;
-            int32_t             ret;
-        } xfer_args;
-        */
 
         // (1) compute the maximum number of ULTs that can handle this transfer
         // as well as the number of individual transfers needed given the buffer sizes
