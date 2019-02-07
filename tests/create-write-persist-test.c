@@ -161,6 +161,7 @@ int main(int argc, char *argv[])
 }
 
 static char* read_input_file(const char* filename) {
+    size_t ret;
     FILE* fp = fopen(filename, "r");
     if(fp == NULL) {
         fprintf(stderr, "Could not open %s\n", filename);
@@ -170,7 +171,12 @@ static char* read_input_file(const char* filename) {
     size_t sz = ftell(fp);
     fseek(fp, 0, SEEK_SET);
     char* buf = calloc(1,sz+1);
-    fread(buf, 1, sz, fp);
+    ret = fread(buf, 1, sz, fp);
+    if (ret != sz && ferror(fp)) {
+        free(buf);
+        perror("read_input_file");
+        buf=NULL;
+    }
     fclose(fp);
     return buf;
 }
