@@ -137,7 +137,7 @@ int main(int argc, char **argv)
     }
 
     if(num_targets < target_number) {
-        fprintf(stderr, "Error: provider has only %d storage targets\n", num_targets);
+        fprintf(stderr, "Error: provider has only %llu storage targets\n", (long long unsigned int)num_targets);
         margo_addr_free(mid, svr_addr);
         bake_client_finalize(bcl);
         margo_finalize(mid);

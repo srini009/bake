@@ -147,8 +147,8 @@ int bake_client_finalize(bake_client_t client)
 {
     if(client->num_provider_handles != 0) {
         fprintf(stderr, 
-                "[BAKE] Warning: %d provider handles not released before bake_client_finalize was called\n",
-                client->num_provider_handles);
+                "[BAKE] Warning: %llu provider handles not released before bake_client_finalize was called\n",
+                (long long unsigned int)client->num_provider_handles);
     }
     free(client);
     return BAKE_SUCCESS;
