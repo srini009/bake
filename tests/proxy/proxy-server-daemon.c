@@ -159,7 +159,7 @@ int main(int argc, char **argv)
     ret = bake_client_init(mid, &g_proxy_svr_ctx->bcl);
     if(ret != 0)
     {
-        fprintf(stderr, "Error: bake_client_init()\n");
+        bake_perror( "Error: bake_client_init()\n", ret);
         margo_finalize(mid);
         return -1;
     }
@@ -184,7 +184,7 @@ int main(int argc, char **argv)
 
     if(ret != 0)
     {
-        fprintf(stderr, "Error: bake_provider_handle_create()\n");
+        bake_perror( "Error: bake_provider_handle_create()", ret);
         bake_client_finalize(g_proxy_svr_ctx->bcl);
         margo_finalize(mid);
         return -1;
@@ -196,7 +196,7 @@ int main(int argc, char **argv)
                 1, &g_proxy_svr_ctx->svr_bti, &num_targets);
     if(ret < 0)
     {
-        fprintf(stderr, "Error: bake_probe_instance()\n");
+        bake_perror( "Error: bake_probe_instance()", ret);
         return(-1);
     }
     margo_addr_free(mid, bake_svr_addr);

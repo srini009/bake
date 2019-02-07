@@ -59,7 +59,7 @@ int main(int argc, char **argv)
 
     if(ret < 0)
     {
-        fprintf(stderr, "Error: bake_probe_instance()\n");
+        bake_perror("Error: bake_probe_instance()", ret);
         margo_addr_free(mid, svr_addr);
         margo_finalize(mid);
         return(-1);

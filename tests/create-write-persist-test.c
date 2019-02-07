@@ -63,7 +63,7 @@ int main(int argc, char *argv[])
     ret = bake_client_init(mid, &bcl);
     if(ret != 0)
     {
-        fprintf(stderr, "Error: bake_client_init()\n");
+        bake_perror( "Error: bake_client_init()", ret);
         margo_finalize(mid);
         return -1;
     }
@@ -72,7 +72,7 @@ int main(int argc, char *argv[])
     hret = margo_addr_lookup(mid, bake_svr_addr_str, &svr_addr);
     if(hret != HG_SUCCESS)
     {
-        fprintf(stderr, "Error: margo_addr_lookup()\n");
+        bake_perror( "Error: margo_addr_lookup()", ret);
         bake_client_finalize(bcl);
         margo_finalize(mid);
         return(-1);
@@ -82,7 +82,7 @@ int main(int argc, char *argv[])
     ret = bake_provider_handle_create(bcl, svr_addr, mplex_id, &bph);
     if(ret != 0)
     {
-        fprintf(stderr, "Error: bake_provider_handle_create()\n");
+        bake_perror( "Error: bake_provider_handle_create()", ret);
         margo_addr_free(mid, svr_addr);
         bake_client_finalize(bcl);
         margo_finalize(mid);
@@ -94,7 +94,7 @@ int main(int argc, char *argv[])
     ret = bake_probe(bph, 1, &bti, &num_targets);
     if(ret != 0)
     {
-        fprintf(stderr, "Error: bake_probe()\n");
+        bake_perror( "Error: bake_probe()", ret);
         bake_provider_handle_release(bph);
         margo_addr_free(mid, svr_addr);
         bake_client_finalize(bcl);
@@ -108,7 +108,7 @@ int main(int argc, char *argv[])
     ret = bake_create_write_persist(bph, bti, test_str, buf_size, &the_rid);
     if(ret != 0)
     {
-        fprintf(stderr, "Error: bake_create_write_persist()\n");
+        bake_perror( "Error: bake_create_write_persist()", ret);
         bake_provider_handle_release(bph);
         margo_addr_free(mid, svr_addr);
         bake_client_finalize(bcl);
@@ -125,7 +125,7 @@ int main(int argc, char *argv[])
     ret = bake_read(bph, the_rid, 0, buf, buf_size, &bytes_read);
     if(ret != 0)
     {
-        fprintf(stderr, "Error: bake_read()\n");
+        bake_perror( "Error: bake_read()", ret);
         free(buf);
         bake_provider_handle_release(bph);
         margo_addr_free(mid, svr_addr);

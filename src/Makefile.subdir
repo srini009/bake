@@ -1,8 +1,18 @@
+noinst_LTLIBRARIES = \
+		      src/libutil.la
+
+src_libutil_la_SOURCES = \
+			  src/util.c
+
 src_libbake_client_la_SOURCES += \
  src/bake-client.c
 
+src_libbake_client_la_LIBADD = src/libutil.la
+
 src_libbake_server_la_SOURCES += \
  src/bake-server.c
+
+src_libbake_server_la_LIBADD = src/libutil.la
 
 src_bake_server_daemon_LDADD = src/libbake-server.la
 src_bake_mkpool_LDADD = src/libbake-server.la

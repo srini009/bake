@@ -39,6 +39,14 @@ typedef struct {
 #define BAKE_ERR_REMI              (-10) /* Error related to REMI */
 #define BAKE_ERR_OP_UNSUPPORTED    (-11) /* Operation not supported */
 
+/**
+ * Print bake errors in human-friendly form
+ *
+ * @param a string to print out before the error
+ * @param ret error code from a bake routine
+ */
+void bake_perror(char *s, int ret);
+
 #ifdef __cplusplus
 }
 #endif

@@ -170,7 +170,7 @@ int main(int argc, char **argv)
 
             if(ret != 0)
             {
-                fprintf(stderr, "Error: bake_provider_register()\n");
+                bake_perror( "Error: bake_provider_register()", ret);
                 margo_finalize(mid);
                 return(-1);
             }
@@ -179,7 +179,7 @@ int main(int argc, char **argv)
 
             if(ret != 0)
             {
-                fprintf(stderr, "Error: bake_provider_add_storage_target()\n");
+                bake_perror("Error: bake_provider_add_storage_target()", ret);
                 margo_finalize(mid);
                 return(-1);
             }
@@ -200,7 +200,7 @@ int main(int argc, char **argv)
 
         if(ret != 0)
         {
-            fprintf(stderr, "Error: bake_provider_register()\n");
+            bake_perror("Error: bake_provider_register()", ret);
             margo_finalize(mid);                                    
             return(-1);
         }
@@ -211,7 +211,7 @@ int main(int argc, char **argv)
 
             if(ret != 0)
             {
-                fprintf(stderr, "Error: bake_provider_add_storage_target()\n");
+                bake_perror("Error: bake_provider_add_storage_target()", ret);
                 margo_finalize(mid);                                    
                 return(-1);
             }

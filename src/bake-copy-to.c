@@ -93,7 +93,7 @@ int main(int argc, char **argv)
     ret = bake_client_init(mid, &bcl);
     if(ret != 0)
     {
-        fprintf(stderr, "Error: bake_client_init()\n");
+        bake_perror("Error: bake_client_init()", ret);
         margo_finalize(mid);
         munmap(local_region, statbuf.st_size);
         close(fd);
@@ -119,7 +119,7 @@ int main(int argc, char **argv)
         margo_finalize(mid);
         munmap(local_region, statbuf.st_size);
         close(fd);
-        fprintf(stderr, "Error: bake_provider_handle_create()\n");
+        bake_perror("Error: bake_provider_handle_create()", ret);
         return(-1);
     }
 
@@ -132,7 +132,7 @@ int main(int argc, char **argv)
         margo_finalize(mid);
         munmap(local_region, statbuf.st_size);
         close(fd);
-        fprintf(stderr, "Error: bake_probe()\n");
+        bake_perror( "Error: bake_probe()", ret);
         return(-1);
     }
 
@@ -156,7 +156,7 @@ int main(int argc, char **argv)
         margo_finalize(mid);
         munmap(local_region, statbuf.st_size);
         close(fd);
-        fprintf(stderr, "Error: bake_create()\n");
+        bake_perror("Error: bake_create()", ret);
         return(-1);
     }
 
@@ -175,7 +175,7 @@ int main(int argc, char **argv)
         margo_finalize(mid);
         munmap(local_region, statbuf.st_size);
         close(fd);
-        fprintf(stderr, "Error: bake_write()\n");
+        bake_perror("bake_write():", ret);
         return(-1);
     }
 
@@ -189,7 +189,7 @@ int main(int argc, char **argv)
         margo_addr_free(mid, svr_addr);
         bake_client_finalize(bcl);
         margo_finalize(mid);
-        fprintf(stderr, "Error: bake_persist()\n");
+        bake_perror("Error: bake_persist()", ret);
         return(-1);
     }
 
@@ -202,7 +202,7 @@ int main(int argc, char **argv)
         margo_addr_free(mid, svr_addr);
         bake_client_finalize(bcl);
         margo_finalize(mid);
-        fprintf(stderr, "Error: bake_get_size()\n");
+        bake_perror("Error: bake_get_size()", ret);
         return(-1);
     }
 

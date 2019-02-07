@@ -79,7 +79,7 @@ int main(int argc, char **argv)
     ret = bake_client_init(mid, &bcl);
     if(ret != 0)
     {
-        fprintf(stderr, "Error: bake_client_init()\n");
+        bake_perror("Error: bake_client_init()", ret);
         margo_finalize(mid);
         return -1;
     }
@@ -96,7 +96,7 @@ int main(int argc, char **argv)
     ret = bake_probe(bph, 1, &bti, &num_targets);
     if(ret < 0)
     {
-        fprintf(stderr, "Error: bake_probe()\n");
+        bake_perror( "Error: bake_probe()", ret);
         bake_provider_handle_release(bph);
         margo_addr_free(mid, svr_addr);
         bake_client_finalize(bcl);

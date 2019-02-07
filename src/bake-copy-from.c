@@ -63,7 +63,7 @@ int main(int argc, char **argv)
     ret = bake_client_init(mid, &bcl);
     if(ret != 0)
     {
-        fprintf(stderr, "Error: bake_client_init()\n");
+        bake_perror( "Error: bake_client_init()", ret);
         margo_finalize(mid);
         return -1;
     }
@@ -80,7 +80,7 @@ int main(int argc, char **argv)
     ret = bake_provider_handle_create(bcl, svr_addr, mplex_id, &bph);
     if(ret < 0)
     {
-        fprintf(stderr, "Error: bake_provider_handle_create()\n");
+        bake_perror("Error: bake_provider_handle_create()", ret);
         margo_addr_free(mid, svr_addr);
         bake_client_finalize(bcl);
         margo_finalize(mid);
@@ -116,7 +116,7 @@ int main(int argc, char **argv)
     ret = bake_get_size(bph, rid, &check_size);
     if(ret != 0)
     {
-        fprintf(stderr, "Error: bake_get_size()\n");
+        bake_perror("Error: bake_get_size()", ret);
         bake_provider_handle_release(bph);
         margo_addr_free(mid, svr_addr);
         bake_client_finalize(bcl);
@@ -185,7 +185,7 @@ int main(int argc, char **argv)
         margo_addr_free(mid, svr_addr);
         bake_client_finalize(bcl);
         margo_finalize(mid);
-        fprintf(stderr, "Error: bake_read()\n");
+        bake_perror("Error: bake_read()", ret);
         return(-1);
     }
 
