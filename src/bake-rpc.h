@@ -60,7 +60,6 @@ MERCURY_GEN_PROC(bake_persist_out_t,
 MERCURY_GEN_PROC(bake_create_write_persist_in_t,
     ((bake_target_id_t)(bti))\
     ((uint64_t)(region_size))\
-    ((uint64_t)(region_offset))\
     ((hg_bulk_t)(bulk_handle))\
     ((uint64_t)(bulk_offset))\
     ((uint64_t)(bulk_size))\
