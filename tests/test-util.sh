@@ -44,7 +44,7 @@ function test_start_servers ()
             exit 1
         fi
 
-        run_to ${maxtime} src/bake-server-daemon -b 128 -c 4 -t 4 -f $TMPBASE/svr-$i.addr na+sm $TMPBASE/svr-$i.dat &
+        run_to ${maxtime} src/bake-server-daemon -p -f $TMPBASE/svr-$i.addr na+sm $TMPBASE/svr-$i.dat &
         if [ $? -ne 0 ]; then
             # TODO: this doesn't actually work; can't check return code of
             # something executing in background.  We have to rely on the

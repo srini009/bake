@@ -24,9 +24,7 @@ struct options
     unsigned num_pools;
     char **bake_pools;
     char *host_file;
-    size_t buf_size;
-    size_t buf_count;
-    uint32_t num_threads;
+    int pipeline_enabled;
     mplex_mode_t mplex_mode;
 };
 
@@ -37,9 +35,7 @@ static void usage(int argc, char **argv)
     fprintf(stderr, "       bake_pool is the path to the BAKE pool\n");
     fprintf(stderr, "       [-f filename] to write the server address to a file\n");
     fprintf(stderr, "       [-m mode] multiplexing mode (providers or targets) for managing multiple pools (default is targets)\n");
-    fprintf(stderr, "       [-b size] buffer size for writes on provider\n");
-    fprintf(stderr, "       [-c count] count of buffers used for accesses on provider\n");
-    fprintf(stderr, "       [-t threads] number of threads used for concurrency\n");
+    fprintf(stderr, "       [-p] enable pipelining\n");
     fprintf(stderr, "Example: ./bake-server-daemon tcp://localhost:1234 /dev/shm/foo.dat /dev/shm/bar.dat\n");
     return;
 }
@@ -51,7 +47,7 @@ static void parse_args(int argc, char **argv, struct options *opts)
     memset(opts, 0, sizeof(*opts));
 
     /* get options */
-    while((opt = getopt(argc, argv, "f:m:b:t:c:")) != -1)
+    while((opt = getopt(argc, argv, "f:m:p")) != -1)
     {
         switch(opt)
         {
@@ -68,14 +64,8 @@ static void parse_args(int argc, char **argv, struct options *opts)
                     exit(EXIT_FAILURE);
                 }
                 break;
-            case 'b':
-                opts->buf_size = atol(optarg);
-                break;
-            case 'c':
-                opts->buf_count = atol(optarg);
-                break;
-            case 't':
-                opts->num_threads = atol(optarg);
+            case 'p':
+                opts->pipeline_enabled = 1;
                 break;
             default:
                 usage(argc, argv);
@@ -184,9 +174,8 @@ int main(int argc, char **argv)
                 return(-1);
             }
 
-            bake_provider_set_target_xfer_buffer(provider, tid, opts.buf_count, opts.buf_size);
-            bake_provider_set_target_xfer_concurrency(provider, tid, opts.num_threads);
-
+            if(opts.pipeline_enabled)
+                bake_provider_set_conf(provider, "pipeline_enabled", "1");
             printf("Provider %d managing new target at multiplex id %d\n", i, i+1);
         }
 
@@ -216,9 +205,8 @@ int main(int argc, char **argv)
                 return(-1);
             }
 
-            bake_provider_set_target_xfer_buffer(provider, tid, opts.buf_count, opts.buf_size);
-            bake_provider_set_target_xfer_concurrency(provider, tid, opts.num_threads);
-
+            if(opts.pipeline_enabled)
+                bake_provider_set_conf(provider, "pipeline_enabled", "1");
             printf("Provider 0 managing new target at multiplex id %d\n", 1);
         }
     }

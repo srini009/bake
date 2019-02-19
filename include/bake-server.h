@@ -119,39 +119,24 @@ int bake_provider_list_storage_targets(
         bake_provider_t provider,
         bake_target_id_t* targets);
 
-/**
- * @brief Sets the size and number of intermediate buffers used for transfering data.
- * The size is set to 0 by default. A size of 0 indicates that RDMA will be
- * done all at once and target the backend device directly without using an
- * intermediate buffer.
- *
- * @param provider Bake provider
- * @param target_id Target for which to change the buffer size.
- * @param count Number of buffers to initialize.
- * @param size Size of the buffer.
- *
- * @return 0 on success, -1 on failure
+/* TODO: the following configuration management functions would ideally be
+ * split off into a dedicated component.  Treating this as a prototype for
+ * now.
  */
-int bake_provider_set_target_xfer_buffer(
-        bake_provider_t provider,
-        bake_target_id_t target_id,
-        size_t count,
-        size_t size);
 
 /**
- * @brief Sets the maximum number of ULTs that will be used to concurrently
- * transfer data.
+ * @brief Set configuration parameters as string key/value pairs
  *
  * @param provider Bake provider
- * @param target_id Target for which to change the number of ULTs
- * @param num_threads Number of ULTs
+ * @param key Configuration key
+ * @param value Configuratiion value
  *
  * @return 0 on success, -1 on failure
  */
-int bake_provider_set_target_xfer_concurrency(
+int bake_provider_set_conf(
         bake_provider_t provider,
-        bake_target_id_t target_id,
-        uint32_t num_threads);
+        const char *key,
+        const char *value);
 
 #ifdef __cplusplus
 }
