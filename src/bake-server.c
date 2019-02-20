@@ -508,16 +508,14 @@ static void bake_create_ult(hg_handle_t handle)
 
     TIMERS_END_STEP(1);
 
+#ifdef USE_SIZECHECK_HEADERS
     region_content_t* region = (region_content_t*)pmemobj_direct(prid->oid);
     if(!region) {
         out.ret = BAKE_ERR_PMEM;
         goto finish;
     }
-#ifdef USE_SIZECHECK_HEADERS
     region->size = in.region_size;
-#endif
     PMEMobjpool* pmem_pool = pmemobj_pool_by_oid(prid->oid);
-#ifdef USE_SIZECHECK_HEADERS
     pmemobj_persist(pmem_pool, region, sizeof(region->size));
 #endif
 
