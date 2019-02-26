@@ -38,7 +38,9 @@ int main(int argc, char **argv)
     char* local_region;
     int region_fd;
     char region_file[128];
+#ifdef USE_SIZECHECK_HEADERS
     uint64_t  check_size;
+#endif
  
     if(argc != 5)
     {

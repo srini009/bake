@@ -21,7 +21,6 @@ int main(int argc, char **argv)
     char *svr_addr_str;
     hg_addr_t svr_addr;
     margo_instance_id mid;
-    bake_target_id_t bti;
     hg_return_t hret;
     int ret;
  

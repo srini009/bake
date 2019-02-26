@@ -721,7 +721,6 @@ static void bake_eager_write_ult(hg_handle_t handle)
     in.size = 0;
     hg_return_t hret;
     char* buffer = NULL;
-    hg_bulk_t bulk_handle = HG_BULK_NULL;
     pmemobj_region_id_t* prid = NULL;
     ABT_rwlock lock = ABT_RWLOCK_NULL;
 
@@ -1061,7 +1060,9 @@ static void bake_get_size_ult(hg_handle_t handle)
     bake_get_size_out_t out;
     bake_get_size_in_t in;
     hg_return_t hret;
+#ifdef USE_SIZECHECK_HEADERS
     pmemobj_region_id_t* prid;
+#endif
     ABT_rwlock lock = ABT_RWLOCK_NULL;
 
     memset(&out, 0, sizeof(out));
@@ -1173,8 +1174,6 @@ static void bake_noop_ult(hg_handle_t handle)
 {
     margo_instance_id mid = margo_hg_handle_get_instance(handle);
     assert(mid);
-    const struct hg_info* hgi = margo_get_info(handle);
-    bake_provider_t svr_ctx = margo_registered_data(mid, hgi->id);
 
     margo_respond(handle, NULL);
     margo_destroy(handle);
