@@ -22,5 +22,4 @@ bin_PROGRAMS += \
  src/bake-mkpool \
  src/bake-shutdown \
  src/bake-copy-to \
- src/bake-copy-from \
- src/bake-latency-bench
+ src/bake-copy-from
