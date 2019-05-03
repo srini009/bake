@@ -180,16 +180,6 @@ int bake_provider_register(
             return BAKE_ERR_MERCURY;
         }
     }
-    /* check if a REMI provider exists with the same provider id */
-    {
-        int flag;
-        // TODO pass an actual ABT-IO instance
-        remi_provider_registered(mid, provider_id, &flag, NULL, NULL, NULL);
-        if(flag) {
-            fprintf(stderr, "bake_provider_register(): a REMI provider with the same (%d) already exists\n", provider_id);
-            return BAKE_ERR_REMI;
-        }
-    }
 
     /* allocate the resulting structure */    
     tmp_svr_ctx = calloc(1,sizeof(*tmp_svr_ctx));
@@ -287,18 +277,28 @@ int bake_provider_register(
     }
 
     /* register a REMI provider */
-    // TODO actually use an ABT-IO instance
-    ret = remi_provider_register(mid, ABT_IO_INSTANCE_NULL, provider_id, abt_pool, &(tmp_svr_ctx->remi_provider));
-    if(ret != REMI_SUCCESS) {
-        // XXX unregister RPCs, cleanup tmp_svr_ctx before returning
-        return BAKE_ERR_REMI;
-    }
-    ret = remi_provider_register_migration_class(tmp_svr_ctx->remi_provider,
-            "bake", NULL,
-            bake_target_post_migration_callback, NULL, tmp_svr_ctx);
-    if(ret != REMI_SUCCESS) {
-        // XXX unregister RPCs, cleanup tmp_svr_ctx before returning
-        return BAKE_ERR_REMI;
+    {
+        int flag;
+        remi_provider_t remi_provider;
+        /* check if a REMI provider exists with the same provider id */
+        remi_provider_registered(mid, provider_id, &flag, NULL, NULL, &remi_provider);
+        if(flag) { /* REMI provider exists */
+            tmp_svr_ctx->remi_provider = remi_provider;
+        } else { /* REMI provider does not exist */
+            // TODO actually use an ABT-IO instance
+            ret = remi_provider_register(mid, ABT_IO_INSTANCE_NULL, provider_id, abt_pool, &(tmp_svr_ctx->remi_provider));
+            if(ret != REMI_SUCCESS) {
+                // XXX unregister RPCs, cleanup tmp_svr_ctx before returning
+                return BAKE_ERR_REMI;
+            }
+        }
+        ret = remi_provider_register_migration_class(tmp_svr_ctx->remi_provider,
+                "bake", NULL,
+                bake_target_post_migration_callback, NULL, tmp_svr_ctx);
+        if(ret != REMI_SUCCESS) {
+            // XXX unregister RPCs, cleanup tmp_svr_ctx before returning
+            return BAKE_ERR_REMI;
+        }
     }
 
     /* install the bake server finalize callback */
