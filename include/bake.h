@@ -48,6 +48,49 @@ typedef struct {
 void bake_perror(char *s, int ret);
 
 /**
+ * @brief Converts a target id into an ASCII readable string.
+ *
+ * @param tid Target id to convert into a string.
+ * @param str Resulting string (must be allocated to at least 37 bytes)
+ * @param size size of the allocated string.
+ *
+ * @return error code.
+ */
+int bake_target_id_to_string(bake_target_id_t tid, char* str, size_t size);
+
+/**
+ * @brief Converts an ASCI readable representation of the target id into
+ * and actual target id.
+ *
+ * @param str Null-terminated string to read from.
+ * @param tid Resulting target id.
+ *
+ * @return error code.
+ */
+int bake_target_id_from_string(const char* str, bake_target_id_t* tid);
+
+/**
+ * @brief Converts the region id into an ASCII readable representation.
+ *
+ * @param rid Region id.
+ * @param str Resulting string, should be preallocated wirg sufficient size.
+ * @param size size of the preallocated string.
+ *
+ * @return error code.
+ */
+int bake_region_id_to_string(bake_region_id_t rid, char* str, size_t size);
+
+/**
+ * @brief Converts a string back into a region id.
+ *
+ * @param str String to convert.
+ * @param rid Resulting region id.
+ *
+ * @return error code.
+ */
+int bake_region_id_from_string(const char* str, bake_region_id_t* rid);
+
+/**
  * Convert region id into printable string for debugging purposes
  *
  * @param[in] str string to fill in

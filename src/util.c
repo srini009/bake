@@ -6,9 +6,11 @@
 
 #include "bake-config.h"
 #include "bake.h"
+#include <stdlib.h>
 #include <stdio.h>
 #include <inttypes.h>
 #include <libpmemobj.h>
+#include "base64/b64.h"
 
 static char * bake_err_str(int ret)
 {
@@ -76,4 +78,39 @@ void bake_print_dbg_region_id_t(char *str, size_t size, bake_region_id_t rid)
     snprintf(str, size, "%u:%" PRIu64 ":%" PRIu64, rid.type, oid->pool_uuid_lo, oid->off);
 
     return;
+}
+
+int bake_target_id_to_string(bake_target_id_t tid, char* str, size_t size)
+{
+    if(size < 37)
+        return BAKE_ERR_INVALID_ARG;
+    uuid_unparse(tid.id, str);
+    return BAKE_SUCCESS;
+}
+
+int bake_target_id_from_string(const char* str, bake_target_id_t* tid)
+{
+    if(uuid_parse(str, tid->id) != 0)
+        return BAKE_ERR_INVALID_ARG;
+    return BAKE_SUCCESS;
+}
+
+int bake_region_id_to_string(bake_region_id_t rid, char* str, size_t size)
+{
+    char* s = bake_b64_encode((const unsigned char*)&rid, sizeof(rid));
+    if(size < strlen(s)+1) {
+        free(s);
+        return BAKE_ERR_INVALID_ARG;
+    }
+    strcpy(str,s);
+    free(s);
+    return BAKE_SUCCESS;
+}
+
+int bake_region_id_from_string(const char* str, bake_region_id_t* tid)
+{
+    unsigned char* data = bake_b64_decode(str, strlen(str));
+    memcpy(tid, data, sizeof(*tid));
+    free(data);
+    return BAKE_SUCCESS;
 }

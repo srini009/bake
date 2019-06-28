@@ -2,7 +2,9 @@ noinst_LTLIBRARIES = \
 		      src/libutil.la
 
 src_libutil_la_SOURCES = \
-			  src/util.c
+			  src/util.c \
+			  src/base64/encode.c \
+			  src/base64/decode.c
 
 src_libbake_client_la_SOURCES += \
  src/bake-client.c
