@@ -98,7 +98,8 @@ int bake_region_id_from_string(const char* str, bake_region_id_t* rid);
  *                 string is longer than this it will be truncated.
  * @param[in] rid region_id
  */
-void bake_print_dbg_region_id_t(char *str, size_t size, bake_region_id_t rid);
+void bake_print_dbg_region_id_t(char *str, size_t size, bake_region_id_t rid)
+    __attribute__((deprecated("use bake_region_id_to_string instead")));
 
 #ifdef __cplusplus
 }
