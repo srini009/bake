@@ -54,6 +54,16 @@ int bake_provider_register(
         bake_provider_t* provider);
 
 /**
+ * @brief Deregisters and destroys the provider.
+ *
+ * @param provider Provider to deregister and destroy.
+ *
+ * @return 0 on success, -1 otherwise.
+ */
+int bake_provider_destroy(
+        bake_provider_t provider);
+
+/**
  * Makes the provider start managing a target.
  * The target must have been previously created with bake_makepool,
  * and it should not be managed by another provider (whether in this
