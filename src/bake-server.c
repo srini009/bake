@@ -12,8 +12,10 @@
 #include <fcntl.h>
 #include <margo.h>
 #include <margo-bulk-pool.h>
+#ifdef USE_REMI
 #include <remi/remi-client.h>
 #include <remi/remi-server.h>
+#endif
 #include "bake-server.h"
 #include "uthash.h"
 #include "bake-rpc.h"
@@ -75,9 +77,11 @@ typedef struct bake_server_context_t
     bake_pmem_entry_t* targets;
     hg_id_t bake_create_write_persist_id; // <-- this is a client version of the id
 
+#ifdef USE_REMI
     remi_client_t remi_client;
     remi_provider_t remi_provider;
     int owns_remi_provider;
+#endif
 
     margo_bulk_poolset_t poolset; /* intermediate buffers, if used */
 
@@ -138,7 +142,9 @@ struct bake_provider_conf global_bake_provider_conf =
 
 static void bake_server_finalize_cb(void *data);
 
+#ifdef USE_REMI
 static int bake_target_post_migration_callback(remi_fileset_t fileset, void* provider);
+#endif
 
 static void xfer_ult(void *_args);
 
@@ -318,6 +324,7 @@ int bake_provider_register(
                 bake_create_write_persist_in_t, bake_create_write_persist_out_t, NULL);
     }
 
+#ifdef USE_REMI
     /* register a REMI client */
     // TODO actually use an ABT-IO instance
     ret = remi_client_init(mid, ABT_IO_INSTANCE_NULL, &(tmp_svr_ctx->remi_client));
@@ -352,6 +359,7 @@ int bake_provider_register(
             return BAKE_ERR_REMI;
         }
     }
+#endif
 
     /* install the bake server finalize callback */
     margo_provider_push_finalize_callback(mid, tmp_svr_ctx, &bake_server_finalize_cb, tmp_svr_ctx);
@@ -1684,8 +1692,6 @@ static void bake_migrate_target_ult(hg_handle_t handle)
     hg_addr_t dest_addr = HG_ADDR_NULL;
     hg_return_t hret;
     int ret;
-    remi_provider_handle_t remi_ph = REMI_PROVIDER_HANDLE_NULL;
-    remi_fileset_t local_fileset = REMI_FILESET_NULL;
     ABT_rwlock lock = ABT_RWLOCK_NULL;
 
     memset(&out, 0, sizeof(out));
@@ -1706,6 +1712,10 @@ static void bake_migrate_target_ult(hg_handle_t handle)
         goto finish;
     }
 
+#ifdef USE_REMI
+
+    remi_provider_handle_t remi_ph = REMI_PROVIDER_HANDLE_NULL;
+    remi_fileset_t local_fileset = REMI_FILESET_NULL;
     /* lock provider */
     lock = svr_ctx->lock;
     ABT_rwlock_wrlock(lock);
@@ -1764,11 +1774,19 @@ static void bake_migrate_target_ult(hg_handle_t handle)
 
     out.ret = BAKE_SUCCESS;
 
+#else
+
+    out.ret = BAKE_ERR_OP_UNSUPPORTED;
+
+#endif
+
 finish:
     if(lock != ABT_RWLOCK_NULL)
         ABT_rwlock_unlock(lock);
+#ifdef USE_REMI
     remi_fileset_free(local_fileset);
     remi_provider_handle_release(remi_ph);
+#endif
     margo_addr_free(mid, dest_addr);
     margo_free_input(handle, &in);
     margo_respond(handle, &out);
@@ -1802,10 +1820,12 @@ static void bake_server_finalize_cb(void *data)
     margo_deregister(mid, provider->rpc_migrate_region_id);
     margo_deregister(mid, provider->rpc_migrate_target_id);
 
+#ifdef USE_REMI
     remi_client_finalize(provider->remi_client);
     if(provider->owns_remi_provider) {
         remi_provider_destroy(provider->remi_provider);
     }
+#endif
 
     bake_provider_remove_all_storage_targets(provider);
 
@@ -1818,6 +1838,8 @@ static void bake_server_finalize_cb(void *data)
 
     return;
 }
+
+#ifdef USE_REMI
 
 typedef struct migration_cb_args {
     char root[1024];
@@ -1844,6 +1866,8 @@ static int bake_target_post_migration_callback(remi_fileset_t fileset, void* uar
     remi_fileset_foreach_file(fileset, migration_fileset_cb, &args);
     return 0;
 }
+
+#endif
 
 static void xfer_ult(void *_args)
 {

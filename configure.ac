@@ -2,7 +2,7 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.63])
-AC_INIT([bake], [0.1], [],[],[]) 
+AC_INIT([bake], [0.3.4], [],[],[]) 
 AC_CONFIG_MACRO_DIR([m4])
 LT_INIT
 
@@ -80,11 +80,27 @@ LIBS="$UUID_LIBS $LIBS"
 CPPFLAGS="$UUID_CFLAGS $CPPFLAGS"
 CFLAGS="$UUID_CFLAGS $CFLAGS"
 
-PKG_CHECK_MODULES([REMI],[remi],[],
-   [AC_MSG_ERROR([Could not find working remi installation!])])
-LIBS="$REMI_LIBS $LIBS"
-CPPFLAGS="$REMI_CFLAGS $CPPFLAGS"
-CFLAGS="$REMI_CFLAGS $CFLAGS"
+AC_ARG_ENABLE(remi,
+        [AS_HELP_STRING([--enable-remi],[Enable REMI (migration) support @<:@default=no@:>@])],
+        [case "${enableval}" in
+         yes) enable_remi="yes" ;;
+         no) enable_remi="no" ;;
+         *) AC_MSG_ERROR(bad value ${enableval} for --enable-remi) ;;
+ esac],
+ [enable_remi="no"]
+ )
+AM_CONDITIONAL(ENABLE_REMI, test x$enable_remi = xyes)
+if test "$enable_remi" = "yes"; then
+        PKG_CHECK_MODULES(REMI, remi)
+        AC_DEFINE(USE_REMI, 1, [REMI support enabled.])
+        USE_REMI=1
+        LIBS="$REMI_LIBS $LIBS"
+        CPPFLAGS="$REMI_CFLAGS $CPPFLAGS"
+        CFLAGS="$REMI_CFLAGS $CFLAGS"
+else
+        USE_REMI=0
+fi
+AC_SUBST(USE_REMI)
 
 AC_ARG_ENABLE([sizecheck],
     AS_HELP_STRING([--enable-sizecheck], [Adds a header in regions to keep track of region sizes (may degrade performance) @<:@default=no@:>@]),
