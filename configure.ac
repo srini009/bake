@@ -97,10 +97,13 @@ if test "$enable_remi" = "yes"; then
         LIBS="$REMI_LIBS $LIBS"
         CPPFLAGS="$REMI_CFLAGS $CPPFLAGS"
         CFLAGS="$REMI_CFLAGS $CFLAGS"
+        REMI_PKG="remi"
 else
         USE_REMI=0
+        REMI_PKG=""
 fi
 AC_SUBST(USE_REMI)
+AC_SUBST(REMI_PKG)
 
 AC_ARG_ENABLE([sizecheck],
     AS_HELP_STRING([--enable-sizecheck], [Adds a header in regions to keep track of region sizes (may degrade performance) @<:@default=no@:>@]),
