@@ -13,7 +13,13 @@ CLEANFILES = $(bin_SCRIPTS)
 MAINTAINERCLEANFILES =
 EXTRA_DIST =
 BUILT_SOURCES =
-include_HEADERS = include/bake.h include/bake-client.h include/bake-server.h
+include_HEADERS = include/bake.h\
+		  include/bake-client.h\
+		  include/bake-server.h\
+		  include/bake.hpp\
+		  include/bake-client.hpp\
+		  include/bake-server.hpp
+
 TESTS_ENVIRONMENT =
 
 EXTRA_DIST += \

@@ -38,6 +38,7 @@ typedef struct {
 #define BAKE_ERR_OUT_OF_BOUNDS      (-9) /* Attempting an out of bound access */
 #define BAKE_ERR_REMI              (-10) /* Error related to REMI */
 #define BAKE_ERR_OP_UNSUPPORTED    (-11) /* Operation not supported */
+#define BAKE_ERR_END               (-12) /* End of valid bake error codes */
 
 /**
  * Print bake errors in human-friendly form

@@ -105,6 +105,24 @@ fi
 AC_SUBST(USE_REMI)
 AC_SUBST(REMI_PKG)
 
+AC_ARG_ENABLE(benchmark,
+              [AS_HELP_STRING([--enable-benchmark],[Build Bake benchmark @<:@default=no@:>@])],
+              [case "${enableval}" in
+                yes) enable_benchmark="yes" ;;
+                no) enable_benchmark="no" ;;
+                *) AC_MSG_ERROR(bad value ${enableval} for --enable-benchmark) ;;
+               esac],
+              [enable_benchmark="no"]
+)
+AM_CONDITIONAL(BUILD_BENCHMARK, test x$enable_benchmark = xyes)
+
+if [test "$enable_benchmark" = "yes"]; then
+        PKG_CHECK_MODULES(JSONCPP, jsoncpp)
+        LIBS="$JSONCPP_LIBS $LIBS"
+        CPPFLAGS="$JSONCPP_CFLAGS $CPPFLAGS"
+        CFLAGS="$JSONCPP_CFLAGS $CFLAGS"
+fi
+
 AC_ARG_ENABLE([sizecheck],
     AS_HELP_STRING([--enable-sizecheck], [Adds a header in regions to keep track of region sizes (may degrade performance) @<:@default=no@:>@]),
     [AS_CASE(${enableval}, [yes], [AC_DEFINE([USE_SIZECHECK_HEADERS], 1, [Enable sizecheck])], [no], [],

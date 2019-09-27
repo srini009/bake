@@ -25,3 +25,12 @@ bin_PROGRAMS += \
  src/bake-shutdown \
  src/bake-copy-to \
  src/bake-copy-from
+
+if BUILD_BENCHMARK
+src_bake_benchmark_SOURCES = src/bake-benchmark.cc
+src_bake_benchmark_LDADD = src/libbake-server.la src/libbake-client.la
+bin_PROGRAMS += src/bake-benchmark
+#src_bake_benchmark_LDADD = ${LIBS} -lbake-client -lbake-server
+endif
+
+

@@ -1,0 +1,36 @@
+{
+    "protocol" : "tcp",
+    "seed" : 0,
+    "server" : {
+        "use-progress-thread" : false,
+        "rpc-thread-count" : 0,
+        "target" : {
+            "path" : "/dev/shm/mytarget"
+        }
+    },
+    "benchmarks" : [
+        {
+            "type" : "create",
+            "repetitions" : 10,
+            "num-entries" : 30,
+            "region-sizes" : [ 8, 32 ],
+            "erase-on-teardown" : true
+        },
+        {
+            "type" : "create-write-persist",
+            "repetitions" : 10,
+            "num-entries" : 30,
+            "region-sizes" : [ 8, 32 ],
+            "reuse-buffer" : false,
+            "erase-on-teardown" : true
+        },
+        {
+            "type" : "read",
+            "repetitions" : 10,
+            "num-entries" : 30,
+            "region-sizes" : [ 8, 32 ],
+            "reuse-buffer" : false,
+            "erase-on-teardown" : true
+        }
+    ]
+}
