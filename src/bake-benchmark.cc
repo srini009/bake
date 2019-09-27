@@ -12,20 +12,15 @@
 #include <bake-client.hpp>
 #include <bake-server.hpp>
 
-/**
- * Helper function to generate random strings of a certain length.
- * These strings are readable.
- */
-static std::string gen_random_string(size_t len) {
-    static const char alphanum[] =
-        "0123456789"
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-        "abcdefghijklmnopqrstuvwxyz";
-    std::string s(len, ' ');
-    for (unsigned i = 0; i < len; ++i) {
-        s[i] = alphanum[rand() % (sizeof(alphanum) - 1)];
-    }
-    return s;
+
+int getConfigInt(Json::Value& config, const std::string& key, int _default) {
+    if(config[key]) return config[key].asInt();
+    else return _default;
+}
+
+int getConfigBool(Json::Value& config, const std::string& key, bool _default) {
+    if(config[key]) return config[key].asBool();
+    else return _default;
 }
 
 template<typename T>
@@ -117,7 +112,7 @@ class AbstractAccessBenchmark : public AbstractBenchmark {
     AbstractAccessBenchmark(Json::Value& config, T&& ... args)
     : AbstractBenchmark(std::forward<T>(args)...) {
         // read the configuration
-        m_num_entries = config["num-entries"].asUInt64();
+        m_num_entries = getConfigInt(config, "num-entries", 1);
         if(config["region-sizes"].isIntegral()) {
             auto x = config["region-sizes"].asUInt64();
             m_region_size_range = { x, x+1 };
@@ -129,7 +124,7 @@ class AbstractAccessBenchmark : public AbstractBenchmark {
         } else {
             throw std::range_error("invalid region-sizes range or value");
         }
-        m_erase_on_teardown = config["erase-on-teardown"].asBool();
+        m_erase_on_teardown = getConfigBool(config, "erase-on-teardown", true);
     }
 };
 
@@ -202,7 +197,7 @@ class CreateWritePersistBenchmark : public AbstractAccessBenchmark {
     template<typename ... T>
     CreateWritePersistBenchmark(Json::Value& config, T&& ... args)
     : AbstractAccessBenchmark(config, std::forward<T>(args)...) { 
-        m_reuse_buffer = config["reuse-buffer"].asBool();
+        m_reuse_buffer = getConfigBool(config, "reuse-buffer", false);
     }
 
     virtual void setup() override {
@@ -270,7 +265,7 @@ class ReadBenchmark : public AbstractAccessBenchmark {
     template<typename ... T>
     ReadBenchmark(Json::Value& config, T&& ... args)
     : AbstractAccessBenchmark(config, std::forward<T>(args)...) { 
-        m_reuse_buffer = config["reuse-buffer"].asBool();
+        m_reuse_buffer = getConfigBool(config, "reuse-buffer", false);
     }
 
     virtual void setup() override {
@@ -355,9 +350,14 @@ int main(int argc, char** argv) {
         MPI_Abort(MPI_COMM_WORLD, -1);
     }
 
-    Json::Reader reader;
+    Json::CharReaderBuilder builder;
     Json::Value config;
-    reader.parse(config_file, config);
+    JSONCPP_STRING errs;
+    if(!parseFromStream(builder, config_file, &config, &errs)) {
+        std::cout << errs << std::endl;
+        MPI_Abort(MPI_COMM_WORLD, -1);
+        return -1;
+    }
 
     MPI_Comm comm;
     MPI_Comm_split(MPI_COMM_WORLD, rank == 0 ? 0 : 1, rank, &comm);
@@ -408,7 +408,8 @@ static void run_client(MPI_Comm comm, Json::Value& config) {
     int rank, num_clients;
     MPI_Comm_rank(comm, &rank);
     MPI_Comm_size(comm, &num_clients);
-    Json::StyledStreamWriter styledStream;
+    Json::StreamWriterBuilder builder;
+    const std::unique_ptr<Json::StreamWriter> writer(builder.newStreamWriter());
     // initialize Margo
     margo_instance_id mid = MARGO_INSTANCE_NULL;
     std::string protocol = config["protocol"].asString();
@@ -477,7 +478,8 @@ static void run_client(MPI_Comm comm, Json::Value& config) {
             if(rank == 0) {
                 size_t n = global_timings.size();
                 std::cout << "================ " << types[i] << " ================" << std::endl;
-                styledStream.write(std::cout, config["benchmarks"][i]);
+                writer->write(config["benchmarks"][i], &std::cout);
+                std::cout << std::endl;
                 std::cout << "-----------------" << std::string(types[i].size(),'-') << "-----------------" << std::endl;
                 double average  = std::accumulate(global_timings.begin(), global_timings.end(), 0.0) / n;
                 double variance = std::accumulate(global_timings.begin(), global_timings.end(), 0.0, [average](double acc, double x) {
