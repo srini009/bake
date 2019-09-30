@@ -16,6 +16,13 @@
 
 namespace bake {
 
+/**
+ * @brief Creates a pool at a given path, with a given size and mode.
+ *
+ * @param pool_name Pool name.
+ * @param pool_size Pool size.
+ * @param pool_mode Mode.
+ */
 inline void makepool(
         const std::string& pool_name,
         size_t pool_size,
@@ -24,6 +31,9 @@ inline void makepool(
     _CHECK_RET(ret);
 }
 
+/**
+ * @brief The provider class is the C++ equivalent to a bake_provider_t.
+ */
 class provider {
 
     margo_instance_id m_mid = MARGO_INSTANCE_NULL;
@@ -46,6 +56,15 @@ class provider {
 
     public:
 
+    /**
+     * @brief Factory method to create an instance of provider.
+     *
+     * @param mid Margo instance id.
+     * @param provider_id Provider id.
+     * @param pool Argobots pool.
+     *
+     * @return Pointer to newly created provider.
+     */
     static provider* create(margo_instance_id mid,
                             uint16_t provider_id = 0,
                             ABT_pool pool = BAKE_ABT_POOL_DEFAULT) {
@@ -54,16 +73,42 @@ class provider {
         return p;
     }
 
+    /**
+     * @brief Deleted copy constructor.
+     */
     provider(const provider&) = delete;
+
+    /**
+     * @brief Deleted move constructor.
+     */
     provider(provider&& other) = delete;
+
+    /**
+     * @brief Deleted copy-assignment operator.
+     */
     provider& operator=(const provider&) = delete;
+
+    /**
+     * @brief Deleted move-assignment operator.
+     */
     provider& operator=(provider&& other) = delete;
 
+    /**
+     * @brief Destructor.
+     */
     ~provider() {
         margo_provider_pop_finalize_callback(m_mid, this);
         bake_provider_destroy(m_provider);
     }
 
+    /**
+     * @brief Adds a storage target to the provider.
+     * The target must have been created beforehand.
+     *
+     * @param target_name Path to the target.
+     *
+     * @return a target object.
+     */
     target add_storage_target(const std::string& target_name) {
         target t;
         int ret = bake_provider_add_storage_target(
@@ -74,16 +119,31 @@ class provider {
         return t;
     }
 
+    /**
+     * @brief Removes the storage target from the provider.
+     * This does not removes the storage target from the device, it
+     * simply makes it unaccessible through this provider.
+     *
+     * @param t target to remove.
+     */
     void remove_storage_target(const target& t) {
         int ret = bake_provider_remove_storage_target(m_provider, t.m_tid);
         _CHECK_RET(ret);
     }
 
+    /**
+     * @brief Removes all the storage targets managed by the provider.
+     */
     void remove_all_storage_targets() {
         int ret = bake_provider_remove_all_storage_targets(m_provider);
         _CHECK_RET(ret);
     }
 
+    /**
+     * @brief Count the number of storage targets managed by the provider.
+     *
+     * @return number of storage targets.
+     */
     uint64_t count_storage_targets() const {
         uint64_t count;
         int ret = bake_provider_count_storage_targets(m_provider, &count);
@@ -91,6 +151,11 @@ class provider {
         return count;
     }
 
+    /**
+     * @brief Lists all the storage targets managed by the provider.
+     *
+     * @return Vector of targets.
+     */
     std::vector<target> list_storage_targets() const {
         uint64_t count = count_storage_targets();
         std::vector<target> result(count);
