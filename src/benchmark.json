@@ -5,7 +5,7 @@
         "use-progress-thread" : false,
         "rpc-thread-count" : 0,
         "target" : {
-            "path" : "/dev/shm/mytarget"
+            "path" : "/dev/shm/myTarget"
         }
     },
     "benchmarks" : [
@@ -30,6 +30,23 @@
             "num-entries" : 30,
             "region-sizes" : [ 8, 32 ],
             "reuse-buffer" : false,
+            "reuse-region" : false,
+            "erase-on-teardown" : true
+        },
+        {
+            "type" : "write",
+            "repetitions" : 10,
+            "num-entries" : 30,
+            "region-sizes" : [ 8, 32 ],
+            "reuse-buffer" : false,
+            "reuse-region" : false,
+            "erase-on-teardown" : true
+        },
+        {
+            "type" : "persist",
+            "repetitions" : 10,
+            "num-entries" : 30,
+            "region-sizes" : [ 8, 32 ],
             "erase-on-teardown" : true
         }
     ]

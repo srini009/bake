@@ -15,12 +15,18 @@
 
 int getConfigInt(Json::Value& config, const std::string& key, int _default) {
     if(config[key]) return config[key].asInt();
-    else return _default;
+    else {
+        config[key] = _default;
+        return _default;
+    }
 }
 
 int getConfigBool(Json::Value& config, const std::string& key, bool _default) {
     if(config[key]) return config[key].asBool();
-    else return _default;
+    else {
+        config[key] = _default;
+        return _default;
+    }
 }
 
 template<typename T>
@@ -247,6 +253,80 @@ class CreateWritePersistBenchmark : public AbstractAccessBenchmark {
 REGISTER_BENCHMARK("create-write-persist", CreateWritePersistBenchmark);
 
 /**
+ * WriteBenchmark executes a series of bake_write
+ * operations and measures their duration.
+ */
+class WriteBenchmark : public AbstractAccessBenchmark {
+
+    protected:
+
+    std::vector<size_t>       m_access_sizes;
+    bake::region              m_region_id;
+    std::vector<char>         m_data;
+    bool                      m_reuse_buffer;
+    bool                      m_reuse_region;
+
+    public:
+
+    template<typename ... T>
+    WriteBenchmark(Json::Value& config, T&& ... args)
+    : AbstractAccessBenchmark(config, std::forward<T>(args)...) { 
+        m_reuse_buffer = getConfigBool(config, "reuse-buffer", false);
+        m_reuse_region = getConfigBool(config, "reuse-region", false);
+    }
+
+    virtual void setup() override {
+        // generate region and region sizes
+        auto& _clt = client();
+        auto& _ph = ph();
+        auto& _tgt = target();
+        size_t data_size = 0;
+        m_access_sizes.resize(m_num_entries);
+        size_t region_size = 0;
+        for(unsigned i=0; i < m_num_entries; i++) {
+            size_t size = m_region_size_range.first + (rand() % (m_region_size_range.second - m_region_size_range.first));
+            m_access_sizes[i] = size;
+            if(m_reuse_region) region_size = std::max(size, region_size);
+            else region_size += size;
+            if(m_reuse_buffer) data_size = std::max(size, data_size);
+            else data_size += size;
+        }
+        m_data.resize(data_size);
+        for(unsigned i=0; i < data_size; i++) {
+            m_data[i] = 'a' + (i%26);
+        }
+        m_region_id = _clt.create(_ph, _tgt, region_size);
+    }
+
+    virtual void execute() override {
+        auto& _clt = client();
+        auto& _tgt = target();
+        auto& _ph = ph();
+        size_t data_offset = 0;
+        size_t region_offset = 0;
+        for(unsigned i=0; i < m_num_entries; i++) {
+            size_t size = m_access_sizes[i];
+            char* data = m_data.data() + data_offset;
+            _clt.write(_ph, m_region_id, region_offset, (void*)data, size);
+            if(!m_reuse_buffer) data_offset += size;
+            if(!m_reuse_region) region_offset += size;
+        }
+    }
+
+    virtual void teardown() override {
+        if(m_erase_on_teardown) {
+            auto& _clt = client();
+            auto& _tgt = target();
+            auto& _ph = ph();
+            _clt.remove(_ph, m_region_id);
+        }
+        m_access_sizes.resize(0); m_access_sizes.shrink_to_fit();
+        m_data.resize(0);         m_data.shrink_to_fit();
+    }
+};
+REGISTER_BENCHMARK("write", WriteBenchmark);
+
+/**
  * ReadBenchmark executes a series of bake_create_write_persist
  * the a series of bake_read operations and measures the duration of the latter.
  */
@@ -254,11 +334,11 @@ class ReadBenchmark : public AbstractAccessBenchmark {
 
     protected:
 
-    std::vector<size_t>       m_region_sizes;
-    std::vector<bake::region> m_region_ids;
-    std::vector<char>         m_write_data;
+    std::vector<size_t>       m_access_sizes;
+    bake::region              m_region_id;
     std::vector<char>         m_read_data;
     bool                      m_reuse_buffer;
+    bool                      m_reuse_region;
 
     public:
 
@@ -266,6 +346,7 @@ class ReadBenchmark : public AbstractAccessBenchmark {
     ReadBenchmark(Json::Value& config, T&& ... args)
     : AbstractAccessBenchmark(config, std::forward<T>(args)...) { 
         m_reuse_buffer = getConfigBool(config, "reuse-buffer", false);
+        m_reuse_region = getConfigBool(config, "reuse-region", false);
     }
 
     virtual void setup() override {
@@ -273,24 +354,24 @@ class ReadBenchmark : public AbstractAccessBenchmark {
         auto& _tgt = target();
         auto& _ph = ph();
         // generate region sizes
-        size_t write_data_size = 0;
         size_t read_data_size = 0;
-        m_region_ids.reserve(m_num_entries);
-        m_region_sizes.reserve(m_num_entries);
+        size_t region_size = 0;
+        std::vector<char> write_data;
+        m_access_sizes.reserve(m_num_entries);
         for(unsigned i=0; i < m_num_entries; i++) {
             size_t size = m_region_size_range.first + (rand() % (m_region_size_range.second - m_region_size_range.first));
-            m_region_sizes[i] = size;
-            write_data_size = std::max(size, write_data_size);
+            m_access_sizes[i] = size;
             if(m_reuse_buffer) read_data_size = std::max(size, read_data_size);
             else read_data_size += size;
+            if(m_reuse_region) region_size = std::max(size, region_size);
+            else region_size += size;
+
         }
-        m_write_data.resize(write_data_size);
-        for(unsigned i=0; i < write_data_size; i++) {
-            m_write_data[i] = 'a' + (i%26);
+        write_data.resize(region_size);
+        for(unsigned i=0; i < region_size; i++) {
+            write_data[i] = 'a' + (i%26);
         }
-        for(unsigned i=0; i < m_num_entries; i++) {
-            m_region_ids[i] = _clt.create_write_persist(_ph, _tgt, (void*)m_write_data.data(), m_region_sizes[i]);
-        }
+        m_region_id = _clt.create_write_persist(_ph, _tgt, (void*)write_data.data(), region_size);
         m_read_data.resize(read_data_size);
     }
 
@@ -298,12 +379,75 @@ class ReadBenchmark : public AbstractAccessBenchmark {
         auto& _clt = client();
         auto& _tgt = target();
         auto& _ph = ph();
-        size_t offset = 0;
+        size_t data_offset = 0;
+        size_t region_offset = 0;
         for(unsigned i=0; i < m_num_entries; i++) {
-            size_t size = m_region_sizes[i];
-            char* data = m_reuse_buffer ? m_read_data.data() : (m_read_data.data() + offset);
-            offset += size;
-            _clt.read(_ph, m_region_ids[i], 0, (void*)data, m_region_sizes[i]);
+            size_t size = m_access_sizes[i];
+            char* data = m_read_data.data() + data_offset; 
+            _clt.read(_ph, m_region_id, region_offset, (void*)data, size);
+            if(!m_reuse_buffer) data_offset += size;
+            if(!m_reuse_region) region_offset += size;
+        }
+    }
+
+    virtual void teardown() override {
+        if(m_erase_on_teardown) {
+            auto& _clt = client();
+            auto& _tgt = target();
+            auto& _ph = ph();
+            _clt.remove(_ph, m_region_id);
+        }
+        m_access_sizes.resize(0); m_access_sizes.shrink_to_fit();
+        m_read_data.resize(0);    m_read_data.shrink_to_fit();
+    }
+};
+REGISTER_BENCHMARK("read", ReadBenchmark);
+
+/**
+ * PersistBenchmark executes a series of bake_persist
+ * operations and measures the duration of the latter.
+ */
+class PersistBenchmark : public AbstractAccessBenchmark {
+
+    protected:
+
+    std::vector<bake::region> m_region_ids;
+    std::vector<size_t>       m_access_sizes;
+
+    public:
+
+    template<typename ... T>
+    PersistBenchmark(Json::Value& config, T&& ... args)
+    : AbstractAccessBenchmark(config, std::forward<T>(args)...) { }
+
+    virtual void setup() override {
+        auto& _clt = client();
+        auto& _tgt = target();
+        auto& _ph = ph();
+        m_region_ids.resize(m_num_entries);
+        std::vector<char> write_data;
+        m_access_sizes.resize(m_num_entries);
+        for(unsigned i=0; i < m_num_entries; i++) {
+            size_t size = m_region_size_range.first + (rand() % (m_region_size_range.second - m_region_size_range.first));
+            m_access_sizes[i] = size;
+            if(size > write_data.size()) write_data.resize(size);
+        }
+        for(unsigned i=0; i < write_data.size(); i++) {
+            write_data[i] = 'a' + (i%26);
+        }
+        for(unsigned i=0; i < m_num_entries; i++) {
+            m_region_ids[i] = _clt.create(_ph, _tgt, m_access_sizes[i]);
+            _clt.write(_ph, m_region_ids[i], 0, (void*)write_data.data(), m_access_sizes[i]);
+        }
+    }
+
+    virtual void execute() override {
+        auto& _clt = client();
+        auto& _tgt = target();
+        auto& _ph = ph();
+        for(unsigned i=0; i < m_num_entries; i++) {
+            size_t size = m_access_sizes[i];
+            _clt.persist(_ph, m_region_ids[i], 0, size);
         }
     }
 
@@ -316,13 +460,11 @@ class ReadBenchmark : public AbstractAccessBenchmark {
                 _clt.remove(_ph, m_region_ids[i]);
             }
         }
-        m_region_sizes.resize(0); m_region_sizes.shrink_to_fit();
         m_region_ids.resize(0);   m_region_ids.shrink_to_fit();
-        m_read_data.resize(0);    m_read_data.shrink_to_fit();
-        m_write_data.resize(0);   m_write_data.shrink_to_fit();
+        m_access_sizes.resize(0); m_access_sizes.shrink_to_fit();
     }
 };
-REGISTER_BENCHMARK("read", ReadBenchmark);
+REGISTER_BENCHMARK("persist", PersistBenchmark);
 
 static void run_server(MPI_Comm comm, Json::Value& config);
 static void run_client(MPI_Comm comm, Json::Value& config);
