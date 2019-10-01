@@ -98,9 +98,6 @@ int main(int argc, char **argv)
 	bake_write(bph, rid, 0, buf, size);
 	/* Make all modifications persistent */
 	bake_persist(bph, rid);
-	/* Get size of region */
-	size_t check_size;
-	bake_get_size(bph, rid, &check_size);
 	/* Release provider handle */
 	bake_provider_handle_release(bph);
 	/* Release BAKE client */
@@ -146,7 +143,7 @@ This makes the provider manage the given storage target.
 Other functions are available to remove a storage target (or all storage
 targets) from a provider.
 
-## Benchmark execution example
+## Latency benchmark execution example
 
 * `./bake-latency-bench sm:///tmp/cci/sm/carns-x1/1/1 100000 4 8`
 
@@ -163,6 +160,57 @@ The second argument is the number of benchmark iterations.
 
 The third and fourth arguments specify the range of sizes to use for read and
 write operations in the benchmark.
+
+## Generic Bake benchmark
+
+By using `--enable-benchmark` when compiling Bake (or `+benchmark` when using Spack),
+you will build a `bake-benchmark` program that can be used as a configurable benchmark.
+This benchmark requires an MPI compiler, hence you may need to configure Bake with
+`CC=mpicc` and `CXX=mpicxx`.
+
+The benchmark is an MPI program that can be run on 2 or more ranks. Rank 0 will act
+as a server, while non-zero ranks act as clients. The server will not create
+a Bake target. The Bake target needs to be created (with `bake-makepool`) beforehand.
+
+The program takes as parameter the path to a JSON file containing the sequence
+of benchmarks to execute. An example of such a file is located in `src/benchmark.json`.
+Each entry in the `benchmarks` array corresponds to a benchmark. The `type` field indicates
+the type of benchmark to execute. The `repetitions` field indicates how many times the
+benchmark should be repeated.
+
+The following table describes each type of benchmark and their parameters.
+
+| type                 | parameter         | default | description                                                       |
+|----------------------|-------------------|---------|-------------------------------------------------------------------|
+|                      |                   |         |                                                                   |
+| create               | num-entries       | 1       | Number of regions to create                                       |
+|                      | region-sizes      | -       | Size of the regions, or range (e.g. [12, 24])                     |
+|                      | erase-on-teardown | true    | Whether to erase the created regions after the benchmark executed |
+|                      |                   |         |                                                                   |
+| write                | num-entries       | 1       | Number of regions to write                                        |
+|                      | region-sizes      | -       | Size of the regions, or range (e.g. [12, 24])                     |
+|                      | reuse-buffer      | false   | Whether to reuse the input buffer for each write                  |
+|                      | reuse-region      | false   | Whether to write to the same region                               |
+|                      | preregister-bulk  | false   | Whether to preregister the input buffer for RDMA                  |
+|                      | erase-on-teardown | true    | Whether to erase the created regions after the benchmark executed |
+|                      |                   |         |                                                                   |
+| persist              | num-entries       | 1       | Number of region to persist                                       |
+|                      | region-sizes      | -       | Size of the regions, or range (e.g. [12, 24])                     |
+|                      | erase-on-teardown | true    | Whether to erase the created regions after the benchmark executed |
+|                      |                   |         |                                                                   |
+| read                 | num-entries       | 1       | Number of region to read                                          |
+|                      | region-sizes      | -       | Size of the regions, or range (e.g. [12, 24])                     |
+|                      | reuse-buffer      | false   | Whether to reuse the same buffer for each read                    |
+|                      | reuse-region      | false   | Whether to access the same region for each read                   |
+|                      | preregister-bulk  | false   | Whether to preregister the client's buffer for RDMA               |
+|                      | erase-on-teardown | true    | Whether to remove the regions after the benchmark                 |
+|                      |                   |         |                                                                   |
+| create-write-persist | num-entries       | 1       | Number of regions to create/write/persist                         |
+|                      | region-sizes      | -       | Size of the regions, or range (e.g. [12, 24])                     |
+|                      | reuse-buffer      | false   | Whether to reuse the same buffer on clients for each operation    |
+|                      | preregister-bulk  | false   | Whether to preregister the client's buffer for RDMA               |
+|                      | erase-on-teardown | true    | Whether to remove the regions after the benchmark                 |
+
 
 ## Misc tips
 
