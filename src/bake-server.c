@@ -638,7 +638,7 @@ static int write_transfer_data(
     /* resolve addr, could be addr of rpc sender (normal case) or a third
      * party (proxy write)
      */
-    if(remote_addr_str)
+    if(remote_addr_str && strlen(remote_addr_str))
     {
         /* a proxy address was provided to pull write data from */
         hret = margo_addr_lookup(mid, remote_addr_str, &src_addr);
@@ -648,7 +648,9 @@ static int write_transfer_data(
     else
     {
         /* no proxy write, use the source of this request */
-        src_addr = hgi_addr;
+        hret = margo_addr_dup(mid, hgi_addr, &src_addr);
+        if(hret != HG_SUCCESS)
+            return(BAKE_ERR_MERCURY);
     }
 
     if(global_bake_provider_conf.pipeline_enable == 0)
@@ -713,8 +715,7 @@ static int write_transfer_data(
     }
 
 finish:
-    if(remote_addr_str)
-        margo_addr_free(mid, src_addr);
+    margo_addr_free(mid, src_addr);
     margo_bulk_free(bulk_handle);
 
     return(ret);
@@ -1327,7 +1328,7 @@ static void bake_read_ult(hg_handle_t handle)
 
     TIMERS_END_STEP(1);
 
-    if(in.remote_addr_str)
+    if(in.remote_addr_str && strlen(in.remote_addr_str))
     {
         /* a proxy address was provided to push read data to */
         hret = margo_addr_lookup(mid, in.remote_addr_str, &src_addr);
@@ -1340,7 +1341,12 @@ static void bake_read_ult(hg_handle_t handle)
     else
     {
         /* no proxy write, use the source of this request */
-        src_addr = hgi->addr;
+        hret = margo_addr_dup(mid, hgi->addr, &src_addr);
+        if(hret != HG_SUCCESS)
+        {
+            out.ret = BAKE_ERR_MERCURY;
+            goto finish;
+        }
     }
     hret = margo_bulk_transfer(mid, HG_BULK_PUSH, src_addr, in.bulk_handle,
             in.bulk_offset, bulk_handle, 0, size_to_read);
@@ -1361,8 +1367,7 @@ finish:
     margo_respond(handle, &out);
     TIMERS_END_STEP(3);
     TIMERS_FINALIZE();
-    if(in.remote_addr_str)
-        margo_addr_free(mid, src_addr);
+    margo_addr_free(mid, src_addr);
     margo_bulk_free(bulk_handle);
     margo_free_input(handle, &in);
     margo_destroy(handle);
@@ -1982,25 +1987,31 @@ static int set_conf_cb_pipeline_enabled(bake_provider_t provider,
     int ret;
     hg_return_t hret;
 
-    ret = sscanf(value, "%u", &global_bake_provider_conf.pipeline_enable);
-    if(ret != 1)
-        return(-1);
+    static int first_call = 1;
 
-    /* for now we don't support disabling at runtime */
-    assert(global_bake_provider_conf.pipeline_enable == 1);
+    if(first_call) {
 
-    hret = margo_bulk_poolset_create(
-            provider->mid, 
-            global_bake_provider_conf.pipeline_npools,
-            global_bake_provider_conf.pipeline_nbuffers_per_pool,
-            global_bake_provider_conf.pipeline_first_buffer_size,
-            global_bake_provider_conf.pipeline_multiplier,
-            HG_BULK_READWRITE,
-            &(provider->poolset));
-    if(hret != 0)
-        return(-1);
+        ret = sscanf(value, "%u", &global_bake_provider_conf.pipeline_enable);
+        if(ret != 1)
+            return BAKE_ERR_INVALID_ARG;
 
-    return(0);
+        if(global_bake_provider_conf.pipeline_enable) {
+            hret = margo_bulk_poolset_create(
+                    provider->mid, 
+                    global_bake_provider_conf.pipeline_npools,
+                    global_bake_provider_conf.pipeline_nbuffers_per_pool,
+                    global_bake_provider_conf.pipeline_first_buffer_size,
+                    global_bake_provider_conf.pipeline_multiplier,
+                    HG_BULK_READWRITE,
+                    &(provider->poolset));
+            if(hret != 0)
+                return BAKE_ERR_MERCURY;
+        }
+        first_call = 0; // for now we only allow setting the parameter once
+        return BAKE_SUCCESS;
+    } else {
+        return BAKE_ERR_FORBIDDEN;
+    }
 }
 
 int bake_provider_set_conf(
@@ -2013,14 +2024,8 @@ int bake_provider_set_conf(
     /* TODO: make this more generic, manually issuing callbacks for
      * particular keys right now.
      */
-
     if(strcmp(key, "pipeline_enabled") == 0)
-        ret = set_conf_cb_pipeline_enabled(provider, value);
+        return set_conf_cb_pipeline_enabled(provider, value);
     else
-    {
-        fprintf(stderr, "Error: bake_provider_set_conf() unsupported key %s\n", key);
-        return(-1);
-    }
-
-    return(ret);
+        return BAKE_ERR_INVALID_ARG;
 }

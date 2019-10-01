@@ -27,7 +27,8 @@ const char* const bake_error_messages[] = {
     "Unknown region",
     "Access out of bound",
     "REMI error",
-    "Operation not supported"
+    "Operation not supported",
+    "Forbidden operation"
 };
 
 class client;

@@ -6,6 +6,9 @@
         "rpc-thread-count" : 0,
         "target" : {
             "path" : "/dev/shm/myTarget"
+        },
+        "provider-config" : {
+            "pipeline_enabled" : "0" 
         }
     },
     "benchmarks" : [
@@ -22,6 +25,7 @@
             "num-entries" : 30,
             "region-sizes" : [ 8, 32 ],
             "reuse-buffer" : false,
+            "preregister-bulk" : true,
             "erase-on-teardown" : true
         },
         {
@@ -31,6 +35,7 @@
             "region-sizes" : [ 8, 32 ],
             "reuse-buffer" : false,
             "reuse-region" : false,
+            "preregister-bulk" : false,
             "erase-on-teardown" : true
         },
         {
@@ -40,6 +45,7 @@
             "region-sizes" : [ 8, 32 ],
             "reuse-buffer" : false,
             "reuse-region" : false,
+            "preregister-bulk" : false,
             "erase-on-teardown" : true
         },
         {

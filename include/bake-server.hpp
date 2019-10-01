@@ -167,6 +167,11 @@ class provider {
         }
         return result;
     }
+
+    void set_config(const std::string& key, const std::string& value) {
+        int ret = bake_provider_set_conf(m_provider, key.c_str(), value.c_str());
+        _CHECK_RET(ret);
+    }
 };
 
 }

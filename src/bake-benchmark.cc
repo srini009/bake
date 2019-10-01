@@ -40,6 +40,7 @@ class BenchmarkRegistration;
 class AbstractBenchmark {
 
     MPI_Comm              m_comm;    // communicator gathering all clients
+    margo_instance_id     m_mid;     // margo instance
     bake::client&         m_client;  // bake client
     bake::provider_handle m_bake_ph; // provider handle
     bake::target          m_target;  // bake target
@@ -48,11 +49,12 @@ class AbstractBenchmark {
     friend class BenchmarkRegistration;
 
     using benchmark_factory_function = std::function<
-        std::unique_ptr<AbstractBenchmark>(Json::Value&, MPI_Comm, bake::client&, const bake::provider_handle&, const bake::target&)>;
+        std::unique_ptr<AbstractBenchmark>(Json::Value&, MPI_Comm, margo_instance_id, bake::client&, const bake::provider_handle&, const bake::target&)>;
     static std::map<std::string, benchmark_factory_function> s_benchmark_factories;
 
     protected:
 
+    margo_instance_id mid() { return m_mid; }
     bake::client& client() { return m_client; }
     bake::provider_handle& ph() { return m_bake_ph; }
     bake::target& target() { return m_target; }
@@ -60,8 +62,9 @@ class AbstractBenchmark {
 
     public:
 
-    AbstractBenchmark(MPI_Comm c, bake::client& client, const bake::provider_handle& ph, const bake::target& tgt)
+    AbstractBenchmark(MPI_Comm c, margo_instance_id mid, bake::client& client, const bake::provider_handle& ph, const bake::target& tgt)
     : m_comm(c)
+    , m_mid(mid)
     , m_client(client)
     , m_bake_ph(ph)
     , m_target(tgt) {}
@@ -93,8 +96,8 @@ class BenchmarkRegistration {
     public:
     BenchmarkRegistration(const std::string& type) {
         AbstractBenchmark::s_benchmark_factories[type] = 
-            [](Json::Value& config, MPI_Comm comm, bake::client& clt, const bake::provider_handle& ph, const bake::target& tgt) {
-                return std::make_unique<T>(config, comm, clt, ph, tgt);
+            [](Json::Value& config, MPI_Comm comm, margo_instance_id mid, bake::client& clt, const bake::provider_handle& ph, const bake::target& tgt) {
+                return std::make_unique<T>(config, comm, mid, clt, ph, tgt);
         };
     }
 };
@@ -131,6 +134,8 @@ class AbstractAccessBenchmark : public AbstractBenchmark {
             throw std::range_error("invalid region-sizes range or value");
         }
         m_erase_on_teardown = getConfigBool(config, "erase-on-teardown", true);
+        size_t eager_size = getConfigInt(config, "eager-limit", 2048);
+        ph().set_eager_limit(eager_size);
     }
 };
 
@@ -197,6 +202,8 @@ class CreateWritePersistBenchmark : public AbstractAccessBenchmark {
     std::vector<bake::region> m_region_ids;
     std::vector<char>         m_data;
     bool                      m_reuse_buffer;
+    bool                      m_preregister_bulk;
+    hg_bulk_t                 m_bulk = HG_BULK_NULL;
 
     public:
 
@@ -204,6 +211,7 @@ class CreateWritePersistBenchmark : public AbstractAccessBenchmark {
     CreateWritePersistBenchmark(Json::Value& config, T&& ... args)
     : AbstractAccessBenchmark(config, std::forward<T>(args)...) { 
         m_reuse_buffer = getConfigBool(config, "reuse-buffer", false);
+        m_preregister_bulk = getConfigBool(config, "preregister-bulk", false);
     }
 
     virtual void setup() override {
@@ -221,6 +229,11 @@ class CreateWritePersistBenchmark : public AbstractAccessBenchmark {
         for(unsigned i=0; i < data_size; i++) {
             m_data[i] = 'a' + (i%26);
         }
+        if(m_preregister_bulk) {
+            void* bulk_ptr = m_data.data();
+            hg_size_t bulk_size = data_size;
+            margo_bulk_create(mid(), 1, &bulk_ptr, &bulk_size, HG_BULK_READ_ONLY, &m_bulk);
+        }
     }
 
     virtual void execute() override {
@@ -230,9 +243,12 @@ class CreateWritePersistBenchmark : public AbstractAccessBenchmark {
         size_t offset = 0;
         for(unsigned i=0; i < m_num_entries; i++) {
             size_t size = m_region_sizes[i];
-            char* data = m_reuse_buffer ? m_data.data() : (m_data.data() + offset);
-            offset += size;
-            m_region_ids[i] = _clt.create_write_persist(_ph, _tgt, (void*)data, m_region_sizes[i]);
+            if(m_preregister_bulk) {
+                m_region_ids[i] = _clt.create_write_persist(_ph, _tgt, m_bulk, offset, "",  m_region_sizes[i]);
+            } else {
+                m_region_ids[i] = _clt.create_write_persist(_ph, _tgt, m_data.data()+offset, m_region_sizes[i]);
+            }
+            if(!m_reuse_buffer) offset += size;
         }
     }
 
@@ -245,6 +261,7 @@ class CreateWritePersistBenchmark : public AbstractAccessBenchmark {
                 _clt.remove(_ph, m_region_ids[i]);
             }
         }
+        if(m_preregister_bulk) margo_bulk_free(m_bulk);
         m_region_sizes.resize(0); m_region_sizes.shrink_to_fit();
         m_region_ids.resize(0);   m_region_ids.shrink_to_fit();
         m_data.resize(0);         m_data.shrink_to_fit();
@@ -265,6 +282,8 @@ class WriteBenchmark : public AbstractAccessBenchmark {
     std::vector<char>         m_data;
     bool                      m_reuse_buffer;
     bool                      m_reuse_region;
+    bool                      m_preregister_bulk;
+    hg_bulk_t                 m_bulk;
 
     public:
 
@@ -273,6 +292,7 @@ class WriteBenchmark : public AbstractAccessBenchmark {
     : AbstractAccessBenchmark(config, std::forward<T>(args)...) { 
         m_reuse_buffer = getConfigBool(config, "reuse-buffer", false);
         m_reuse_region = getConfigBool(config, "reuse-region", false);
+        m_preregister_bulk = getConfigBool(config, "preregister-bulk", false);
     }
 
     virtual void setup() override {
@@ -296,6 +316,11 @@ class WriteBenchmark : public AbstractAccessBenchmark {
             m_data[i] = 'a' + (i%26);
         }
         m_region_id = _clt.create(_ph, _tgt, region_size);
+        if(m_preregister_bulk) {
+            void* bulk_ptr = m_data.data();
+            hg_size_t bulk_size = data_size;
+            margo_bulk_create(mid(), 1, &bulk_ptr, &bulk_size, HG_BULK_READ_ONLY, &m_bulk);
+        }
     }
 
     virtual void execute() override {
@@ -306,8 +331,12 @@ class WriteBenchmark : public AbstractAccessBenchmark {
         size_t region_offset = 0;
         for(unsigned i=0; i < m_num_entries; i++) {
             size_t size = m_access_sizes[i];
-            char* data = m_data.data() + data_offset;
-            _clt.write(_ph, m_region_id, region_offset, (void*)data, size);
+            if(m_preregister_bulk) {
+                _clt.write(_ph, m_region_id, region_offset, m_bulk, data_offset, "",  size);
+            } else {
+                char* data = m_data.data() + data_offset;
+                _clt.write(_ph, m_region_id, region_offset, (void*)data, size);
+            }
             if(!m_reuse_buffer) data_offset += size;
             if(!m_reuse_region) region_offset += size;
         }
@@ -322,6 +351,9 @@ class WriteBenchmark : public AbstractAccessBenchmark {
         }
         m_access_sizes.resize(0); m_access_sizes.shrink_to_fit();
         m_data.resize(0);         m_data.shrink_to_fit();
+        if(m_preregister_bulk) {
+            margo_bulk_free(m_bulk);
+        }
     }
 };
 REGISTER_BENCHMARK("write", WriteBenchmark);
@@ -339,6 +371,8 @@ class ReadBenchmark : public AbstractAccessBenchmark {
     std::vector<char>         m_read_data;
     bool                      m_reuse_buffer;
     bool                      m_reuse_region;
+    bool                      m_preregister_bulk;
+    hg_bulk_t                 m_bulk;
 
     public:
 
@@ -347,6 +381,7 @@ class ReadBenchmark : public AbstractAccessBenchmark {
     : AbstractAccessBenchmark(config, std::forward<T>(args)...) { 
         m_reuse_buffer = getConfigBool(config, "reuse-buffer", false);
         m_reuse_region = getConfigBool(config, "reuse-region", false);
+        m_preregister_bulk = getConfigBool(config, "preregister-bulk", false);
     }
 
     virtual void setup() override {
@@ -373,6 +408,11 @@ class ReadBenchmark : public AbstractAccessBenchmark {
         }
         m_region_id = _clt.create_write_persist(_ph, _tgt, (void*)write_data.data(), region_size);
         m_read_data.resize(read_data_size);
+        if(m_preregister_bulk) {
+            void* bulk_ptr = m_read_data.data();
+            hg_size_t bulk_size = read_data_size;
+            margo_bulk_create(mid(), 1, &bulk_ptr, &bulk_size, HG_BULK_WRITE_ONLY, &m_bulk);
+        }
     }
 
     virtual void execute() override {
@@ -383,8 +423,12 @@ class ReadBenchmark : public AbstractAccessBenchmark {
         size_t region_offset = 0;
         for(unsigned i=0; i < m_num_entries; i++) {
             size_t size = m_access_sizes[i];
-            char* data = m_read_data.data() + data_offset; 
-            _clt.read(_ph, m_region_id, region_offset, (void*)data, size);
+            if(m_preregister_bulk) {
+                _clt.read(_ph, m_region_id, region_offset, m_bulk, data_offset, "",  size);
+            } else {
+                char* data = m_read_data.data() + data_offset;
+                _clt.read(_ph, m_region_id, region_offset, (void*)data, size);
+            }
             if(!m_reuse_buffer) data_offset += size;
             if(!m_reuse_region) region_offset += size;
         }
@@ -399,6 +443,9 @@ class ReadBenchmark : public AbstractAccessBenchmark {
         }
         m_access_sizes.resize(0); m_access_sizes.shrink_to_fit();
         m_read_data.resize(0);    m_read_data.shrink_to_fit();
+        if(m_preregister_bulk) {
+            margo_bulk_free(m_bulk);
+        }
     }
 };
 REGISTER_BENCHMARK("read", ReadBenchmark);
@@ -521,6 +568,7 @@ static void run_server(MPI_Comm comm, Json::Value& config) {
     auto& server_config = config["server"];
     bool use_progress_thread = server_config["use-progress-thread"].asBool();
     int  rpc_thread_count = server_config["rpc-thread-count"].asInt();
+    auto& provider_config = server_config["provider-config"];
     mid = margo_init(protocol.c_str(), MARGO_SERVER_MODE, use_progress_thread, rpc_thread_count);
     margo_enable_remote_shutdown(mid);
     // serialize server address
@@ -539,6 +587,11 @@ static void run_server(MPI_Comm comm, Json::Value& config) {
     auto& target_config = server_config["target"];
     std::string tgt_path = target_config["path"].asString();
     provider->add_storage_target(tgt_path);
+    for(auto it = provider_config.begin(); it != provider_config.end(); it++) {
+        std::string key = it.key().asString();
+        std::string value = provider_config[key].asString();
+        provider->set_config(key.c_str(), value.c_str());
+    }
     // notify clients that the database is ready
     MPI_Barrier(MPI_COMM_WORLD);
     // wait for finalize
@@ -584,7 +637,7 @@ static void run_client(MPI_Comm comm, Json::Value& config) {
         for(auto& bench_config : config["benchmarks"]) {
             std::string type = bench_config["type"].asString();
             types.push_back(type);
-            benchmarks.push_back(AbstractBenchmark::create(type, bench_config, comm, client, ph, target));
+            benchmarks.push_back(AbstractBenchmark::create(type, bench_config, comm, mid, client, ph, target));
             repetitions.push_back(bench_config["repetitions"].asUInt());
         }
         // main execution loop
