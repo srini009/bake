@@ -488,7 +488,7 @@ inline std::vector<target> client::probe(
         tids.resize(1);
         max_targets = 1;
         while(true) {
-            bake_probe(ph.m_ph, max_targets, tids.data(), &num_tgts);
+            ret = bake_probe(ph.m_ph, max_targets, tids.data(), &num_tgts);
             _CHECK_RET(ret);
             if(num_tgts <  max_targets)
                 break;
