@@ -47,7 +47,7 @@ typedef struct {
  * @param a string to print out before the error
  * @param ret error code from a bake routine
  */
-void bake_perror(char *s, int ret);
+void bake_perror(const char *s, int ret);
 
 /**
  * @brief Converts a target id into an ASCII readable string.

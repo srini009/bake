@@ -56,7 +56,7 @@ static char * bake_err_str(int ret)
             break;
     }
 }
-void bake_perror(char *s, int err)
+void bake_perror(const char *s, int err)
 {
     char error_string[256];
     char *p;
