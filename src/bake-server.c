@@ -1836,9 +1836,6 @@ static void bake_server_finalize_cb(void *data)
 
     ABT_rwlock_free(&(provider->lock));
 
-    if(provider->poolset)
-        margo_bulk_poolset_destroy(provider->poolset);
-
     free(provider);
 
     return;
