@@ -543,7 +543,6 @@ DEFINE_MARGO_RPC_HANDLER(bake_persist_ult)
 static void bake_create_write_persist_ult(hg_handle_t handle)
 {
     DECLARE_LOCAL_VARS(create_write_persist);
-    ABT_pool handler_pool;
     FIND_PROVIDER;
     GET_RPC_INPUT;
     LOCK_PROVIDER;
@@ -983,8 +982,6 @@ int bake_provider_set_conf(
         const char *key,
         const char *value)
 {
-    int ret;
-
     /* TODO: make this more generic, manually issuing callbacks for
      * particular keys right now.
      */

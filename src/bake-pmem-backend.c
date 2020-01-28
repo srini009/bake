@@ -130,6 +130,7 @@ static int bake_pmem_backend_finalize(backend_context_t context)
     free(entry->filename);
     free(entry->root);
     free(entry);
+    return 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////
@@ -272,7 +273,6 @@ static int bake_pmem_write_raw(backend_context_t context,
                                size_t size,
                                const void* data)
 {
-    bake_pmem_entry_t *entry = (bake_pmem_entry_t*)context;
     char* ptr = NULL;
     pmemobj_region_id_t* prid = (pmemobj_region_id_t*)rid.data;
     /* find memory address for target object */
@@ -321,7 +321,6 @@ static int bake_pmem_read_raw(backend_context_t context,
                               uint64_t* data_size,
                               free_fn* free_data)
 {
-    bake_pmem_entry_t *entry = (bake_pmem_entry_t*)context;
     *free_data = NULL;
     *data = NULL;
     *data_size = 0;
@@ -425,7 +424,6 @@ static int bake_pmem_persist(backend_context_t context,
                              size_t offset,
                              size_t size)
 {
-    bake_pmem_entry_t *entry = (bake_pmem_entry_t*)context;
     char* ptr = NULL;
     pmemobj_region_id_t* prid = (pmemobj_region_id_t*)rid.data;
     /* find memory address for target object */
@@ -706,7 +704,7 @@ static int bake_pmem_set_conf(backend_context_t context,
                               const char* key,
                               const char* value)
 {
-
+    return 0;
 }
 
 bake_backend g_bake_pmem_backend = {
