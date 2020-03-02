@@ -685,7 +685,7 @@ static void run_client(MPI_Comm comm, Json::Value& config) {
                 std::sort(global_timings.begin(), global_timings.end());
                 double min = global_timings[0];
                 double max = global_timings[global_timings.size()-1];
-                double median = (n % 2) ? global_timings[n/2] : ((global_timings[n/2] + global_timings[n/2 + 1])/2.0);
+                double median = (n % 2) ? global_timings[n/2] : ((global_timings[n/2] + global_timings[n/2 - 1])/2.0);
                 double q1 = global_timings[n/4];
                 double q3 = global_timings[(3*n)/4];
                 std::cout << std::setprecision(9) << std::fixed;
