@@ -780,6 +780,7 @@ DEFINE_MARGO_RPC_HANDLER(bake_migrate_region_ult)
 
 static void bake_migrate_target_ult(hg_handle_t handle)
 {
+#ifdef USE_REMI
     DECLARE_LOCAL_VARS(migrate_target);
     int ret;
     in.dest_remi_addr = NULL;
@@ -789,8 +790,6 @@ static void bake_migrate_target_ult(hg_handle_t handle)
     hg_addr_t dest_addr = HG_ADDR_NULL;
 
     memset(&out, 0, sizeof(out));
-
-#ifdef USE_REMI
 
     remi_provider_handle_t remi_ph = REMI_PROVIDER_HANDLE_NULL;
     remi_fileset_t local_fileset = REMI_FILESET_NULL;
@@ -847,22 +846,23 @@ static void bake_migrate_target_ult(hg_handle_t handle)
     LOCK_PROVIDER;
 
     out.ret = BAKE_SUCCESS;
-
-#else
-
-    out.ret = BAKE_ERR_OP_UNSUPPORTED;
-
-#endif
-
 finish:
     UNLOCK_PROVIDER;
-#ifdef USE_REMI
     remi_fileset_free(local_fileset);
     remi_provider_handle_release(remi_ph);
-#endif
     margo_addr_free(mid, dest_addr);
     RESPOND_AND_CLEANUP;
+
+#else /* if USE_REMI undefined */
+    bake_migrate_target_out_t out;
+    out.ret = BAKE_ERR_OP_UNSUPPORTED;
+    margo_respond(handle, &out);
+    margo_destroy(handle);
+    return;
+#endif
 }
+
+
 DEFINE_MARGO_RPC_HANDLER(bake_migrate_target_ult)
 
 static void bake_server_finalize_cb(void *data)
