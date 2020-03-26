@@ -163,7 +163,7 @@ int main(int argc, char **argv)
         return(-1);
     }
 
-    bake_print_dbg_region_id_t(region_str, 127, rid);
+    bake_region_id_to_string(rid, region_str, 128);
     printf("# created bake region %s\n", region_str);
 
     /* transfer data */
