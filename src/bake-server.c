@@ -384,7 +384,7 @@ int bake_provider_list_storage_targets(
 
 #define DECLARE_LOCAL_VARS(rpc_name)               \
     margo_instance_id mid = MARGO_INSTANCE_NULL;   \
-    bake_##rpc_name##_out_t out;                   \
+    bake_##rpc_name##_out_t out = {0};             \
     bake_##rpc_name##_in_t in;                     \
     hg_return_t hret;                              \
     ABT_rwlock lock = ABT_RWLOCK_NULL;             \
