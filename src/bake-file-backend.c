@@ -24,9 +24,9 @@
  */
 
 /* TODO: determine proper alignment at runtime if possible */
-#define BAKE_ALIGNMENT 512
-#define BAKE_ALIGN_UP(x) ( (((unsigned long)(x)) + 511)  & (~(511)) )
-#define BAKE_ALIGN_DOWN(x) ((unsigned long)(x) & (~(511)))
+#define BAKE_ALIGNMENT 4096
+#define BAKE_ALIGN_UP(x) ( (((unsigned long)(x)) + 4095)  & (~(4095)) )
+#define BAKE_ALIGN_DOWN(x) ((unsigned long)(x) & (~(4095)))
 
 #define TRANSFER_DATA_READ 1
 #define TRANSFER_DATA_WRITE 2
