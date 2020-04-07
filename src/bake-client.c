@@ -278,7 +278,7 @@ int bake_provider_handle_get_info(bake_provider_handle_t handle,
     hg_return_t hret = HG_SUCCESS;
     if(handle == BAKE_PROVIDER_HANDLE_NULL) return BAKE_ERR_INVALID_ARG;
     if(client) *client = handle->client;
-    if(addr) hret = margo_addr_dup(handle->mid, handle->addr, addr);
+    if(addr) hret = margo_addr_dup(handle->client->mid, handle->addr, addr);
     if(provider_id) *provider_id = handle->provider_id;
     if(hret != HG_SUCCESS)
         ret = BAKE_ERR_MERCURY;
