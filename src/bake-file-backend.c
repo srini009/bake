@@ -176,7 +176,7 @@ static int bake_file_backend_initialize(bake_provider_t provider,
 
     /* initialize an abt-io instance just for this target */
     /* TODO: make number of backing threads tunable */
-    new_entry->abtioi = abt_io_init(8);
+    new_entry->abtioi = abt_io_init(16);
     if(!new_entry->abtioi)
     {
         ret = BAKE_ERR_IO;
