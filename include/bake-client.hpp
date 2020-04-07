@@ -409,7 +409,7 @@ class provider_handle {
             const client& clt,
             hg_addr_t addr,
             uint16_t provider_id=0) 
-    : m_provider_id(provider_id) {
+    {
         int ret = bake_provider_handle_create(clt.m_client,
                 addr, provider_id, &m_ph);
         _CHECK_RET(ret);
@@ -420,7 +420,7 @@ class provider_handle {
      */
     provider_handle(const provider_handle& other) 
     : m_ph(other.m_ph)
-    , m_provider_id(other.m_provider_id) {
+    {
         if(m_ph != BAKE_PROVIDER_HANDLE_NULL) {
             int ret = bake_provider_handle_ref_incr(m_ph);
             _CHECK_RET(ret);
@@ -432,7 +432,7 @@ class provider_handle {
      */
     provider_handle(provider_handle&& other)
     : m_ph(other.m_ph)
-    , m_provider_id(other.m_provider_id) {
+    {
         other.m_ph = BAKE_PROVIDER_HANDLE_NULL;
     }
 
@@ -446,7 +446,6 @@ class provider_handle {
             _CHECK_RET(ret);
         }
         m_ph = other.m_ph;
-        m_provider_id = other.m_provider_id;
         int ret = bake_provider_handle_ref_incr(m_ph);
         _CHECK_RET(ret);
         return *this;
@@ -462,7 +461,6 @@ class provider_handle {
             _CHECK_RET(ret);
         }
         m_ph = other.m_ph;
-        m_provider_id = other.m_provider_id;
         other.m_ph = BAKE_PROVIDER_HANDLE_NULL;
         return *this;
     }
