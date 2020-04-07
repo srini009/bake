@@ -269,15 +269,15 @@ int bake_provider_handle_ref_incr(bake_provider_handle_t handle)
     return BAKE_SUCCESS;
 }
 
-int bake_provider_get_info(bake_provider_handle_t handle,
-                           margo_instance_id *mid,
+int bake_provider_handle_get_info(bake_provider_handle_t handle,
+                           bake_client_t *client,
                            hg_addr_t *addr,
                            uint16_t *provider_id)
 {
     int ret = BAKE_SUCCESS;
     hg_return_t hret = HG_SUCCESS;
     if(handle == BAKE_PROVIDER_HANDLE_NULL) return BAKE_ERR_INVALID_ARG;
-    if(mid) *mid = handle->mid;
+    if(client) *client = handle->client;
     if(addr) hret = margo_addr_dup(handle->mid, handle->addr, addr);
     if(provider_id) *provider_id = handle->provider_id;
     if(hret != HG_SUCCESS)

@@ -77,16 +77,16 @@ int bake_provider_handle_ref_incr(bake_provider_handle_t handle);
  * margo_addr_free.
  *
  * @param handle Provider handle
- * @param mid Returned margo instance (ignored if NULL)
+ * @param client Returned bake client (ignored if NULL)
  * @param addr Returned address (ignored if NULL)
  * @param provider_id Returned provider id (ignored if NULL)
  *
  * @return BAKE_SUCCESS or corresponding error code. 
  */
-int bake_provider_get_info(bake_provider_handle_t handle,
-                           margo_instance_id *mid,
-                           hg_addr_t *addr,
-                           uint16_t *provider_id);
+int bake_provider_handle_get_info(bake_provider_handle_t handle,
+                                  bake_client_t *client,
+                                  hg_addr_t *addr,
+                                  uint16_t *provider_id);
 
 /**
  * Get the limit (in bytes) bellow which this provider handle will use
