@@ -389,7 +389,6 @@ class provider_handle {
     friend class client;
 
     bake_provider_handle_t m_ph = BAKE_PROVIDER_HANDLE_NULL;
-    uint16_t               m_provider_id;
 
     public:
 
@@ -480,7 +479,21 @@ class provider_handle {
      * @brief Returns the provider id.
      */
     uint16_t provider_id() const {
-        return m_provider_id;
+        uint16_t result;
+        int ret = bake_provider_handle_get_info(m_ph, NULL, NULL, &result);
+        _CHECK_RET(ret);
+        return result;
+    }
+
+    /**
+     * @brief Returns the address of the provider handle.
+     * It is up to the caller to free the returned address.
+     */
+    hg_addr_t address() const {
+        hg_addr_t addr = HG_ADDR_NULL;
+        int ret = bake_provider_handle_get_info(m_ph, NULL, &addr, NULL);
+        _CHECK_RET(ret);
+        return addr;
     }
 
     /**
