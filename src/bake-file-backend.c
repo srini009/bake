@@ -578,6 +578,37 @@ static int bake_file_set_conf(backend_context_t context,
     return 0;
 }
 
+static int bake_file_create_fileset(backend_context_t context,
+                                    remi_fileset_t* fileset)
+{
+#ifdef USE_REMI
+    bake_file_entry_t *entry = (bake_file_entry_t*)context;
+    int ret;
+    /* create a fileset */
+    ret = remi_fileset_create("bake", entry->root, fileset);
+    if(ret != REMI_SUCCESS) {
+        ret = BAKE_ERR_REMI;
+        goto error;
+    }
+
+    /* fill the fileset */
+    ret = remi_fileset_register_file(*fileset, entry->filename);
+    if(ret != REMI_SUCCESS) {
+        ret = BAKE_ERR_REMI;
+        goto error;
+    }
+
+finish:
+    return ret;
+error:
+    remi_fileset_free(*fileset);
+    *fileset = NULL;
+    goto finish;
+#else
+    return BAKE_ERR_OP_UNSUPPORTED;
+#endif
+}
+
 bake_backend g_bake_file_backend = {
     .name                       = "file",
     ._initialize                = bake_file_backend_initialize,
@@ -594,9 +625,7 @@ bake_backend g_bake_file_backend = {
     ._get_region_data           = bake_file_get_region_data,
     ._remove                    = bake_file_remove,
     ._migrate_region            = bake_file_migrate_region,
-#ifdef USE_REMI
     ._create_fileset            = bake_file_create_fileset,
-#endif
     ._set_conf                  = bake_file_set_conf
 };
 
