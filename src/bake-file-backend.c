@@ -7,6 +7,10 @@
 /* for O_DIRECT */
 #define _GNU_SOURCE
 #include <assert.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
 #include <abt-io.h>
 #include "bake-config.h"
 #include "bake.h"
@@ -158,6 +162,7 @@ static int bake_file_backend_initialize(bake_provider_t provider,
     new_entry->log_fd = -1;
     const char *tmp;
     ptrdiff_t d;
+    struct stat statbuf;
 
     if(!provider->config.pipeline_enable)
     {
@@ -190,11 +195,18 @@ static int bake_file_backend_initialize(bake_provider_t provider,
         ret = BAKE_ERR_IO;
         goto error_cleanup;
     }
-    /* TODO: is this code path used for existing targets too?  If so, need
-     * to set log offset appropriately
-     */
-    new_entry->log_offset = BAKE_ALIGNMENT;  /* skip over header info */
+
+    /* check size of log to see where to pick up with new entries */
+    /* TODO: abt-io version of this fn */
+    ret = fstat(new_entry->log_fd, &statbuf);
+    if(ret < 0)
+    {
+        perror("fstat");
+        ret = BAKE_ERR_IO;
+        goto error_cleanup;
+    }
     ABT_mutex_create(&new_entry->log_offset_mutex);
+    new_entry->log_offset = statbuf.st_size;
 
     /* check to make sure the root is properly set */
     ret = posix_memalign((void**)(&new_entry->file_root),
