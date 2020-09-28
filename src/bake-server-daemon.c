@@ -228,6 +228,7 @@ int main(int argc, char **argv)
     if(mid == MARGO_INSTANCE_NULL)
     {
         fprintf(stderr, "Error: margo_init()\n");
+        mochi_cfg_release_component(cfg);
         return(-1);
     }
     free(cfg_str);
@@ -250,6 +251,7 @@ int main(int argc, char **argv)
         {
             fprintf(stderr, "Error: margo_addr_self()\n");
             margo_finalize(mid);
+            mochi_cfg_release_component(cfg);
             return(-1);
         }
         hret = margo_addr_to_string(mid, self_addr_str, &self_addr_str_sz, self_addr);
@@ -258,6 +260,7 @@ int main(int argc, char **argv)
             fprintf(stderr, "Error: margo_addr_to_string()\n");
             margo_addr_free(mid, self_addr);
             margo_finalize(mid);
+            mochi_cfg_release_component(cfg);
             return(-1);
         }
         margo_addr_free(mid, self_addr);
@@ -267,6 +270,7 @@ int main(int argc, char **argv)
         {
             perror("fopen");
             margo_finalize(mid);
+            mochi_cfg_release_component(cfg);
             return(-1);
         }
 
@@ -285,6 +289,7 @@ int main(int argc, char **argv)
         {
             fprintf(stderr, "Error: hit provider limit of %d\n", MAX_PROVIDERS);
             margo_finalize(mid);
+            mochi_cfg_release_component(cfg);
             return(-1);
         }
         ret = bake_provider_register_json(mid, prov_index+1,
@@ -295,6 +300,7 @@ int main(int argc, char **argv)
         {
             bake_perror( "Error: bake_provider_register_json()", ret);
             margo_finalize(mid);
+            mochi_cfg_release_component(cfg);
             return(-1);
         }
         free(prov_cfg_string);
@@ -308,6 +314,7 @@ int main(int argc, char **argv)
             {
                 bake_perror("Error: bake_provider_add_storage_target()", ret);
                 margo_finalize(mid);
+                mochi_cfg_release_component(cfg);
                 return(-1);
             }
 
@@ -345,6 +352,7 @@ int main(int argc, char **argv)
     /* suspend until the BAKE server gets a shutdown signal from the client */
     margo_wait_for_finalize(mid);
 
+    mochi_cfg_release_component(cfg);
     free(opts.bake_pools);
 
     return(0);
