@@ -224,7 +224,15 @@ int main(int argc, char **argv)
     /* start margo */
     mochi_cfg_get_object(cfg, "margo", &margo_cfg);
     cfg_str = mochi_cfg_emit(margo_cfg, "margo");
-    mid = margo_init_json(cfg_str);
+    struct margo_init_info mid_info = {
+        .json_config = cfg_str,
+        .progress_pool = ABT_POOL_NULL,
+        .rpc_pool = ABT_POOL_NULL,
+        .hg_class = NULL,
+        .hg_context = NULL,
+        .hg_init_info = NULL
+    };
+    mid = margo_init_ext(opts.listen_addr_str, MARGO_SERVER_MODE, &mid_info);
     if(mid == MARGO_INSTANCE_NULL)
     {
         fprintf(stderr, "Error: margo_init()\n");
