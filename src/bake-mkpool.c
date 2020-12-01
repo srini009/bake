@@ -36,7 +36,7 @@ int parse_size(char *str, size_t *size_out)
     const char *suffixes[] = { "B", "K", "M", "G", "T", "P" };
     size_t size_mults[] = { 1ULL, 1ULL << 10, 1ULL << 20, 1ULL << 30, 1ULL << 40, 1ULL << 50 };
     size_t size;
-    char suff[3] = {0};
+    char suff[2] = {0};
     int i;
     int ret;
 
