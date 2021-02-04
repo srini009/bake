@@ -10,6 +10,11 @@
 #include <margo.h>
 #include <libpmemobj.h>
 #include <bake.h>
+//#ifdef USE_SYMBIOMON
+#include <symbiomon/symbiomon-server.h>
+#include <symbiomon/symbiomon-metric.h>
+#include <symbiomon/symbiomon-common.h>
+//#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -152,6 +157,10 @@ int bake_target_set_conf(bake_provider_t  provider,
                          const char*      key,
                          const char*      value);
 
+//#ifdef USE_SYMBIOMON
+/* Set symbiomon_provider_t instance for metrics reporting*/
+int bake_provider_set_symbiomon(bake_provider_t provider, symbiomon_provider_t metric_provider);
+//#endif
 #ifdef __cplusplus
 }
 #endif

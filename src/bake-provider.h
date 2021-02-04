@@ -21,6 +21,12 @@
 #include "bake-backend.h"
 #include "uthash.h"
 
+#ifdef USE_SYMBIOMON
+#include <symbiomon/symbiomon-metric.h>
+#include <symbiomon/symbiomon-common.h>
+#include <symbiomon/symbiomon-server.h>
+#endif
+
 typedef struct {
     bake_target_id_t  target_id;
     backend_context_t context;
@@ -73,6 +79,11 @@ typedef struct bake_provider {
     hg_id_t rpc_remove_id;
     hg_id_t rpc_migrate_region_id;
     hg_id_t rpc_migrate_target_id;
+
+#ifdef USE_SYMBIOMON
+    symbiomon_provider_t metric_provider;
+    symbiomon_metric_t write_latency;
+#endif
 
 } bake_provider;
 

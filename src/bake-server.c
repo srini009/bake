@@ -22,6 +22,12 @@
 #include "bake-timing.h"
 #include "bake-provider.h"
 
+#ifdef USE_SYMBIOMON
+#include <symbiomon/symbiomon-metric.h>
+#include <symbiomon/symbiomon-common.h>
+#include <symbiomon/symbiomon-server.h>
+#endif
+
 extern bake_backend g_bake_pmem_backend;
 extern bake_backend g_bake_file_backend;
 
@@ -257,6 +263,11 @@ int bake_provider_register(margo_instance_id mid,
     }
 #endif
 
+#ifdef USE_SYMBIOMON
+    /* Set the SYMBIOMON metric provider to NULL */
+    tmp_provider->metric_provider = NULL;
+#endif
+
     /* install the bake server finalize callback */
     margo_provider_push_finalize_callback(
         mid, tmp_provider, &bake_server_finalize_cb, tmp_provider);
@@ -265,6 +276,21 @@ int bake_provider_register(margo_instance_id mid,
 
     return BAKE_SUCCESS;
 }
+
+#ifdef USE_SYMBIOMON
+extern "C" int bake_provider_set_symbiomon(bake_provider_t provider, symbiomon_provider_t metric_provider)
+{
+    provider->metric_provider = metric_provider;
+
+    fprintf(stderr, "Successfully set the SYMBIOMON provider\n");
+    symbiomon_taglist_t taglist;
+
+    symbiomon_taglist_create(&taglist, 1, "dummytag");
+    symbiomon_metric_create("bake", "write_latency", SYMBIOMON_TYPE_TIMER, "bake:write latency in seconds", taglist, &provider->write_latency, provider->metric_provider);
+
+    return BAKE_SUCCESS;
+}
+#endif
 
 int bake_provider_destroy(bake_provider_t provider)
 {
@@ -485,6 +511,9 @@ static void bake_write_ult(hg_handle_t handle)
     LOCK_PROVIDER;
     FIND_TARGET;
 
+    double start, end;
+    start = ABT_get_wtime();
+
     memset(&out, 0, sizeof(out));
     hg_addr_t src_addr = HG_ADDR_NULL;
     if (in.remote_addr_str && strlen(in.remote_addr_str)) {
@@ -500,6 +529,12 @@ static void bake_write_ult(hg_handle_t handle)
     out.ret = target->backend->_write_bulk(
         target->context, in.rid, in.region_offset, in.bulk_size, in.bulk_handle,
         src_addr, in.bulk_offset);
+
+    end = ABT_get_wtime();
+#ifdef USE_SYMBIOMON
+    symbiomon_metric_update(provider->write_latency, (end-start));
+    fprintf(stderr, "Write Latency value: %lf\n", end-start);
+#endif
 
 finish:
     UNLOCK_PROVIDER;

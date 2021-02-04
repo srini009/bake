@@ -151,6 +151,10 @@ class provider {
         return count;
     }
 
+    int set_symbiomon_provider(symbiomon_provider_t metric_provider) {
+        return bake_provider_set_symbiomon(m_provider, metric_provider);
+    }
+
     /**
      * @brief Lists all the storage targets managed by the provider.
      *
