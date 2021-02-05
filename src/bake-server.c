@@ -278,7 +278,7 @@ int bake_provider_register(margo_instance_id mid,
 }
 
 #ifdef USE_SYMBIOMON
-extern "C" int bake_provider_set_symbiomon(bake_provider_t provider, symbiomon_provider_t metric_provider)
+int bake_provider_set_symbiomon(bake_provider_t provider, symbiomon_provider_t metric_provider)
 {
     provider->metric_provider = metric_provider;
 
