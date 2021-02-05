@@ -287,6 +287,9 @@ int bake_provider_set_symbiomon(bake_provider_t provider, symbiomon_provider_t m
 
     symbiomon_taglist_create(&taglist, 1, "dummytag");
     symbiomon_metric_create("bake", "write_latency", SYMBIOMON_TYPE_TIMER, "bake:write latency in seconds", taglist, &provider->write_latency, provider->metric_provider);
+    symbiomon_metric_create("bake", "eager_write_latency", SYMBIOMON_TYPE_TIMER, "bake:eager_write latency in seconds", taglist, &provider->eager_write_latency, provider->metric_provider);
+    symbiomon_metric_create("bake", "eager_write_size", SYMBIOMON_TYPE_GAUGE, "bake:eager_write data size", taglist, &provider->eager_write_size, provider->metric_provider);
+    symbiomon_metric_create("bake", "write_size", SYMBIOMON_TYPE_GAUGE, "bake:write data size", taglist, &provider->write_size, provider->metric_provider);
 
     return BAKE_SUCCESS;
 }
@@ -533,7 +536,8 @@ static void bake_write_ult(hg_handle_t handle)
     end = ABT_get_wtime();
 #ifdef USE_SYMBIOMON
     symbiomon_metric_update(provider->write_latency, (end-start));
-    fprintf(stderr, "Write Latency value: %lf\n", end-start);
+    symbiomon_metric_update(provider->write_size, in.bulk_size);
+    fprintf(stderr, "Write Latency value: %lf and size: %lu\n", end-start, in.bulk_size);
 #endif
 
 finish:
@@ -546,6 +550,9 @@ DEFINE_MARGO_RPC_HANDLER(bake_write_ult)
 /* service a remote RPC that writes to a BAKE region in eager mode */
 static void bake_eager_write_ult(hg_handle_t handle)
 {
+
+    double start, end;
+    start = ABT_get_wtime();
     DECLARE_LOCAL_VARS(eager_write);
     in.buffer = NULL;
     in.size   = 0;
@@ -556,7 +563,12 @@ static void bake_eager_write_ult(hg_handle_t handle)
 
     out.ret = target->backend->_write_raw(target->context, in.rid,
                                           in.region_offset, in.size, in.buffer);
-
+    end = ABT_get_wtime();
+#ifdef USE_SYMBIOMON
+    symbiomon_metric_update(provider->eager_write_latency, (end-start));
+    symbiomon_metric_update(provider->eager_write_size, in.size);
+    fprintf(stderr, "Eager write Latency value: %lf and size: %lu\n", end-start, in.size);
+#endif
 finish:
     UNLOCK_PROVIDER;
     RESPOND_AND_CLEANUP;

@@ -83,6 +83,9 @@ typedef struct bake_provider {
 #ifdef USE_SYMBIOMON
     symbiomon_provider_t metric_provider;
     symbiomon_metric_t write_latency;
+    symbiomon_metric_t eager_write_latency;
+    symbiomon_metric_t write_size;
+    symbiomon_metric_t eager_write_size;
 #endif
 
 } bake_provider;
