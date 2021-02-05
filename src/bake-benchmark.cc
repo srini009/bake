@@ -598,6 +598,7 @@ static void run_server(MPI_Comm comm, Json::Value& config) {
 
     /* initialize SYMBIOMON */
     struct symbiomon_provider_args args = SYMBIOMON_PROVIDER_ARGS_INIT;
+    args.push_finalize_callback = 0;
 
     symbiomon_provider_t metric_provider;
     int ret = symbiomon_provider_register(mid, 42, &args, &metric_provider);
