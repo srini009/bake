@@ -266,6 +266,7 @@ int bake_provider_register(margo_instance_id mid,
 #ifdef USE_SYMBIOMON
     /* Set the SYMBIOMON metric provider to NULL */
     tmp_provider->metric_provider = NULL;
+    tmp_provider->provider_id = provider_id;
 #endif
 
     /* install the bake server finalize callback */
@@ -297,6 +298,23 @@ int bake_provider_set_symbiomon(bake_provider_t provider, symbiomon_provider_t m
 
 int bake_provider_destroy(bake_provider_t provider)
 {
+#ifdef USE_SYMBIOMON
+    fprintf(stderr, "BAKE provider destroy invoked\n");
+    int pid = getpid();
+    char * pid_el = (char*)malloc(20);
+    char * pid_es = (char*)malloc(20);
+    char * pid_wl = (char*)malloc(20);
+    char * pid_ws = (char*)malloc(20);
+    sprintf(pid_el, "eager_write_latency_%d_%d", pid, provider->provider_id);
+    sprintf(pid_es, "eager_write_size_%d_%d", pid, provider->provider_id);
+    sprintf(pid_wl, "write_latency_%d_%d", pid, provider->provider_id);
+    sprintf(pid_ws, "write_size_%d_%d", pid, provider->provider_id);
+    symbiomon_metric_dump_raw_data(provider->eager_write_latency, pid_el);
+    symbiomon_metric_dump_raw_data(provider->eager_write_size, pid_es);
+    symbiomon_metric_dump_raw_data(provider->write_latency, pid_wl);
+    symbiomon_metric_dump_raw_data(provider->write_size, pid_ws);
+#endif
+
     margo_provider_pop_finalize_callback(provider->mid, provider);
     bake_server_finalize_cb(provider);
     return BAKE_SUCCESS;
