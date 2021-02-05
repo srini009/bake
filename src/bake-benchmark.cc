@@ -11,6 +11,9 @@
 #include <json/json.h>
 #include <bake-client.hpp>
 #include <bake-server.hpp>
+//#ifdef USE_SYMBIOMON
+#include <symbiomon/symbiomon-server.h>
+//#endif
 
 
 int getConfigInt(Json::Value& config, const std::string& key, int _default) {
@@ -592,6 +595,20 @@ static void run_server(MPI_Comm comm, Json::Value& config) {
         std::string value = provider_config[key].asString();
         provider->set_config(key.c_str(), value.c_str());
     }
+
+    /* initialize SYMBIOMON */
+    struct symbiomon_provider_args args = SYMBIOMON_PROVIDER_ARGS_INIT;
+
+    symbiomon_provider_t metric_provider;
+    int ret = symbiomon_provider_register(mid, 42, &args, &metric_provider);
+    if(ret != 0)
+        fprintf(stderr, "Error: symbiomon_provider_register() failed. Continuing on.\n");
+           
+    ret = provider->set_symbiomon_provider(metric_provider);
+    if(ret != 0)
+        fprintf(stderr, "Error: sdskv_provider_set_symbiomon() failed. Contuinuing on.\n");
+
+    fprintf(stderr, "Benchmark: Successfully set the SYMBIOMON provider\n");
     // notify clients that the database is ready
     MPI_Barrier(MPI_COMM_WORLD);
     // wait for finalize
