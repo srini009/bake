@@ -305,10 +305,10 @@ int bake_provider_destroy(bake_provider_t provider)
     char * pid_es = (char*)malloc(20);
     char * pid_wl = (char*)malloc(20);
     char * pid_ws = (char*)malloc(20);
-    sprintf(pid_el, "eager_write_latency_%d_%d", pid, provider->provider_id);
-    sprintf(pid_es, "eager_write_size_%d_%d", pid, provider->provider_id);
-    sprintf(pid_wl, "write_latency_%d_%d", pid, provider->provider_id);
-    sprintf(pid_ws, "write_size_%d_%d", pid, provider->provider_id);
+    sprintf(pid_el, "bake_eager_write_latency_%d_%d", pid, provider->provider_id);
+    sprintf(pid_es, "bake_eager_write_size_%d_%d", pid, provider->provider_id);
+    sprintf(pid_wl, "bake_write_latency_%d_%d", pid, provider->provider_id);
+    sprintf(pid_ws, "bake_write_size_%d_%d", pid, provider->provider_id);
     symbiomon_metric_dump_raw_data(provider->eager_write_latency, pid_el);
     symbiomon_metric_dump_raw_data(provider->eager_write_size, pid_es);
     symbiomon_metric_dump_raw_data(provider->write_latency, pid_wl);
