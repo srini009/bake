@@ -289,7 +289,9 @@ int bake_provider_set_symbiomon(bake_provider_t provider, symbiomon_provider_t m
     symbiomon_taglist_create(&taglist, 1, "dummytag");
     symbiomon_metric_create("bake", "write_latency", SYMBIOMON_TYPE_TIMER, "bake:write latency in seconds", taglist, &provider->write_latency, provider->metric_provider);
     symbiomon_metric_create("bake", "eager_write_latency", SYMBIOMON_TYPE_TIMER, "bake:eager_write latency in seconds", taglist, &provider->eager_write_latency, provider->metric_provider);
+    symbiomon_metric_create("bake", "eager_read_latency", SYMBIOMON_TYPE_TIMER, "bake:eager_eager latency in seconds", taglist, &provider->eager_read_latency, provider->metric_provider);
     symbiomon_metric_create("bake", "eager_write_size", SYMBIOMON_TYPE_GAUGE, "bake:eager_write data size", taglist, &provider->eager_write_size, provider->metric_provider);
+    symbiomon_metric_create("bake", "eager_read_size", SYMBIOMON_TYPE_GAUGE, "bake:eager_read data size", taglist, &provider->eager_read_size, provider->metric_provider);
     symbiomon_metric_create("bake", "write_size", SYMBIOMON_TYPE_GAUGE, "bake:write data size", taglist, &provider->write_size, provider->metric_provider);
 
     return BAKE_SUCCESS;
@@ -303,14 +305,20 @@ int bake_provider_destroy(bake_provider_t provider)
     int pid = getpid();
     char * pid_el = (char*)malloc(20);
     char * pid_es = (char*)malloc(20);
+    char * pid_erl = (char*)malloc(20);
+    char * pid_ers = (char*)malloc(20);
     char * pid_wl = (char*)malloc(20);
     char * pid_ws = (char*)malloc(20);
     sprintf(pid_el, "bake_eager_write_latency_%d_%d", pid, provider->provider_id);
     sprintf(pid_es, "bake_eager_write_size_%d_%d", pid, provider->provider_id);
+    sprintf(pid_erl, "bake_eager_read_latency_%d_%d", pid, provider->provider_id);
+    sprintf(pid_ers, "bake_eager_read_size_%d_%d", pid, provider->provider_id);
     sprintf(pid_wl, "bake_write_latency_%d_%d", pid, provider->provider_id);
     sprintf(pid_ws, "bake_write_size_%d_%d", pid, provider->provider_id);
     symbiomon_metric_dump_raw_data(provider->eager_write_latency, pid_el);
     symbiomon_metric_dump_raw_data(provider->eager_write_size, pid_es);
+    symbiomon_metric_dump_raw_data(provider->eager_read_latency, pid_erl);
+    symbiomon_metric_dump_raw_data(provider->eager_read_size, pid_ers);
     symbiomon_metric_dump_raw_data(provider->write_latency, pid_wl);
     symbiomon_metric_dump_raw_data(provider->write_size, pid_ws);
 #endif
@@ -788,10 +796,18 @@ static void bake_eager_read_ult(hg_handle_t handle)
     LOCK_PROVIDER;
     FIND_TARGET;
 
+    double start, end;
+    start = ABT_get_wtime();
     free_fn free_data = NULL;
     out.ret           = target->backend->_read_raw(
         target->context, in.rid, in.region_offset, in.size, (void**)&out.buffer,
         &out.size, &free_data);
+    end = ABT_get_wtime();
+#ifdef USE_SYMBIOMON
+    symbiomon_metric_update(provider->eager_read_latency, (end-start));
+    symbiomon_metric_update(provider->eager_read_size, in.size);
+    fprintf(stderr, "Eager read Latency value: %lf and size: %lu\n", end-start, in.size);
+#endif
 
 finish:
     UNLOCK_PROVIDER;
