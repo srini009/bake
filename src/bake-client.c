@@ -13,7 +13,7 @@
 #include "bake-rpc.h"
 #include "bake-timing.h"
 
-#define BAKE_DEFAULT_EAGER_LIMIT 64000
+#define BAKE_DEFAULT_EAGER_LIMIT 2048
 
 /* Refers to a single Margo initialization, for now this is shared by
  * all remote BAKE targets.  In the future we probably need to support
