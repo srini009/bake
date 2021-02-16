@@ -378,9 +378,11 @@ int bake_write(bake_provider_handle_t provider,
     bake_write_out_t out;
     int              ret;
 
-    if (buf_size <= provider->eager_limit)
+    if (buf_size <= provider->eager_limit) {
+        fprintf(stderr, "Do I get here bake_write\n");
         return (
             bake_eager_write(provider, tid, rid, region_offset, buf, buf_size));
+    }
 
     TIMERS_INITIALIZE("bulk_create", "forward", "end");
 
@@ -1143,9 +1145,11 @@ int bake_read(bake_provider_handle_t provider,
     bake_read_out_t out;
     int             ret;
 
-    if (buf_size <= provider->eager_limit)
+    if (buf_size <= provider->eager_limit) {
+        fprintf(stderr, "Do I get here bake_read\n");
         return (bake_eager_read(provider, bti, rid, region_offset, buf,
                                 buf_size, bytes_read));
+    }
 
     TIMERS_INITIALIZE("bulk_create", "forward", "end");
 
