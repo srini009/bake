@@ -790,14 +790,14 @@ DEFINE_MARGO_RPC_HANDLER(bake_read_ult)
  * response */
 static void bake_eager_read_ult(hg_handle_t handle)
 {
+    double start, end;
+    start = ABT_get_wtime();
     DECLARE_LOCAL_VARS(eager_read);
     FIND_PROVIDER;
     GET_RPC_INPUT;
     LOCK_PROVIDER;
     FIND_TARGET;
 
-    double start, end;
-    start = ABT_get_wtime();
     free_fn free_data = NULL;
     out.ret           = target->backend->_read_raw(
         target->context, in.rid, in.region_offset, in.size, (void**)&out.buffer,
