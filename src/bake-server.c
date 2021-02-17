@@ -293,6 +293,8 @@ int bake_provider_set_symbiomon(bake_provider_t provider, symbiomon_provider_t m
     symbiomon_metric_create("bake", "eager_write_size", SYMBIOMON_TYPE_GAUGE, "bake:eager_write data size", taglist, &provider->eager_write_size, provider->metric_provider);
     symbiomon_metric_create("bake", "eager_read_size", SYMBIOMON_TYPE_GAUGE, "bake:eager_read data size", taglist, &provider->eager_read_size, provider->metric_provider);
     symbiomon_metric_create("bake", "write_size", SYMBIOMON_TYPE_GAUGE, "bake:write data size", taglist, &provider->write_size, provider->metric_provider);
+    symbiomon_metric_create("bake", "write_rss", SYMBIOMON_TYPE_GAUGE, "bake:write max rss", taglist, &provider->write_rss, provider->metric_provider);
+    symbiomon_metric_create("bake", "eager_write_rss", SYMBIOMON_TYPE_GAUGE, "bake:eager_write max rss", taglist, &provider->eager_write_rss, provider->metric_provider);
 
     return BAKE_SUCCESS;
 }
@@ -307,20 +309,26 @@ int bake_provider_destroy(bake_provider_t provider)
     char * pid_es = (char*)malloc(20);
     char * pid_erl = (char*)malloc(20);
     char * pid_ers = (char*)malloc(20);
+    char * pid_ewrss = (char*)malloc(20);
     char * pid_wl = (char*)malloc(20);
     char * pid_ws = (char*)malloc(20);
+    char * pid_wrss = (char*)malloc(20);
     sprintf(pid_el, "bake_eager_write_latency_%d_%d", pid, provider->provider_id);
     sprintf(pid_es, "bake_eager_write_size_%d_%d", pid, provider->provider_id);
+    sprintf(pid_ewrss, "bake_eager_write_rss_%d_%d", pid, provider->provider_id);
     sprintf(pid_erl, "bake_eager_read_latency_%d_%d", pid, provider->provider_id);
     sprintf(pid_ers, "bake_eager_read_size_%d_%d", pid, provider->provider_id);
     sprintf(pid_wl, "bake_write_latency_%d_%d", pid, provider->provider_id);
     sprintf(pid_ws, "bake_write_size_%d_%d", pid, provider->provider_id);
+    sprintf(pid_wrss, "bake_write_rss_%d_%d", pid, provider->provider_id);
     symbiomon_metric_dump_raw_data(provider->eager_write_latency, pid_el);
     symbiomon_metric_dump_raw_data(provider->eager_write_size, pid_es);
+    symbiomon_metric_dump_raw_data(provider->eager_write_rss, pid_ewrss);
     symbiomon_metric_dump_raw_data(provider->eager_read_latency, pid_erl);
     symbiomon_metric_dump_raw_data(provider->eager_read_size, pid_ers);
     symbiomon_metric_dump_raw_data(provider->write_latency, pid_wl);
     symbiomon_metric_dump_raw_data(provider->write_size, pid_ws);
+    symbiomon_metric_dump_raw_data(provider->write_rss, pid_wrss);
 #endif
 
     margo_provider_pop_finalize_callback(provider->mid, provider);
@@ -561,8 +569,11 @@ static void bake_write_ult(hg_handle_t handle)
 
     end = ABT_get_wtime();
 #ifdef USE_SYMBIOMON
+    struct rusage usage;    
+    getrusage(RUSAGE_SELF, &usage);
     symbiomon_metric_update(provider->write_latency, (end-start));
     symbiomon_metric_update(provider->write_size, in.bulk_size);
+    symbiomon_metric_update(provider->write_rss, (double)usage.ru_maxrss);
     fprintf(stderr, "Write Latency value: %lf and size: %lu\n", end-start, in.bulk_size);
 #endif
 
@@ -591,8 +602,11 @@ static void bake_eager_write_ult(hg_handle_t handle)
                                           in.region_offset, in.size, in.buffer);
     end = ABT_get_wtime();
 #ifdef USE_SYMBIOMON
+    struct rusage usage;    
+    getrusage(RUSAGE_SELF, &usage);
     symbiomon_metric_update(provider->eager_write_latency, (end-start));
     symbiomon_metric_update(provider->eager_write_size, in.size);
+    symbiomon_metric_update(provider->eager_write_rss, (double)usage.ru_maxrss);
     fprintf(stderr, "Eager write Latency value: %lf and size: %lu\n", end-start, in.size);
 #endif
 finish:
