@@ -295,7 +295,7 @@ int bake_provider_set_symbiomon(bake_provider_t provider, symbiomon_provider_t m
     symbiomon_metric_create("bake", "eager_write_size", SYMBIOMON_TYPE_GAUGE, "bake:eager_write data size", taglist, &provider->eager_write_size, provider->metric_provider);
     symbiomon_metric_create("bake", "eager_read_size", SYMBIOMON_TYPE_GAUGE, "bake:eager_read data size", taglist, &provider->eager_read_size, provider->metric_provider);
     symbiomon_metric_create("bake", "write_size", SYMBIOMON_TYPE_GAUGE, "bake:write data size", taglist, &provider->write_size, provider->metric_provider);
-    rymbiomon_metric_create("bake", "write_rss", SYMBIOMON_TYPE_GAUGE, "bake:write max rss", taglist, &provider->write_rss, provider->metric_provider);
+    symbiomon_metric_create("bake", "write_rss", SYMBIOMON_TYPE_GAUGE, "bake:write max rss", taglist, &provider->write_rss, provider->metric_provider);
     symbiomon_metric_create("bake", "eager_write_rss", SYMBIOMON_TYPE_GAUGE, "bake:eager_write max rss", taglist, &provider->eager_write_rss, provider->metric_provider);
 
     return BAKE_SUCCESS;
