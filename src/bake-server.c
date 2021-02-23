@@ -325,7 +325,7 @@ int bake_provider_destroy(bake_provider_t provider)
     sprintf(pid_wl, "bake_write_latency_%d_%d", pid, provider->provider_id);
     sprintf(pid_ws, "bake_write_size_%d_%d", pid, provider->provider_id);
     sprintf(pid_wrss, "bake_write_rss_%d_%d", pid, provider->provider_id);
-    sprintf(pid_ne, "bake_write_num_entrants_%d_%d", pid, provider->provider_id);
+    sprintf(pid_wne, "bake_write_num_entrants_%d_%d", pid, provider->provider_id);
     symbiomon_metric_dump_raw_data(provider->eager_write_latency, pid_el);
     symbiomon_metric_dump_raw_data(provider->eager_write_size, pid_es);
     symbiomon_metric_dump_raw_data(provider->eager_write_rss, pid_ewrss);
