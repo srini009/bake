@@ -569,7 +569,7 @@ static void bake_write_ult(hg_handle_t handle)
     }
 
 #ifdef USE_SYMBIOMON
-    symbiomon_metric_update(provider->write_num_entrants, symbiomon_metric_get_last_value(provider->write_num_entrants) + 1);
+    symbiomon_metric_update_gauge_by_fixed_amount(provider->write_num_entrants, 1);
 #endif
     out.ret = target->backend->_write_bulk(
         target->context, in.rid, in.region_offset, in.bulk_size, in.bulk_handle,
@@ -579,7 +579,7 @@ static void bake_write_ult(hg_handle_t handle)
 #ifdef USE_SYMBIOMON
     struct rusage usage;    
     getrusage(RUSAGE_SELF, &usage);
-    symbiomon_metric_update(provider->write_num_entrants, symbiomon_metric_get_last_value(provider->write_num_entrants) - 1);
+    symbiomon_metric_update_gauge_by_fixed_amount(provider->write_num_entrants, -1);
     symbiomon_metric_update(provider->write_latency, (end-start));
     symbiomon_metric_update(provider->write_size, in.bulk_size);
     symbiomon_metric_update(provider->write_rss, (double)usage.ru_maxrss);
