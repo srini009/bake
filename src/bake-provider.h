@@ -90,6 +90,7 @@ typedef struct bake_provider {
     symbiomon_metric_t eager_read_size;
     symbiomon_metric_t write_rss;
     symbiomon_metric_t eager_write_rss;
+    symbiomon_metric_t write_num_entrants;
     uint8_t provider_id;
 #endif
 
