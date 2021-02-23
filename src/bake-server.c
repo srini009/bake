@@ -308,15 +308,15 @@ int bake_provider_destroy(bake_provider_t provider)
 #ifdef USE_SYMBIOMON
     fprintf(stderr, "BAKE provider destroy invoked\n");
     int pid = getpid();
-    char * pid_el = (char*)malloc(20);
-    char * pid_es = (char*)malloc(20);
-    char * pid_erl = (char*)malloc(20);
-    char * pid_ers = (char*)malloc(20);
-    char * pid_ewrss = (char*)malloc(20);
-    char * pid_wl = (char*)malloc(20);
-    char * pid_ws = (char*)malloc(20);
-    char * pid_wrss = (char*)malloc(20);
-    char * pid_wne = (char*)malloc(20);
+    char * pid_el = (char*)malloc(40);
+    char * pid_es = (char*)malloc(40);
+    char * pid_erl = (char*)malloc(40);
+    char * pid_ers = (char*)malloc(40);
+    char * pid_ewrss = (char*)malloc(40);
+    char * pid_wl = (char*)malloc(40);
+    char * pid_ws = (char*)malloc(40);
+    char * pid_wrss = (char*)malloc(40);
+    char * pid_wne = (char*)malloc(40);
     sprintf(pid_el, "bake_eager_write_latency_%d_%d", pid, provider->provider_id);
     sprintf(pid_es, "bake_eager_write_size_%d_%d", pid, provider->provider_id);
     sprintf(pid_ewrss, "bake_eager_write_rss_%d_%d", pid, provider->provider_id);
