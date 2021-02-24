@@ -554,7 +554,6 @@ static void bake_write_ult(hg_handle_t handle)
     FIND_TARGET;
 
     double start, end;
-    start = ABT_get_wtime();
 
     memset(&out, 0, sizeof(out));
     hg_addr_t src_addr = HG_ADDR_NULL;
@@ -570,6 +569,7 @@ static void bake_write_ult(hg_handle_t handle)
 
 #ifdef USE_SYMBIOMON
     symbiomon_metric_update_gauge_by_fixed_amount(provider->write_num_entrants, 1);
+    start = ABT_get_wtime();
 #endif
     out.ret = target->backend->_write_bulk(
         target->context, in.rid, in.region_offset, in.bulk_size, in.bulk_handle,
@@ -598,7 +598,6 @@ static void bake_eager_write_ult(hg_handle_t handle)
 {
 
     double start, end;
-    start = ABT_get_wtime();
     DECLARE_LOCAL_VARS(eager_write);
     in.buffer = NULL;
     in.size   = 0;
@@ -607,6 +606,7 @@ static void bake_eager_write_ult(hg_handle_t handle)
     LOCK_PROVIDER;
     FIND_TARGET;
 
+    start = ABT_get_wtime();
     out.ret = target->backend->_write_raw(target->context, in.rid,
                                           in.region_offset, in.size, in.buffer);
     end = ABT_get_wtime();
