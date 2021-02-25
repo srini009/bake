@@ -121,8 +121,10 @@ int main(int argc, char* argv[])
     }
 
     if (strcmp(backend_type, "pmem") == 0) {
+        fprintf(stderr, "Backend type is pmem\n");
         ret = bake_makepool(opts.pmem_pool, opts.pool_size, opts.pool_mode);
     } else if (strcmp(backend_type, "file") == 0) {
+        fprintf(stderr, "Backend type is file\n");
         ret = bake_file_makepool(opts.pmem_pool, opts.pool_size,
                                  opts.pool_mode);
     } else {
