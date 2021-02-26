@@ -592,7 +592,7 @@ static void run_server(MPI_Comm comm, Json::Value& config) {
     auto& target2_config = server_config["target2"];
     std::string tgt2_path = target2_config["path"].asString();
     provider->add_storage_target(tgt_path);
-    provider->add_storage_target(tgt2_path);
+    //provider->add_storage_target(tgt2_path);
     for(auto it = provider_config.begin(); it != provider_config.end(); it++) {
         std::string key = it.key().asString();
         std::string value = provider_config[key].asString();
@@ -645,7 +645,8 @@ static void run_client(MPI_Comm comm, Json::Value& config) {
         bake::client client(mid);
         bake::provider_handle ph(client, server_addr);
         std::vector<bake::target> targets = client.probe(ph);
-        bake::target target = targets[rank%2];
+        //bake::target target = targets[rank%2];
+        bake::target target = targets[0];
         fprintf(stderr, "Number of targets: %d\n", targets.size());
         // initialize the RNG seed
         int seed = config["seed"].asInt();
