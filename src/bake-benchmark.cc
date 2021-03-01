@@ -307,8 +307,8 @@ class WriteBenchmark : public AbstractAccessBenchmark {
         m_access_sizes.resize(m_num_entries);
         size_t region_size = 0;
         for(unsigned i=0; i < m_num_entries; i++) {
-            size_t size = m_region_size_range.first + (rand() % (m_region_size_range.second - m_region_size_range.first));
-            //size_t size = m_region_size_range.first + i;
+            //size_t size = m_region_size_range.first + (rand() % (m_region_size_range.second - m_region_size_range.first));
+            size_t size = m_region_size_range.first + i;
             m_access_sizes[i] = size;
             if(m_reuse_region) region_size = std::max(size, region_size);
             else region_size += size;
@@ -318,9 +318,10 @@ class WriteBenchmark : public AbstractAccessBenchmark {
 
         fprintf(stderr, "Data size is %d\n", data_size);
 
-        m_data.resize(data_size);
+        //m_data.resize(data_size);
         for(unsigned i=0; i < data_size; i++) {
-            m_data[i] = 'a' + (i%26);
+            //m_data[i] = 'a' + (i%26);
+            m_data.push_back('a' + (i%26));
         }
         m_region_id = _clt.create(_ph, _tgt, region_size);
         if(m_preregister_bulk) {
