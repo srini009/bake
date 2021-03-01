@@ -317,7 +317,7 @@ class WriteBenchmark : public AbstractAccessBenchmark {
             if(m_reuse_buffer) data_size = std::max(size, data_size);
             else data_size += size;
         }
-        m_data.resize(data_size);
+        //m_data.resize(data_size);
         for(unsigned i=0; i < data_size; i++) {
             m_data[i] = 'a' + (i%26);
         }
