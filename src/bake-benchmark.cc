@@ -307,6 +307,7 @@ class WriteBenchmark : public AbstractAccessBenchmark {
         m_access_sizes.resize(m_num_entries);
         size_t region_size = 0;
         fprintf(stderr, "Max size of: %d\n", m_data.max_size());
+        m_data.reserve(10000000);
         for(unsigned i=0; i < m_num_entries; i++) {
             //size_t size = m_region_size_range.first + (rand() % (m_region_size_range.second - m_region_size_range.first));
             size_t size = m_region_size_range.first + i;
