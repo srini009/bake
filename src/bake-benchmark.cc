@@ -306,18 +306,16 @@ class WriteBenchmark : public AbstractAccessBenchmark {
         size_t data_size = 0;
         m_access_sizes.resize(m_num_entries);
         size_t region_size = 0;
-        fprintf(stderr, "Max size of: %d\n", m_data.max_size());
-        m_data.reserve(10000000);
         for(unsigned i=0; i < m_num_entries; i++) {
-            //size_t size = m_region_size_range.first + (rand() % (m_region_size_range.second - m_region_size_range.first));
-            size_t size = m_region_size_range.first + i;
+            size_t size = m_region_size_range.first + (rand() % (m_region_size_range.second - m_region_size_range.first));
+            //size_t size = m_region_size_range.first + i;
             m_access_sizes[i] = size;
             if(m_reuse_region) region_size = std::max(size, region_size);
             else region_size += size;
             if(m_reuse_buffer) data_size = std::max(size, data_size);
             else data_size += size;
         }
-        //m_data.resize(data_size);
+        m_data.resize(data_size);
         for(unsigned i=0; i < data_size; i++) {
             m_data[i] = 'a' + (i%26);
         }
