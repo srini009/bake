@@ -595,8 +595,20 @@ static void run_server(MPI_Comm comm, Json::Value& config) {
     std::string tgt_path = target_config["path"].asString();
     auto& target2_config = server_config["target2"];
     std::string tgt2_path = target2_config["path"].asString();
+    auto& target3_config = server_config["target3"];
+    std::string tgt3_path = target3_config["path"].asString();
+    auto& target4_config = server_config["target4"];
+    std::string tgt4_path = target4_config["path"].asString();
+    auto& target5_config = server_config["target5"];
+    std::string tgt5_path = target5_config["path"].asString();
+    auto& target6_config = server_config["target6"];
+    std::string tgt6_path = target6_config["path"].asString();
     provider->add_storage_target(tgt_path);
     provider->add_storage_target(tgt2_path);
+    provider->add_storage_target(tgt3_path);
+    provider->add_storage_target(tgt4_path);
+    provider->add_storage_target(tgt5_path);
+    provider->add_storage_target(tgt6_path);
     for(auto it = provider_config.begin(); it != provider_config.end(); it++) {
         std::string key = it.key().asString();
         std::string value = provider_config[key].asString();
@@ -649,9 +661,9 @@ static void run_client(MPI_Comm comm, Json::Value& config) {
         bake::client client(mid);
         bake::provider_handle ph(client, server_addr);
         std::vector<bake::target> targets = client.probe(ph);
-        bake::target target = targets[rank%2];
+        bake::target target = targets[rank%6];
         //bake::target target = targets[0];
-        fprintf(stderr, "Number of targets: %d and my target = \n", targets.size(), rank%2);
+        fprintf(stderr, "Number of targets: %d and my target = %d\n", targets.size(), rank%2);
         // initialize the RNG seed
         int seed = config["seed"].asInt();
         // initialize benchmark instances
