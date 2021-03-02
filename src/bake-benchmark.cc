@@ -651,7 +651,7 @@ static void run_client(MPI_Comm comm, Json::Value& config) {
         std::vector<bake::target> targets = client.probe(ph);
         bake::target target = targets[rank%2];
         //bake::target target = targets[0];
-        fprintf(stderr, "Number of targets: %d and my target = \n", targets.size(, rank%2);
+        fprintf(stderr, "Number of targets: %d and my target = \n", targets.size(), rank%2);
         // initialize the RNG seed
         int seed = config["seed"].asInt();
         // initialize benchmark instances
