@@ -520,8 +520,8 @@ class PersistBenchmark : public AbstractAccessBenchmark {
 };
 REGISTER_BENCHMARK("persist", PersistBenchmark);
 
-static void run_server(MPI_Comm comm, Json::Value& config);
-static void run_client(MPI_Comm comm, Json::Value& config);
+static void run_server(MPI_Comm comm, MPI_Comm global_comm, Json::Value& config);
+static void run_client(MPI_Comm comm, MPI_Comm global_comm, Json::Value& config);
 
 /**
  * @brief Main function.
