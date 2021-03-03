@@ -615,6 +615,7 @@ static void run_server(MPI_Comm comm, Json::Value& config) {
     auto& target_config = server_config["target"];
     std::string tgt_path = target_config["path"].asString();
     auto& target2_config = server_config["target2"];
+    std::string tgt2_path = target2_config["path"].asString();
     provider->add_storage_target(tgt_path);
     provider->add_storage_target(tgt2_path);
     for(auto it = provider_config.begin(); it != provider_config.end(); it++) {
