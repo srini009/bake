@@ -670,7 +670,7 @@ static void run_client(MPI_Comm comm, MPI_Comm global_comm, Json::Value& config)
       server_addr_str.resize(buf_size, 0);
       MPI_Bcast(server_addr_str.data(), buf_size, MPI_BYTE, 0, comm);
       margo_addr_lookup(mid, server_addr_str.data(), &server_addr);
-      fprintf(stderr, "Server address string is %s\n", server_addr_str.c_str());
+      fprintf(stderr, "Server address string is %s\n", server_addr_str.data());
     } 
     // wait for server to have initialize the database
 
