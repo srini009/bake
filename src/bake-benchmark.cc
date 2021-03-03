@@ -601,13 +601,8 @@ static void run_server(MPI_Comm comm, MPI_Comm global_comm, Json::Value& config)
     margo_addr_to_string(mid, server_addr_str.data(), &buf_size, server_addr);
     margo_addr_free(mid, server_addr);
     // send server address to client
-    if(config["num-servers"] == 1) {
-      MPI_Bcast(&buf_size, sizeof(hg_size_t), MPI_BYTE, 0, MPI_COMM_WORLD);
-      MPI_Bcast(server_addr_str.data(), buf_size, MPI_BYTE, 0, MPI_COMM_WORLD);
-    } else {
-      MPI_Bcast(&buf_size, sizeof(hg_size_t), MPI_BYTE, 0, comm);
-      MPI_Bcast(server_addr_str.data(), buf_size, MPI_BYTE, 0, comm);
-    }
+    MPI_Bcast(&buf_size, sizeof(hg_size_t), MPI_BYTE, 0, global_comm);
+    MPI_Bcast(server_addr_str.data(), buf_size, MPI_BYTE, 0, global_comm);
 
     // initialize sdskv provider
     auto provider = bake::provider::create(mid);
@@ -660,18 +655,11 @@ static void run_client(MPI_Comm comm, MPI_Comm global_comm, Json::Value& config)
     hg_size_t buf_size;
     hg_addr_t server_addr = HG_ADDR_NULL;
 
-    if(config["num-servers"] == 1) {
-      MPI_Bcast(&buf_size, sizeof(hg_size_t), MPI_BYTE, 0, MPI_COMM_WORLD);
-      server_addr_str.resize(buf_size, 0);
-      MPI_Bcast(server_addr_str.data(), buf_size, MPI_BYTE, 0, MPI_COMM_WORLD);
-      margo_addr_lookup(mid, server_addr_str.data(), &server_addr);
-    } else {
-      MPI_Bcast(&buf_size, sizeof(hg_size_t), MPI_BYTE, 0, global_comm);
-      server_addr_str.resize(buf_size, 0);
-      MPI_Bcast(server_addr_str.data(), buf_size, MPI_BYTE, 0, global_comm);
-      margo_addr_lookup(mid, server_addr_str.data(), &server_addr);
-      fprintf(stderr, "Server address string is %s\n", server_addr_str.data());
-    } 
+    MPI_Bcast(&buf_size, sizeof(hg_size_t), MPI_BYTE, 0, global_comm);
+    server_addr_str.resize(buf_size, 0);
+    MPI_Bcast(server_addr_str.data(), buf_size, MPI_BYTE, 0, global_comm);
+    margo_addr_lookup(mid, server_addr_str.data(), &server_addr);
+    fprintf(stderr, "Server address string is %s\n", server_addr_str.data());
     // wait for server to have initialize the database
 
     MPI_Barrier(global_comm);
