@@ -666,9 +666,9 @@ static void run_client(MPI_Comm comm, MPI_Comm global_comm, Json::Value& config)
       MPI_Bcast(server_addr_str.data(), buf_size, MPI_BYTE, 0, MPI_COMM_WORLD);
       margo_addr_lookup(mid, server_addr_str.data(), &server_addr);
     } else {
-      MPI_Bcast(&buf_size, sizeof(hg_size_t), MPI_BYTE, 0, comm);
+      MPI_Bcast(&buf_size, sizeof(hg_size_t), MPI_BYTE, 0, global_comm);
       server_addr_str.resize(buf_size, 0);
-      MPI_Bcast(server_addr_str.data(), buf_size, MPI_BYTE, 0, comm);
+      MPI_Bcast(server_addr_str.data(), buf_size, MPI_BYTE, 0, global_comm);
       margo_addr_lookup(mid, server_addr_str.data(), &server_addr);
       fprintf(stderr, "Server address string is %s\n", server_addr_str.data());
     } 
