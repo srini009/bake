@@ -568,7 +568,7 @@ int main(int argc, char** argv) {
     } else if (config["num-servers"] == 2) {
 
       fprintf(stderr, "Running with 2 servers...\n");
-      MPI_Comm_split(MPI_COMM_WORLD, rank % 2 ? 0 : 1, rank, &comm);
+      MPI_Comm_split(MPI_COMM_WORLD, rank < (size/2) ? 0 : 1, rank, &comm);
       int local_rank;
       MPI_Comm_rank(comm, &local_rank);
       
