@@ -556,12 +556,27 @@ int main(int argc, char** argv) {
     }
 
     MPI_Comm comm;
-    MPI_Comm_split(MPI_COMM_WORLD, rank == 0 ? 0 : 1, rank, &comm);
 
-    if(rank == 0) {
-        run_server(comm, config);
-    } else {
-        run_client(comm, config);
+    if(config["num-servers"] == 1) {
+      MPI_Comm_split(MPI_COMM_WORLD, rank == 0 ? 0 : 1, rank, &comm);
+  
+      if(rank == 0) {
+          run_server(comm, config);
+      } else {
+          run_client(comm, config);
+      }
+    } else if (config["num-servers"] == 2) {
+
+      fprintf(stderr, "Running with 2 servers...\n");
+      MPI_Comm_split(MPI_COMM_WORLD, rank % 2 ? 0 : 1, rank, &comm);
+      int local_rank;
+      MPI_Comm_rank(comm, &local_rank);
+      
+      if(local_rank == 0) {
+          run_server(comm, config);
+      } else {
+          run_client(comm, config);
+      }
     }
 
     MPI_Finalize();
@@ -586,29 +601,22 @@ static void run_server(MPI_Comm comm, Json::Value& config) {
     margo_addr_to_string(mid, server_addr_str.data(), &buf_size, server_addr);
     margo_addr_free(mid, server_addr);
     // send server address to client
-    MPI_Bcast(&buf_size, sizeof(hg_size_t), MPI_BYTE, 0, MPI_COMM_WORLD);
-    MPI_Bcast(server_addr_str.data(), buf_size, MPI_BYTE, 0, MPI_COMM_WORLD);
+    if(config["num-servers"] == 1) {
+      MPI_Bcast(&buf_size, sizeof(hg_size_t), MPI_BYTE, 0, MPI_COMM_WORLD);
+      MPI_Bcast(server_addr_str.data(), buf_size, MPI_BYTE, 0, MPI_COMM_WORLD);
+    } else {
+      MPI_Bcast(&buf_size, sizeof(hg_size_t), MPI_BYTE, 0, comm);
+      MPI_Bcast(server_addr_str.data(), buf_size, MPI_BYTE, 0, comm);
+    }
+
     // initialize sdskv provider
     auto provider = bake::provider::create(mid);
     // initialize database
     auto& target_config = server_config["target"];
     std::string tgt_path = target_config["path"].asString();
     auto& target2_config = server_config["target2"];
-    std::string tgt2_path = target2_config["path"].asString();
-    auto& target3_config = server_config["target3"];
-    std::string tgt3_path = target3_config["path"].asString();
-    auto& target4_config = server_config["target4"];
-    std::string tgt4_path = target4_config["path"].asString();
-    auto& target5_config = server_config["target5"];
-    std::string tgt5_path = target5_config["path"].asString();
-    auto& target6_config = server_config["target6"];
-    std::string tgt6_path = target6_config["path"].asString();
     provider->add_storage_target(tgt_path);
     provider->add_storage_target(tgt2_path);
-    provider->add_storage_target(tgt3_path);
-    provider->add_storage_target(tgt4_path);
-    provider->add_storage_target(tgt5_path);
-    provider->add_storage_target(tgt6_path);
     for(auto it = provider_config.begin(); it != provider_config.end(); it++) {
         std::string key = it.key().asString();
         std::string value = provider_config[key].asString();
@@ -650,10 +658,18 @@ static void run_client(MPI_Comm comm, Json::Value& config) {
     std::vector<char> server_addr_str;
     hg_size_t buf_size;
     hg_addr_t server_addr = HG_ADDR_NULL;
-    MPI_Bcast(&buf_size, sizeof(hg_size_t), MPI_BYTE, 0, MPI_COMM_WORLD);
-    server_addr_str.resize(buf_size, 0);
-    MPI_Bcast(server_addr_str.data(), buf_size, MPI_BYTE, 0, MPI_COMM_WORLD);
-    margo_addr_lookup(mid, server_addr_str.data(), &server_addr);
+
+    if(config["num-servers"] == 1) {
+      MPI_Bcast(&buf_size, sizeof(hg_size_t), MPI_BYTE, 0, MPI_COMM_WORLD);
+      server_addr_str.resize(buf_size, 0);
+      MPI_Bcast(server_addr_str.data(), buf_size, MPI_BYTE, 0, MPI_COMM_WORLD);
+      margo_addr_lookup(mid, server_addr_str.data(), &server_addr);
+    } else {
+      MPI_Bcast(&buf_size, sizeof(hg_size_t), MPI_BYTE, 0, comm);
+      server_addr_str.resize(buf_size, 0);
+      MPI_Bcast(server_addr_str.data(), buf_size, MPI_BYTE, 0, comm);
+      margo_addr_lookup(mid, server_addr_str.data(), &server_addr);
+    } 
     // wait for server to have initialize the database
     MPI_Barrier(MPI_COMM_WORLD);
     {
@@ -661,8 +677,8 @@ static void run_client(MPI_Comm comm, Json::Value& config) {
         bake::client client(mid);
         bake::provider_handle ph(client, server_addr);
         std::vector<bake::target> targets = client.probe(ph);
-        bake::target target = targets[rank%6];
-        //bake::target target = targets[0];
+        //bake::target target = targets[rank%2];
+        bake::target target = targets[0];
         // initialize the RNG seed
         int seed = config["seed"].asInt();
         // initialize benchmark instances
