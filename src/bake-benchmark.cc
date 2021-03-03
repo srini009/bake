@@ -555,15 +555,15 @@ int main(int argc, char** argv) {
         return -1;
     }
 
-    MPI_Comm comm;
+    MPI_Comm comm, comm2;
 
     if(config["num-servers"] == 1) {
       MPI_Comm_split(MPI_COMM_WORLD, rank == 0 ? 0 : 1, rank, &comm);
   
       if(rank == 0) {
-          run_server(comm, config);
+          run_server(comm, MPI_COMM_WORLD, config);
       } else {
-          run_client(comm, config);
+          run_client(comm, MPI_COMM_WORLD, config);
       }
     } else if (config["num-servers"] == 2) {
 
@@ -571,11 +571,11 @@ int main(int argc, char** argv) {
       MPI_Comm_split(MPI_COMM_WORLD, rank < (size/2) ? 0 : 1, rank, &comm);
       int local_rank;
       MPI_Comm_rank(comm, &local_rank);
-      
+      MPI_Comm_split(comm, local_rank == 0 ? 0 : 1, local_rank, &comm2);  
       if(local_rank == 0) {
-          run_server(comm, config);
+          run_server(comm2, comm, config);
       } else {
-          run_client(comm, config);
+          run_client(comm2, comm, config);
       }
     }
 
@@ -583,7 +583,7 @@ int main(int argc, char** argv) {
     return 0;
 }
 
-static void run_server(MPI_Comm comm, Json::Value& config) {
+static void run_server(MPI_Comm comm, MPI_Comm global_comm, Json::Value& config) {
     // initialize Margo
     margo_instance_id mid = MARGO_INSTANCE_NULL;
     std::string protocol = config["protocol"].asString();
@@ -639,12 +639,12 @@ static void run_server(MPI_Comm comm, Json::Value& config) {
 
     fprintf(stderr, "Benchmark: Successfully set the SYMBIOMON provider\n");
     // notify clients that the database is ready
-    MPI_Barrier(MPI_COMM_WORLD);
+    MPI_Barrier(global_comm);
     // wait for finalize
     margo_wait_for_finalize(mid);
 }
 
-static void run_client(MPI_Comm comm, Json::Value& config) {
+static void run_client(MPI_Comm comm, MPI_Comm global_comm, Json::Value& config) {
     // get info from communicator
     int rank, num_clients;
     MPI_Comm_rank(comm, &rank);
@@ -672,7 +672,8 @@ static void run_client(MPI_Comm comm, Json::Value& config) {
       margo_addr_lookup(mid, server_addr_str.data(), &server_addr);
     } 
     // wait for server to have initialize the database
-    MPI_Barrier(MPI_COMM_WORLD);
+
+    MPI_Barrier(global_comm);
     {
         // open remote database
         bake::client client(mid);
