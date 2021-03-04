@@ -634,6 +634,8 @@ static void run_server(MPI_Comm comm, MPI_Comm global_comm, Json::Value& config)
 
     fprintf(stderr, "Benchmark: Successfully set the SYMBIOMON provider\n");
     // notify clients that the database is ready
+    //
+    fprintf(stderr,"Server: Waiting at global barrier\n");
     MPI_Barrier(global_comm);
     // wait for finalize
     margo_wait_for_finalize(mid);
